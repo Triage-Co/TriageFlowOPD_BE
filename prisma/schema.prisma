@@ -6,14 +6,27 @@ datasource db {
   provider = "postgresql"
 }
 
+enum UserRole {
+  USER
+  DOCTOR
+  RECEPTIONEST
+  ANCILLARY_STAFFS
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
 model Users {
-  id        String   @id @default(uuid())
-  full_name String
-  email     String   @unique
-  age       Int
-  role      String   @default("user")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  gender String @default("other")
-  citizen_id String? @unique
+  id         String   @id @default(uuid()) @db.Uuid
+  full_name  String
+  email      String   @unique
+  age        Int
+  role       UserRole @default(USER)
+  createdAt  DateTime @default(now()) @db.Timestamptz()
+  updatedAt  DateTime @updatedAt @db.Timestamptz()
+  gender     Gender   @default(MALE)
+  citizen_id String?  @unique
 }

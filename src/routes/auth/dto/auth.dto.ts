@@ -97,18 +97,18 @@ export class SignUpReqDto {
 
     @ApiProperty({
         name: "gender",
-        example: "nam"
+        example: "MALE"
     })
     @IsNotEmpty({ message: "Vui Lòng nhập giới tính." })
-    @IsEnum(["nam", "nữ", "khác"], {
-        message: "Giới tính phải là nam, nữ và khác."
+    @IsEnum(["MALE", "FEMALE"], {
+        message: "Giới tính phải là MALE hoặc FEMALE."
     })
     gender: string;
 
 
     @ApiProperty({
         name: "citizen_id",
-        example: "08420300761"
+        example: "084203000761"
     })
     @IsNotEmpty({ message: "Vui Lòng nhập giới tính." })
     @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." })
