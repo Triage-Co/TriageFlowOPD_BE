@@ -94,6 +94,8 @@ export class AuthService {
         data: {
           full_name: signUpReqDto.fullName,
           age: signUpReqDto.age,
+          citizen_id: signUpReqDto.citizen_id,
+          gender: signUpReqDto.gender
         }
       }
     })
