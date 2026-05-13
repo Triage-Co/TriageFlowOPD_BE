@@ -9,7 +9,7 @@ datasource db {
 enum UserRole {
   USER
   DOCTOR
-  RECEPTIONEST
+  RECEPTIONIST
   ANCILLARY_STAFFS
   ADMIN
 }
@@ -26,7 +26,11 @@ model Users {
   age        Int
   role       UserRole @default(USER)
   createdAt  DateTime @default(now()) @db.Timestamptz()
-  updatedAt  DateTime @updatedAt @db.Timestamptz()
+  updatedAt  DateTime @default(now()) @updatedAt @db.Timestamptz()
   gender     Gender   @default(MALE)
   citizen_id String?  @unique
+  
+  @@index([full_name])
+  @@index([role, gender])
+  @@map("users")
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignInResDto, SignUpReqDto, SignUpResDto, VerifyOtpReqDto } from './dto/auth.dto';
+import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignInResDto, SignOutReqDto, SignUpReqDto, SignUpResDto, VerifyOtpReqDto } from './dto/auth.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BaseResponse } from '../../shared/type/response.type';
@@ -60,6 +60,8 @@ export class AuthService {
     }
   }
 
+
+
   async verifyOTP(verifyOtpReqDto: VerifyOtpReqDto): Promise<BaseResponse<SignInResDto>> {
     const { data, error } = await this.supabaseClient.auth.verifyOtp({
       email: verifyOtpReqDto.email,
@@ -99,6 +101,8 @@ export class AuthService {
         }
       }
     })
+
+
     if (error) {
       throw new BadRequestException({
         code: 400,
@@ -119,8 +123,8 @@ export class AuthService {
     }
   }
 
-  async signOut(): Promise<BaseResponse<any>> {
-    const { error } = await this.supabaseClient.auth.signOut();
+  async signOut(signOutReqDto: SignOutReqDto): Promise<BaseResponse<any>> {
+    const { error } = await this.supabaseClient.auth.admin.signOut(signOutReqDto.token, "local");
 
     if (error) {
       throw new BadRequestException({

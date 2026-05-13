@@ -1,6 +1,6 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth.dto';
+import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth.dto';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
 
 @Controller('auth')
@@ -39,6 +39,7 @@ export class AuthController {
     return this.authService.signIn(signInReqDto);
   }
 
+
   @Post("/otp/send")
   @ApiOperation({
     summary: "Gửi OTP đến email, đăng nhập",
@@ -63,7 +64,7 @@ export class AuthController {
       }
     }
   })
-  signInWithOtp(@Body() signInReqWithOtpDto: SignInReqWithOtpDto) {
+  sendOtp(@Body() signInReqWithOtpDto: SignInReqWithOtpDto) {
     return this.authService.sendOtp(signInReqWithOtpDto);
   }
 
@@ -157,9 +158,10 @@ export class AuthController {
       }
     }
   })
-  signOut() {
-    return this.authService.signOut();
+  signOut(@Body() signOutReqDto: SignOutReqDto) {
+    return this.authService.signOut(signOutReqDto);
   }
+
 
 
   @Post("/refresh")
