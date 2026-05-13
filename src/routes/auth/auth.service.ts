@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignInResDto, SignOutReqDto, SignUpReqDto, SignUpResDto, VerifyOtpReqDto } from './dto/auth.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -89,6 +89,26 @@ export class AuthService {
   }
 
   async signUp(signUpReqDto: SignUpReqDto): Promise<BaseResponse<SignUpResDto>> {
+
+    const { data: exitedUser, error: checkError } = await this.supabaseClient.from("users").select("id").eq("citizen_id", signUpReqDto.citizen_id).maybeSingle();
+
+    if (checkError) {
+      throw new InternalServerErrorException({
+        code: 500,
+        status: "error",
+        message: "Lỗi kết nối cơ sở dữ liệu khi kiểm tra CMND/CCCD.",
+        detail: checkError.message
+      });
+    }
+
+    if (exitedUser) {
+      throw new ConflictException({
+        code: 409,
+        status: "error",
+        message: "CMND/CCCD đã tồn tại trong hệ thống.",
+      })
+    }
+
     const { data, error } = await this.supabaseClient.auth.signUp({
       email: signUpReqDto.email,
       password: signUpReqDto.password,
@@ -117,7 +137,7 @@ export class AuthService {
       status: 'success',
       message: 'Đăng ký tài khoản thành công',
       data: {
-        email: data.user?.user_metadata.email,
+        email: data.user?.email!,
         id: data.user?.id!
       }
     }
