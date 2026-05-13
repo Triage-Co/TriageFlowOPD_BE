@@ -21,14 +21,14 @@ async function bootstrap() {
 
   const config = new DocumentBuilder().setTitle("Triage Flow OPD BACKEND SYSTEM").setDescription("A project for seb201 subject in FPT University").setVersion("1.0.0").addBearerAuth().build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
-  // const customerConfig = {
-  //   customCssUrl: "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui.min.css",
-  //   customJs: [
-  //     "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui-standalone-preset.js",
-  //     "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui-standalone-preset.js"
-  //   ]
-  // }
-  SwaggerModule.setup('api-docs', app, documentFactory);
+  const customerConfig = {
+    customCssUrl: "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui.min.css",
+    customJs: [
+      "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui-standalone-preset.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui-standalone-preset.js"
+    ]
+  }
+  SwaggerModule.setup('api-docs', app, documentFactory, customerConfig);
 
 
   await app.listen(process.env.PORT ?? 3000);
