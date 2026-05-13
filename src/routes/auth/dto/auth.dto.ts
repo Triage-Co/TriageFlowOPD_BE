@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsNumber, IsPhoneNumber, IsString, Length, Max, Min } from "class-validator";
+import { IsEmail, IsEnum, IsNotEmpty, IsNumber, IsPhoneNumber, IsString, Length, Matches, Max, Min } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 
@@ -93,6 +93,26 @@ export class SignUpReqDto {
     @IsNotEmpty({ message: "Vui Lòng nhập mật khẩu." })
     @Length(6, 30, { message: "Mật khẩu từ 6 đến 30 ký tự." })
     password: string;
+
+
+    @ApiProperty({
+        name: "gender",
+        example: "nam"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập giới tính." })
+    @IsEnum(["nam", "nữ", "khác"], {
+        message: "Giới tính phải là nam, nữ và khác."
+    })
+    gender: string;
+
+
+    @ApiProperty({
+        name: "citizen_id",
+        example: "08420300761"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập giới tính." })
+    @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." })
+    citizen_id: string
 }
 
 

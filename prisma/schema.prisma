@@ -11,8 +11,9 @@ model Users {
   full_name String
   email     String   @unique
   age       Int
-  phone     String   @unique
   role      String   @default("user")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  gender String @default("other")
+  citizen_id String? @unique
 }
