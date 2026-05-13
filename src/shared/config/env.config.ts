@@ -1,17 +1,7 @@
-import path from "path";
-import fs from "fs";
 import { IsString, validateSync } from "class-validator";
 import { plainToInstance } from "class-transformer";
 import { config } from 'dotenv'
-config({
-    path: ".env"
-})
-
-
-if (!fs.existsSync(path.resolve(".env"))) {
-    console.log("File .env không tồn tại");
-    process.exit(1);
-}
+config()
 
 
 class EnvClass {
