@@ -3,6 +3,7 @@ import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpD
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BaseResponse } from '../../shared/type/response.type';
+import { PrismaConfig } from '../../shared/config/prisma.config';
 
 @Injectable()
 export class AuthService {
@@ -189,6 +190,4 @@ export class AuthService {
       }
     }
   }
-
-
 }

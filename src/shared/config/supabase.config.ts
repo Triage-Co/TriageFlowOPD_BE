@@ -12,7 +12,13 @@ export class SupabaseConfig {
 
         const supabaseUrl = this.configService.get<string>("SUPABASE_URL") ?? envInstance.SUPABASE_URL;
         const supabaseKey = this.configService.get<string>("DATABASE_KEY") ?? envInstance.SUPABASE_KEY;
-        this.supabase = createClient(supabaseUrl, supabaseKey);
+        this.supabase = createClient(supabaseUrl, supabaseKey, {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
+            }
+        });
     }
 
 

@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth.dto';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
