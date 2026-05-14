@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignInResDto, SignOutReqDto, SignUpReqDto, SignUpResDto, VerifyOtpReqDto } from './dto/auth.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -8,7 +8,7 @@ import { PrismaConfig } from '../../shared/config/prisma.config';
 @Injectable()
 export class AuthService {
   private supabaseClient: SupabaseClient;
-  constructor(private readonly supabaseConfig: SupabaseConfig) {
+  constructor(private readonly supabaseConfig: SupabaseConfig, private readonly prismaConfig: PrismaConfig) {
     this.supabaseClient = this.supabaseConfig.getClient();
   }
 
@@ -90,57 +90,63 @@ export class AuthService {
   }
 
   async signUp(signUpReqDto: SignUpReqDto): Promise<BaseResponse<SignUpResDto>> {
-
-    const { data: exitedUser, error: checkError } = await this.supabaseClient.from("users").select("id").eq("citizen_id", signUpReqDto.citizen_id).maybeSingle();
-
-    if (checkError) {
-      throw new InternalServerErrorException({
-        code: 500,
-        status: "error",
-        message: "Lỗi kết nối cơ sở dữ liệu khi kiểm tra CMND/CCCD.",
-        detail: checkError.message
-      });
-    }
-
-    if (exitedUser) {
-      throw new ConflictException({
-        code: 409,
-        status: "error",
-        message: "CMND/CCCD đã tồn tại trong hệ thống.",
+    try {
+      const exitedUser = await this.prismaConfig.users.findUnique({
+        where: {
+          citizen_id: signUpReqDto.citizen_id
+        }
       })
-    }
 
-    const { data, error } = await this.supabaseClient.auth.signUp({
-      email: signUpReqDto.email,
-      password: signUpReqDto.password,
-      options: {
+      if (exitedUser) {
+        throw new ConflictException({
+          code: 409,
+          status: "error",
+          message: "CMND/CCCD đã tồn tại trong hệ thống.",
+        })
+      }
+
+      const { data, error } = await this.supabaseClient.auth.signUp({
+        email: signUpReqDto.email,
+        password: signUpReqDto.password,
+        options: {
+          data: {
+            full_name: signUpReqDto.fullName,
+            age: signUpReqDto.age,
+            citizen_id: signUpReqDto.citizen_id,
+            gender: signUpReqDto.gender
+          }
+        }
+      })
+
+
+      if (error) {
+        throw new BadRequestException({
+          code: 400,
+          status: 'error',
+          message: 'Đăng ký thất bại',
+          detail: error.message,
+        });
+      }
+
+      return {
+        code: 201,
+        status: 'success',
+        message: 'Đăng ký tài khoản thành công',
         data: {
-          full_name: signUpReqDto.fullName,
-          age: signUpReqDto.age,
-          citizen_id: signUpReqDto.citizen_id,
-          gender: signUpReqDto.gender
+          email: data.user?.email!,
+          id: data.user?.id!
         }
       }
-    })
-
-
-    if (error) {
-      throw new BadRequestException({
-        code: 400,
-        status: 'error',
-        message: 'Đăng ký thất bại',
-        detail: error.message,
-      });
-    }
-
-    return {
-      code: 201,
-      status: 'success',
-      message: 'Đăng ký tài khoản thành công',
-      data: {
-        email: data.user?.email!,
-        id: data.user?.id!
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
       }
+      throw new InternalServerErrorException({
+        code: 500,
+        status: 'error',
+        message: 'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
+        detail: error instanceof HttpException ? error.message : String(error),
+      });
     }
   }
 
