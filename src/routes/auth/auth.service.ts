@@ -209,7 +209,7 @@ export class AuthService {
         throw new BadRequestException({
           code: 400,
           status: 'error',
-          message: 'Đăng ký thất bại',
+          message: 'Đăng ký tài khoản thất bại',
           detail: error.message,
         });
       }
@@ -285,6 +285,21 @@ export class AuthService {
 
 
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<BaseResponse<any>> {
+
+    const exitedEmail = await this.prismaConfig.users.findUnique({
+      where: {
+        email: forgotPasswordDto.email
+      }
+    })
+
+    if (!exitedEmail) {
+      throw new NotFoundException({
+        code: 404,
+        status: "error",
+        message: "Email không tồn tại",
+      })
+    }
+
     const { error } = await this.supabaseClient.auth.resetPasswordForEmail(forgotPasswordDto.email);
 
     if (error) {

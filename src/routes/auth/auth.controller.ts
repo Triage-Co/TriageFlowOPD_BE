@@ -197,7 +197,7 @@ export class AuthController {
       example: {
         "code": 400,
         "status": "error",
-        "message": "Đăng ký thất bại",
+        "message": "Đăng ký tài khoản thất bại",
         "detail": "User already registered"
       }
     }
@@ -298,6 +298,15 @@ export class AuthController {
         "code": 200,
         "status": "success",
         "message": "Gửi mã otp thành công"
+      }
+    }
+  })
+  @ApiNotFoundResponse({
+    schema: {
+      example: {
+        "code": 404,
+        "status": "error",
+        "message": "Email không tồn tại"
       }
     }
   })
