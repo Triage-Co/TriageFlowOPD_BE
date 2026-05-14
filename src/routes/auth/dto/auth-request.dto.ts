@@ -20,12 +20,26 @@ export class SignInReqDto {
     password: string;
 }
 
-export class SignInResDto {
-    @ApiProperty()
-    token: string;
-    @ApiProperty()
-    refreshToken: string;
+
+export class SignInWithCitizenIdReqDto {
+    @ApiProperty({
+        name: "citizenId",
+        example: "08420300718"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập CMND/CCCD." })
+    @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." }) 
+    citizen_id: string;
+
+    @ApiProperty({
+        name: "password",
+        example: "TriageFlowOPDPassword"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập mật khẩu." })
+    @Length(6, 30, { message: "Mật khẩu từ 6 đến 30 ký tự." })
+    password: string;
 }
+
+
 
 export class SignInReqWithOtpDto {
 
@@ -112,18 +126,13 @@ export class SignUpReqDto {
         name: "citizen_id",
         example: "084203000761"
     })
-    @IsNotEmpty({ message: "Vui Lòng nhập giới tính." })
+    @IsNotEmpty({ message: "Vui Lòng nhập CMND/CCCD." })
     @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." })
     citizen_id: string
 }
 
 
-export class SignUpResDto {
-    @ApiProperty()
-    id: string;
-    @ApiProperty()
-    email: string;
-}
+
 
 export class RefreshTokenReqDto {
     @ApiProperty({
@@ -146,7 +155,6 @@ export class SignOutReqDto {
     token: string;
 }
 
-export class RefreshTokenResDto extends SignInResDto { }
 
 
 

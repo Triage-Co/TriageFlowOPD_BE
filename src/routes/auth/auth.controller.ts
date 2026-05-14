@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth.dto';
-import { ApiBadRequestResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth-request.dto';
+import { ApiBadRequestResponse, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
@@ -40,6 +40,59 @@ export class AuthController {
   }
 
 
+
+  @Post("/signin/citizen")
+  @ApiOperation({
+    summary: "Đăng nhập bằng CMND/CCCD",
+    tags: ["Auth"]
+  })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        "code": 200,
+        "message": "Đăng nhập thành công",
+        "status": "success",
+        "data": {
+          "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6ImI3MDQ4MWFlLWYyZDktNGUzYy05MTIyLWM0MTc1ZmM4MWM0NyIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL290Z29ibHFnaW9kcGVybWdvbHVhLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI4MDExNDIzMi0xNWU3LTQ5MzktOTQ4Yi03MzY2MDUyMzYzNDQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzc4NzI4NTUxLCJpYXQiOjE3Nzg2NDIxNTEsImVtYWlsIjoidGhhaW5nb2NkZzIwMDM1NTNAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCJdfSwidXNlcl9tZXRhZGF0YSI6eyJhZ2UiOjIwLCJlbWFpbCI6InRoYWluZ29jZGcyMDAzNTUzQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJExrDGoW5nIFRow6FpIE5n4buNYyIsInBob25lX3ZlcmlmaWVkIjpmYWxzZSwic3ViIjoiODAxMTQyMzItMTVlNy00OTM5LTk0OGItNzM2NjA1MjM2MzQ0In0sInJvbGUiOiJhdXRoZW50aWNhdGVkIiwiYWFsIjoiYWFsMSIsImFtciI6W3sibWV0aG9kIjoicGFzc3dvcmQiLCJ0aW1lc3RhbXAiOjE3Nzg2NDIxNTF9XSwic2Vzc2lvbl9pZCI6IjY4MGJmNzE2LTBhMjktNDQyYy05NmMxLTM2MDFiMzM5ZmUyNiIsImlzX2Fub255bW91cyI6ZmFsc2V9.29l7Zeypaq36XQ9Q63SQ31qsz_ImVVZQoEkJUhG7S1zLg02NL8SMm4K-7wfA6bYvLdDg0tCrEGeLHyeAIxRUBA",
+          "refreshToken": "ligtf7n4wyrk"
+        }
+      }
+    }
+  })
+  @ApiUnauthorizedResponse({
+    schema: {
+      example: {
+        "code": 401,
+        "status": "error",
+        "message": "Email hoặc mật khẩu không chính xác",
+        "detail": "Invalid login credentials"
+      }
+    }
+  })
+  @ApiNotFoundResponse({
+    schema: {
+      example: {
+        "code": 404,
+        "status": "error",
+        "message": "Không tìm thấy tài khoản với CMND/CCCD này.",
+      }
+    }
+  })
+  @ApiInternalServerErrorResponse({
+    schema: {
+      example: {
+        "code": 500,
+        "status": 'error',
+        "message": 'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
+        "detail": "Đã có lỗi xảy ra"
+      }
+    }
+  })
+  signInWithCitizenId(@Body() signInWithCitizenIdReqDto: SignInWithCitizenIdReqDto) {
+    return this.authService.signInWithCitizenId(signInWithCitizenIdReqDto);
+  }
+
+
   @Post("/otp/send")
   @ApiOperation({
     summary: "Gửi OTP đến email, đăng nhập",
@@ -61,6 +114,25 @@ export class AuthController {
         "status": "error",
         "message": "Không thể gửi mã OTP. Vui lòng thử lại",
         "detail": "Database error saving new user"
+      }
+    }
+  })
+  @ApiNotFoundResponse({
+    schema: {
+      example: {
+        "code": 404,
+        "status": "error",
+        "message": "Email không tồn tại",
+      }
+    }
+  })
+  @ApiInternalServerErrorResponse({
+    schema: {
+      example: {
+        "code": 500,
+        "status": 'error',
+        "message": 'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
+        "detail": "Đã có lỗi xảy ra"
       }
     }
   })
@@ -127,6 +199,25 @@ export class AuthController {
         "status": "error",
         "message": "Đăng ký thất bại",
         "detail": "User already registered"
+      }
+    }
+  })
+  @ApiConflictResponse({
+    schema: {
+      example: {
+        "code": 409,
+        "status": 'error',
+        "message": "CMND/CCCD đã tồn tại trong hệ thống.",
+      }
+    }
+  })
+  @ApiInternalServerErrorResponse({
+    schema: {
+      example: {
+        "code": 500,
+        "status": 'error',
+        "message": 'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
+        "detail": "Đã có lỗi xảy ra"
       }
     }
   })

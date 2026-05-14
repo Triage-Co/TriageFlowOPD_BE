@@ -1,9 +1,10 @@
 import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignInResDto, SignOutReqDto, SignUpReqDto, SignUpResDto, VerifyOtpReqDto } from './dto/auth.dto';
+import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth-request.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BaseResponse } from '../../shared/type/response.type';
 import { PrismaConfig } from '../../shared/config/prisma.config';
+import { RefreshTokenResDto, SignInResDto, SignUpResDto } from './dto/auth-response.dto';
 
 @Injectable()
 export class AuthService {
@@ -40,13 +41,72 @@ export class AuthService {
 
   }
 
+
+  async signInWithCitizenId(signInWithCitizenIdReqDto: SignInWithCitizenIdReqDto): Promise<BaseResponse<SignInResDto>> {
+    try {
+
+      const user = await this.prismaConfig.users.findUnique({
+        where: {
+          citizen_id: signInWithCitizenIdReqDto.citizen_id
+        },
+        select: {
+          email: true
+        }
+      })
+
+      if (!user) {
+        throw new NotFoundException({
+          code: 404,
+          status: "error",
+          message: "Không tìm thấy tài khoản với CMND/CCCD này.",
+        });
+      }
+
+      const { data, error } = await this.supabaseClient.auth.signInWithPassword({
+        email: user.email,
+        password: signInWithCitizenIdReqDto.password
+      })
+
+      if (error) {
+        throw new UnauthorizedException({
+          code: 401,
+          status: "error",
+          message: "Email hoặc mật khẩu không chính xác",
+          detail: error.message
+        });
+      }
+
+      return {
+        code: 200,
+        message: "Đăng nhập thành công",
+        status: "success",
+        data: {
+          token: data.session?.access_token || "",
+          refreshToken: data.session?.refresh_token || ""
+        }
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException({
+        code: 500,
+        status: 'error',
+        message: 'Đã có lỗi hệ thống xảy ra trong quá trình đăng nhập. Vui lòng thử lại sau.',
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+  }
+
   async sendOtp(signInReqWithOtpDto: SignInReqWithOtpDto): Promise<BaseResponse<any>> {
     try {
       const exitedEmail = await this.prismaConfig.users.findUnique({
-      where: {
-        email: signInReqWithOtpDto.email
-      }
-    })
+        where: {
+          email: signInReqWithOtpDto.email
+        }
+      })
 
       if (!exitedEmail) {
         throw new NotFoundException({
