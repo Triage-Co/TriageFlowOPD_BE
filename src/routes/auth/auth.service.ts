@@ -42,9 +42,9 @@ export class AuthService {
 
   async sendOtp(signInReqWithOtpDto: SignInReqWithOtpDto): Promise<BaseResponse<any>> {
     try {
-      onst exitedEmail = await this.prismaConfig.users.findUnique({
+      const exitedEmail = await this.prismaConfig.users.findUnique({
       where: {
-        email: signInReqWithOtpDto.email;
+        email: signInReqWithOtpDto.email
       }
     })
 
