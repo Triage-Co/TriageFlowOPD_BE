@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth-request.dto';
+import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
 import { ApiBadRequestResponse, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
 
 @Controller('auth')
@@ -285,5 +285,22 @@ export class AuthController {
   })
   refreshToken(@Body() refreshTokenReqDto: RefreshTokenReqDto) {
     return this.authService.refreshToken(refreshTokenReqDto);
+  }
+
+
+  @Post("/forgot")
+  @ApiOperation({
+    summary: "Gửi otp lấy lại mật khẩu"
+  })
+  forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post("/forgot/verify")
+  @ApiOperation({
+    summary: "Lấy lại mật khẩu với otp"
+  })
+  verifyForgot(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyForgot(verifyOtpDto);
   }
 }

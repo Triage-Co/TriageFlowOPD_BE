@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpReqDto } from './dto/auth-request.dto';
+import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BaseResponse } from '../../shared/type/response.type';
@@ -280,6 +280,62 @@ export class AuthService {
         token: data.session?.access_token!,
         refreshToken: data.session?.refresh_token!
       }
+    }
+  }
+
+
+  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<BaseResponse<any>> {
+    const { error } = await this.supabaseClient.auth.resetPasswordForEmail(forgotPasswordDto.email);
+
+    if (error) {
+      throw new BadRequestException({
+        code: 500,
+        status: "error",
+        message: "Gửi mã otp không thành công"
+      })
+    }
+
+    return {
+      code: 200,
+      status: "success",
+      message: "Gửi mã otp thành công"
+    }
+  }
+
+  async verifyForgot(verifyOtpDto: VerifyOtpDto): Promise<BaseResponse<any>> {
+    const { error } = await this.supabaseClient.auth.verifyOtp({
+      email: verifyOtpDto.email,
+      token: verifyOtpDto.otp,
+      type: "recovery"
+    })
+
+
+    if (error) {
+      throw new BadRequestException({
+        code: 500,
+        status: "error",
+        message: "Xác thực otp không thành công"
+      })
+    }
+
+
+    const { data, error: updateError } = await this.supabaseClient.auth.updateUser({
+      password: verifyOtpDto.password
+    })
+
+
+    if (updateError) {
+      throw new BadRequestException({
+        code: 500,
+        status: "error",
+        message: "Thay đổi mật khẩu không thành công"
+      })
+    }
+
+    return {
+      code: 200,
+      status: "success",
+      message: "Lấy lại mật khẩu thành công thành công",
     }
   }
 }

@@ -27,7 +27,7 @@ export class SignInWithCitizenIdReqDto {
         example: "08420300728"
     })
     @IsNotEmpty({ message: "Vui Lòng nhập CMND/CCCD." })
-    @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." }) 
+    @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." })
     citizen_id: string;
 
     @ApiProperty({
@@ -156,5 +156,39 @@ export class SignOutReqDto {
 }
 
 
+export class ForgotPasswordDto {
 
+    @ApiProperty({
+        name: "email",
+        example: "TriageFlowOPD@gmail.com"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập email." })
+    @IsEmail({}, { message: "Địa chỉ email không hợp lệ." })
+    email: string;
+}
 
+export class VerifyOtpDto {
+
+    @ApiProperty({
+        name: "email",
+        example: "TriageFlowOPD@gmail.com"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập email." })
+    @IsEmail({}, { message: "Địa chỉ email không hợp lệ." })
+    email: string;
+
+    @ApiProperty({
+        name: "otp",
+        example: "36836336"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập OTP." })
+    otp: string;
+
+    @ApiProperty({
+        name: "password",
+        example: "TriageFlowOPDPassword"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập mật khẩu." })
+    @Length(6, 30, { message: "Mật khẩu từ 6 đến 30 ký tự." })
+    password: string;
+}
