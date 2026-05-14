@@ -23,8 +23,8 @@ export class SignInReqDto {
 
 export class SignInWithCitizenIdReqDto {
     @ApiProperty({
-        name: "citizenId",
-        example: "08420300718"
+        name: "citizen_id",
+        example: "08420300728"
     })
     @IsNotEmpty({ message: "Vui Lòng nhập CMND/CCCD." })
     @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." }) 
