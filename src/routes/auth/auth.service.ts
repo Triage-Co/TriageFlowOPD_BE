@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { RefreshTokenReqDto, RefreshTokenResDto, SignInReqDto, SignInReqWithOtpDto, SignInResDto, SignOutReqDto, SignUpReqDto, SignUpResDto, VerifyOtpReqDto } from './dto/auth.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -41,23 +41,49 @@ export class AuthService {
   }
 
   async sendOtp(signInReqWithOtpDto: SignInReqWithOtpDto): Promise<BaseResponse<any>> {
+    try {
+      onst exitedEmail = await this.prismaConfig.users.findUnique({
+      where: {
+        email: signInReqWithOtpDto.email;
+      }
+    })
 
-    const { error } = await this.supabaseClient.auth.signInWithOtp({
-      email: signInReqWithOtpDto.email
-    });
+      if (!exitedEmail) {
+        throw new NotFoundException({
+          code: 404,
+          status: "error",
+          message: "Email không tồn tại",
+        })
+      }
 
-    if (error) {
-      throw new UnauthorizedException({
-        code: 401,
-        status: "error",
-        message: "Không thể gửi mã OTP. Vui lòng thử lại",
-        detail: error.message
+      const { error } = await this.supabaseClient.auth.signInWithOtp({
+        email: signInReqWithOtpDto.email
       });
-    }
-    return {
-      code: 200,
-      message: "Gửi OTP thành công",
-      status: "success",
+
+      if (error) {
+        throw new UnauthorizedException({
+          code: 401,
+          status: "error",
+          message: "Không thể gửi mã OTP. Vui lòng thử lại",
+          detail: error.message
+        });
+      }
+      return {
+        code: 200,
+        message: "Gửi OTP thành công",
+        status: "success",
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException({
+        code: 500,
+        status: 'error',
+        message: 'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
+        detail: error instanceof HttpException ? error.message : String(error),
+      })
     }
   }
 
