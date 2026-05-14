@@ -197,7 +197,7 @@ export class AuthService {
         options: {
           data: {
             full_name: signUpReqDto.fullName,
-            age: signUpReqDto.age,
+            dob: signUpReqDto.dob,
             citizen_id: signUpReqDto.citizen_id,
             gender: signUpReqDto.gender
           }

@@ -1,5 +1,6 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsNumber, IsPhoneNumber, IsString, Length, Matches, Max, Min } from "class-validator";
+import { IsDate, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsPhoneNumber, IsString, Length, Matches, Max, Min } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 
 
 export class SignInReqDto {
@@ -93,13 +94,12 @@ export class SignUpReqDto {
     fullName: string;
 
     @ApiProperty({
-        name: "age",
-        example: 18
+        name: "dob",
+        example: "2003-03-7"
     })
-    @IsNumber({}, { message: "Số tuổi không hợp lệ." })
-    @Min(18, { message: "Tuổi phải từ 18 đến 100." })
-    @Max(100, { message: "Tuổi phải từ 18 đến 100" })
-    age: number;
+    @Type(() => Date)
+    @IsDate({ message: "Phải là ngày tháng hợp lệ" })
+    dob: Date;
 
 
     @ApiProperty({
