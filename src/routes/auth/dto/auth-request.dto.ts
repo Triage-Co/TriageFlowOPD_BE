@@ -95,7 +95,7 @@ export class SignUpReqDto {
 
     @ApiProperty({
         name: "dob",
-        example: "2003-03-7"
+        example: "2003-03-07"
     })
     @Type(() => Date)
     @IsDate({ message: "Phải là ngày tháng hợp lệ" })

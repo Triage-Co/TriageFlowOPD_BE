@@ -74,7 +74,7 @@ export class AuthController {
       example: {
         "code": 404,
         "status": "error",
-        "message": "Không tìm thấy tài khoản với CMND/CCCD này.",
+        "message": "Không tìm thấy tài khoản với CMND/CCCD này",
       }
     }
   })
@@ -207,7 +207,7 @@ export class AuthController {
       example: {
         "code": 409,
         "status": 'error',
-        "message": "CMND/CCCD đã tồn tại trong hệ thống.",
+        "message": "CMND/CCCD đã tồn tại trong hệ thống",
       }
     }
   })
@@ -292,6 +292,24 @@ export class AuthController {
   @ApiOperation({
     summary: "Gửi otp lấy lại mật khẩu"
   })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        "code": 200,
+        "status": "success",
+        "message": "Gửi mã otp thành công"
+      }
+    }
+  })
+  @ApiBadRequestResponse({
+    schema: {
+      example: {
+        "code": 400,
+        "status": "error",
+        "message": "Gửi mã otp không thành công"
+      }
+    }
+  })
   forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
   }
@@ -299,6 +317,37 @@ export class AuthController {
   @Post("/forgot/verify")
   @ApiOperation({
     summary: "Lấy lại mật khẩu với otp"
+  })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        "code": 200,
+        "status": "success",
+        "message": "Lấy lại mật khẩu thành công thành công"
+      }
+    }
+  })
+  @ApiBadRequestResponse({
+    content: {
+      "application/json": {
+        examples: {
+          invalidOtp: {
+            value: {
+              "code": 400,
+              "status": "error",
+              "message": "Xác thực otp không thành công"
+            }
+          },
+          updatePasswordFailed: {
+            value: {
+              "code": 400,
+              "status": "error",
+              "message": "Thay đổi mật khẩu không thành công"
+            }
+          }
+        }
+      }
+    }
   })
   verifyForgot(@Body() verifyOtpDto: VerifyOtpDto) {
     return this.authService.verifyForgot(verifyOtpDto);

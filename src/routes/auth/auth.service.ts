@@ -289,7 +289,7 @@ export class AuthService {
 
     if (error) {
       throw new BadRequestException({
-        code: 500,
+        code: 400,
         status: "error",
         message: "Gửi mã otp không thành công"
       })
@@ -303,7 +303,7 @@ export class AuthService {
   }
 
   async verifyForgot(verifyOtpDto: VerifyOtpDto): Promise<BaseResponse<any>> {
-    const { error } = await this.supabaseClient.auth.verifyOtp({
+    const { data, error } = await this.supabaseClient.auth.verifyOtp({
       email: verifyOtpDto.email,
       token: verifyOtpDto.otp,
       type: "recovery"
@@ -312,21 +312,27 @@ export class AuthService {
 
     if (error) {
       throw new BadRequestException({
-        code: 500,
+        code: 400,
         status: "error",
         message: "Xác thực otp không thành công"
       })
     }
 
+    if (data.session) {
+      await this.supabaseClient.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    }
 
-    const { data, error: updateError } = await this.supabaseClient.auth.updateUser({
+    const { error: updateError } = await this.supabaseClient.auth.updateUser({
       password: verifyOtpDto.password
     })
 
 
     if (updateError) {
       throw new BadRequestException({
-        code: 500,
+        code: 400,
         status: "error",
         message: "Thay đổi mật khẩu không thành công"
       })

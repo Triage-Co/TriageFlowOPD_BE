@@ -25,10 +25,10 @@ model Users {
   email      String    @unique
   dob        DateTime? @db.Timestamptz()
   role       UserRole  @default(USER)
-  createdAt  DateTime  @default(now()) @db.Timestamptz()
-  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz()
   gender     Gender    @default(MALE)
   citizen_id String?   @unique
+  createdAt  DateTime  @default(now()) @db.Timestamptz()
+  updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz()
 
   @@index([full_name])
   @@index([role, gender])
