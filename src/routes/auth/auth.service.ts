@@ -325,7 +325,7 @@ export class AuthService {
     })
 
 
-    if (error) {
+    if (error || !data.user) {
       throw new BadRequestException({
         code: 400,
         status: "error",
@@ -333,14 +333,7 @@ export class AuthService {
       })
     }
 
-    if (data.session) {
-      await this.supabaseClient.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-    }
-
-    const { error: updateError } = await this.supabaseClient.auth.updateUser({
+    const { error: updateError } = await this.supabaseClient.auth.admin.updateUserById(data.user.id, {
       password: verifyOtpDto.password
     })
 
@@ -356,7 +349,7 @@ export class AuthService {
     return {
       code: 200,
       status: "success",
-      message: "Lấy lại mật khẩu thành công thành công",
+      message: "Lấy lại mật khẩu thành công",
     }
   }
 }

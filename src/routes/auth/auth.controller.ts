@@ -1,7 +1,7 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
-import { ApiBadRequestResponse, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiUnauthorizedResponse } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
@@ -332,7 +332,7 @@ export class AuthController {
       example: {
         "code": 200,
         "status": "success",
-        "message": "Lấy lại mật khẩu thành công thành công"
+        "message": "Lấy lại mật khẩu thành công"
       }
     }
   })
@@ -362,3 +362,4 @@ export class AuthController {
     return this.authService.verifyForgot(verifyOtpDto);
   }
 }
+
