@@ -1,13 +1,13 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
-import { ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-  @Post("/signin")
+  @Post("/login")
   @ApiOperation({
     summary: "Đăng nhập",
     tags: ["Auth"]
@@ -41,7 +41,7 @@ export class AuthController {
 
 
 
-  @Post("/signin/citizen")
+  @Post("/login/citizen")
   @ApiOperation({
     summary: "Đăng nhập bằng CMND/CCCD",
     tags: ["Auth"]
@@ -174,7 +174,7 @@ export class AuthController {
   }
 
 
-  @Post("/signup")
+  @Post("/register")
   @ApiOperation({
     summary: "Đăng ký tài khoản",
     tags: ["Auth"]
@@ -226,7 +226,7 @@ export class AuthController {
   }
 
 
-  @Post("/signout")
+  @Post("/logout")
   @ApiOperation({
     summary: "Đăng xuất",
     tags: ["Auth"]
