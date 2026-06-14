@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from './routes/auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { SharedModule } from './shared/shared.module';
+import { InfermedicaModule } from './routes/infermedica/infermedica.module';
 
 
 @Module({
@@ -10,6 +11,7 @@ import { SharedModule } from './shared/shared.module';
       isGlobal: true,
     }),
     AuthModule,
-    SharedModule],
+    SharedModule,
+    InfermedicaModule],
 })
 export class AppModule { }

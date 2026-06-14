@@ -16,7 +16,7 @@ class EnvClass {
     @IsString({ message: "Thiếu INFERMEDICA_APP_KEY TRONG FILE .ENV" })
     INFERMEDICA_APP_KEY: string;
     @IsString({ message: "Thiếu INFERMEDICA_KEY TRONG FILE .ENV" })
-    INFERMEDICA_KEY: string
+    INFERMEDICA_APP_ID: string
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);
