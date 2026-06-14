@@ -13,6 +13,10 @@ class EnvClass {
     SUPABASE_URL: string;
     @IsString({ message: "Thiếu PORT TRONG FILE .ENV" })
     PORT: string;
+    @IsString({ message: "Thiếu INFERMEDICA_APP_KEY TRONG FILE .ENV" })
+    INFERMEDICA_APP_KEY: string;
+    @IsString({ message: "Thiếu INFERMEDICA_KEY TRONG FILE .ENV" })
+    INFERMEDICA_KEY: string
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

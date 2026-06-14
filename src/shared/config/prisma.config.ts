@@ -20,11 +20,12 @@ export class PrismaConfig extends PrismaClient implements OnModuleInit, OnModule
         super({ adapter })
         this.pool = pool;
     }
+    async onModuleInit() {
+        await this.$connect()
+    }
     async onModuleDestroy() {
         await this.$disconnect();
         await this.pool.end();
     }
-    async onModuleInit() {
-        await this.$connect()
-    }
+
 }
