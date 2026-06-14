@@ -17,6 +17,12 @@ class EnvClass {
     INFERMEDICA_APP_KEY: string;
     @IsString({ message: "Thiếu INFERMEDICA_KEY TRONG FILE .ENV" })
     INFERMEDICA_APP_ID: string
+    @IsString({ message: "Thiếu PAYOS_CLIENT_ID TRONG FILE .ENV" })
+    PAYOS_CLIENT_ID: string
+    @IsString({ message: "Thiếu PAYOS_CHECKSUM_KEY TRONG FILE .ENV" })
+    PAYOS_CHECKSUM_KEY: string
+    @IsString({ message: "Thiếu PAYOS_API_KEY TRONG FILE .ENV" })
+    PAYOS_API_KEY: string
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);
