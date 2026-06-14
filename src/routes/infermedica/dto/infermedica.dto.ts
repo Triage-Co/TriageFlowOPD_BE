@@ -76,3 +76,23 @@ export class TriageDto {
     @Type(() => EvidenceDto)
     evidence: EvidenceDto[];
 }
+
+
+export class SearchDto {
+    @IsNumber({}, { message: "age phải dạng số" })
+    @ApiProperty({
+        name: "age",
+        example: 30
+    })
+    age: number;
+
+
+    @IsString(
+        { message: "phrase phải là một chuỗi ký tự" }
+    )
+    @ApiProperty({
+        name: "phrase",
+        example: "male"
+    })
+    phrase: string;
+}
