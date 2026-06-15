@@ -183,15 +183,28 @@ export class AuthService {
         }
       })
 
+      const exitedEmail = await this.prismaConfig.users.findUnique({
+        where: {
+          email: signUpReqDto.email
+        }
+      })
+
       if (exitedUser) {
         throw new ConflictException({
           code: 409,
           status: "error",
-          message: "CMND/CCCD đã tồn tại trong hệ thống.",
+          message: "CMND/CCCD đã tồn tại trong hệ thống",
         })
       }
 
 
+      if (exitedEmail) {
+        throw new ConflictException({
+          code: 409,
+          status: "error",
+          message: "Email đã tồn tại",
+        })
+      }
 
       const { data, error } = await this.supabaseClient.auth.signUp({
         email: signUpReqDto.email,
@@ -207,7 +220,7 @@ export class AuthService {
       })
 
 
-      await this.prismaConfig.users.create({
+      const dataUser = await this.prismaConfig.users.create({
         data: {
           id: data.user?.id,
           email: signUpReqDto.email,
@@ -217,6 +230,12 @@ export class AuthService {
           citizen_id: signUpReqDto.citizen_id,
         }
       })
+
+      if (!dataUser) {
+        await this.supabaseClient.auth.admin.deleteUser(data.user?.id!);
+
+        throw error;
+      }
 
       if (error) {
         throw new BadRequestException({
@@ -241,6 +260,7 @@ export class AuthService {
       if (error instanceof HttpException) {
         throw error;
       }
+
       throw new InternalServerErrorException({
         code: 500,
         status: 'error',
