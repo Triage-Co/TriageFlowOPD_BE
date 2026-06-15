@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsString, IsUrl } from "class-validator";
+import { IsEnum, IsNumber, IsString, IsUrl } from "class-validator";
+import { PaymentTypeEnum } from "../../../shared/type/payment.type";
 
 export class CreatePaymentDto {
     @IsNumber()
@@ -8,6 +9,16 @@ export class CreatePaymentDto {
         example: 123456
     })
     orderCode: number;
+
+    @IsEnum(PaymentTypeEnum, {
+        message: "Transaction type không hợp lệ"
+    })
+    @ApiProperty({
+        name: "transType",
+        enum: PaymentTypeEnum,
+        example: "APPOINTMENT_PAYMENT"
+    })
+    transType: PaymentTypeEnum;
 
     @IsNumber()
     @ApiProperty({
@@ -36,4 +47,6 @@ export class CreatePaymentDto {
         example: "https://www.youtube.com/watch?v=TQM8bUHOEuE"
     })
     cancelUrl: string;
+
+
 }

@@ -14,6 +14,37 @@ enum UserRole {
   ADMIN
 }
 
+enum TransType {
+  APPOINTMENT_PAYMENT // 11
+  APPOINTMENT_REFUND // 19
+
+  BOOKING_PAYMENT_1 // 21
+  BOOKING_PAYMENT_2 // 22
+  BOOKING_REFUND // 29
+
+  ORDER_PAYMENT // 31
+  ORDER_REFUND // 39
+
+  WALLET_TOPUP // 41
+  WALLET_WITHDRAW // 42
+}
+
+enum TransStatus {
+  SUCCESS
+  CANCEL
+  PENDING
+}
+
+// 11 - thanh toán cho appointment
+// 19 - hoàn tiền cho appointment
+// 21 - thanh toán cho booking lần 1
+// 22 - thanh toán cho booking lần 2
+// 29 - hoàn tiền cho booking
+// 31 - thanh toán cho order
+// 39 - hoàn tiền cho order
+// 41 - nạp tiền cho wallet
+// 42 - rút tiền cho wallet
+
 enum Gender {
   MALE
   FEMALE
@@ -33,4 +64,18 @@ model Users {
   @@index([full_name])
   @@index([role, gender])
   @@map("users")
+}
+
+model Transaction {
+  id String @id @default(uuid()) @db.Uuid
+  amount Int 
+  transDate DateTime @default(now()) @db.Timestamptz()
+  transType TransType 
+  docNo Int @unique
+  buyerId String 
+  status TransStatus @default(PENDING)
+  @@index([docNo])
+  @@index([transDate, transType])
+  @@index([buyerId])
+  @@map("transaction")
 }
