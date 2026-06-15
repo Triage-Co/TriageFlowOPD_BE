@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/payment.dto';
 import { PayosConfig } from '../../shared/config/payos.config';
 import { PrismaConfig } from '../../shared/config/prisma.config';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class PaymentService {
+
+  private readonly logger = new Logger(PaymentService.name);
+
   constructor(private readonly payosClient: PayosConfig, private readonly prismaClient: PrismaConfig) { }
 
   async create(createPaymentDto: CreatePaymentDto) {
@@ -23,8 +28,12 @@ export class PaymentService {
         }
       }
 
+      const orderCode = parseInt(
+        `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`
+      );
+
       const paymentLink = await this.payosClient.getClient().paymentRequests.create({
-        orderCode: createPaymentDto.orderCode,
+        orderCode: orderCode,
         amount: createPaymentDto.amount,
         description: "Thanh toán",
         returnUrl: createPaymentDto.returnUrl,
@@ -61,7 +70,7 @@ export class PaymentService {
           docNo: paymentData.orderCode
         },
         data: {
-          status: "SUCCESS"
+          status: "SUCCESSED"
         }
       })
     } catch (error) {
@@ -71,6 +80,27 @@ export class PaymentService {
         status: "error",
         error: error
       }
+    }
+  }
+
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleExpiredTransactions() {
+    try {
+      const expirationTime = new Date();
+      expirationTime.setMinutes(expirationTime.getMinutes() - 15);
+      await this.prismaClient.transaction.updateMany({
+        where: {
+          status: "PENDING",
+          transDate: {
+            lte: expirationTime
+          }
+        },
+        data: {
+          status: "CANCELLED"
+        }
+      })
+    } catch (error) {
+      this.logger.error("Lỗi khi chạy cron job hủy giao dịch:", error)
     }
   }
 }

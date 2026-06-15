@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { SharedModule } from './shared/shared.module';
 import { InfermedicaModule } from './routes/infermedica/infermedica.module';
 import { PaymentModule } from './routes/payment/payment.module';
+import { ScheduleModule } from '@nestjs/schedule'
 
 
 @Module({
@@ -11,6 +12,7 @@ import { PaymentModule } from './routes/payment/payment.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     AuthModule,
     SharedModule,
     InfermedicaModule,

@@ -1,15 +1,8 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEnum, IsNumber, IsString, IsUrl } from "class-validator";
+import { IsEnum, IsNumber, IsString, IsUrl, Min } from "class-validator";
 import { PaymentTypeEnum } from "../../../shared/type/payment.type";
 
 export class CreatePaymentDto {
-    @IsNumber()
-    @ApiProperty({
-        name: "orderCode",
-        example: 123456
-    })
-    orderCode: number;
-
     @IsEnum(PaymentTypeEnum, {
         message: "Transaction type không hợp lệ"
     })
@@ -20,7 +13,8 @@ export class CreatePaymentDto {
     })
     transType: PaymentTypeEnum;
 
-    @IsNumber()
+    @IsNumber({}, { message: "Ammount phải là 1 số" })
+    @Min(1000, { message: "Ammount phải lớn hơn 1000" })
     @ApiProperty({
         name: "amount",
         example: 2000
@@ -34,14 +28,14 @@ export class CreatePaymentDto {
     })
     clientId: string;
 
-    @IsUrl()
+    @IsUrl({}, { message: "Return url phải là 1 url hợp lệ" })
     @ApiProperty({
         name: "returnUrl",
         example: "https://www.youtube.com/shorts/8Y9-C4UYE_g"
     })
     returnUrl: string;
 
-    @IsUrl()
+    @IsUrl({}, { message: "Cancel url url phải là 1 url hợp lệ" })
     @ApiProperty({
         name: "cancelUrl",
         example: "https://www.youtube.com/watch?v=TQM8bUHOEuE"

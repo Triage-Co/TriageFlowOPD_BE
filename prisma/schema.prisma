@@ -30,8 +30,8 @@ enum TransType {
 }
 
 enum TransStatus {
-  SUCCESS
-  CANCEL
+  SUCCESSED
+  CANCELLED
   PENDING
 }
 
@@ -72,9 +72,9 @@ model Transaction {
   transDate DateTime @default(now()) @db.Timestamptz()
   transType TransType 
   docNo Int @unique
-  buyerId String 
+  buyerId String @db.Uuid
   status TransStatus @default(PENDING)
-  @@index([docNo])
+  @@index([docNo, status])
   @@index([transDate, transType])
   @@index([buyerId])
   @@map("transaction")

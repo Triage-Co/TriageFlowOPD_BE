@@ -2,6 +2,10 @@ import { IsDate, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsPhoneNumber, IsString,
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 
+enum GenderType {
+    MALE = "MALE",
+    FEMALE = "FEMALE"
+}
 
 export class SignInReqDto {
     @ApiProperty({
@@ -119,7 +123,7 @@ export class SignUpReqDto {
     @IsEnum(["MALE", "FEMALE"], {
         message: "Giới tính phải là MALE hoặc FEMALE."
     })
-    gender: string;
+    gender: GenderType;
 
 
     @ApiProperty({

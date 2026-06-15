@@ -191,6 +191,8 @@ export class AuthService {
         })
       }
 
+
+
       const { data, error } = await this.supabaseClient.auth.signUp({
         email: signUpReqDto.email,
         password: signUpReqDto.password,
@@ -205,6 +207,17 @@ export class AuthService {
       })
 
 
+      await this.prismaConfig.users.create({
+        data: {
+          id: data.user?.id,
+          email: signUpReqDto.email,
+          full_name: signUpReqDto.fullName,
+          dob: signUpReqDto.dob,
+          gender: signUpReqDto.gender,
+          citizen_id: signUpReqDto.citizen_id,
+        }
+      })
+
       if (error) {
         throw new BadRequestException({
           code: 400,
@@ -213,6 +226,7 @@ export class AuthService {
           detail: error.message,
         });
       }
+
 
       return {
         code: 201,
