@@ -12,7 +12,7 @@ export class CreateBookingDto {
     @IsUUID()
     @ApiProperty({
         name: "shiftId",
-        example: "428b491c-147c-44f5-90d5-bcbbf71444c5"
+        example: "c208b8a9-4c30-4a47-a4d5-0dd8e6b6a5b7"
     })
     shiftId: string
 }

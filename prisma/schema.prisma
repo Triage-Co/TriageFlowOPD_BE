@@ -143,3 +143,27 @@ model Booking {
   @@index([shiftId])
   @@map("booking")
 }
+
+model Step {
+  id          String @id @default(uuid()) @db.Uuid
+  flowId      String @db.Uuid
+  number      Int   
+  name        String
+  description String
+
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([flowId, number])
+  @@map("step")
+}
+
+model Flow {
+  id     String @id @default(uuid()) @db.Uuid
+  name   String
+  userId String @db.Uuid
+  steps  Step[]
+
+  @@index([name])
+  @@index([userId])
+  @@map("flow")
+}
