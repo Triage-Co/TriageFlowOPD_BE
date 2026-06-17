@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateShiftDto, UpdateShiftDto } from './dto/request-shift.dto';
 import { PrismaConfig } from '../../shared/config/prisma.config';
 
@@ -55,7 +55,35 @@ export class ShiftService {
 
   async findAll() {
     try {
-      const data = await this.pismaClient.shift.findMany();
+      const data = await this.pismaClient.shift.findMany({
+        select: {
+          id: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          capacity: true,
+          doctors: {
+            select: {
+              id: true,
+              specialty: {
+                select: {
+                  name: true
+                }
+              },
+              doctor: {
+                select: {
+                  full_name: true,
+                }
+              }
+            }
+          },
+          status: true,
+
+        }
+      });
+      if (!data) {
+        throw new BadRequestException("Danh sách ca trực rỗng")
+      }
       return {
         code: 200,
         message: "Lấy toàn bộ ca trực thành công",
@@ -71,6 +99,58 @@ export class ShiftService {
     }
   }
 
+  async findOne(id: string) {
+    try {
+      const data = await this.pismaClient.shift.findFirst({
+        where: {
+          id: id
+        },
+        select: {
+          id: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          capacity: true,
+          doctors: {
+            select: {
+              id: true,
+              specialty: {
+                select: {
+                  name: true
+                }
+              },
+              doctor: {
+                select: {
+                  id: true,
+                  full_name: true,
+                  citizen_id: true,
+                  dob: true,
+                  email: true,
+                  gender: true,
+                }
+              }
+            }
+          },
+          status: true,
+        }
+      });
+      if (!data) {
+        throw new BadRequestException("Danh sách ca trực rỗng")
+      }
+      return {
+        code: 200,
+        message: "Lấy toàn bộ ca trực thành công",
+        status: "success",
+        data: data
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error,
+        status: "error",
+      }
+    }
+  }
 
   async update(id: string, updateShiftDto: UpdateShiftDto) {
     try {

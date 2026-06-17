@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateDoctorDto } from './dto/request-doctor.dto';
 import { PrismaConfig } from '../../shared/config/prisma.config';
 
@@ -47,17 +47,84 @@ export class DoctorService {
 
   async findAll() {
     try {
-      const data = await this.pismaClient.doctors.findMany()
+      const data = await this.pismaClient.doctors.findMany({
+        select: {
+          id: true,
+          doctor: {
+            select: {
+              full_name: true,
+            }
+          },
+          specialty: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          practiceCertificateNumber: true
+        },
+
+      })
+
+      if (!data) {
+        throw new BadRequestException("Không có bác sĩ nào trong danh sách")
+      }
       return {
         code: 200,
-        message: "Thêm bác sĩ thành công",
+        message: "Lấy danh sách bác sĩ thành công",
         status: "success",
         data: data
       };
     } catch (error) {
       return {
         code: 500,
-        message: error,
+        message: error instanceof Error ? error.message : "Unknow Error",
+        status: "error",
+      }
+    }
+  }
+
+  async findOne(id: string) {
+    try {
+      const data = await this.pismaClient.doctors.findFirst({
+        where: {
+          id: id
+        },
+        select: {
+          id: true,
+          doctor: {
+            select: {
+              id: true,
+              full_name: true,
+              citizen_id: true,
+              dob: true,
+              email: true,
+              gender: true,
+            }
+          },
+          specialty: {
+            select: {
+              id: true,
+              name: true,
+            }
+          },
+          practiceCertificateNumber: true
+        }
+      })
+
+      if (!data) {
+        throw new BadRequestException("Không có bác sĩ nào trong danh sách")
+      }
+      return {
+        code: 200,
+        message: "Lấy danh sách bác sĩ theo id sĩ thành công",
+        status: "success",
+        data: data
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknow Error",
         status: "error",
       }
     }
