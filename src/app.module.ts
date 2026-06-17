@@ -5,6 +5,10 @@ import { SharedModule } from './shared/shared.module';
 import { InfermedicaModule } from './routes/infermedica/infermedica.module';
 import { PaymentModule } from './routes/payment/payment.module';
 import { ScheduleModule } from '@nestjs/schedule'
+import { BookingModule } from './routes/booking/booking.module';
+import { SpecialtyModule } from './routes/specialty/specialty.module';
+import { DoctorModule } from './routes/doctor/doctor.module';
+import { ShiftModule } from './routes/shift/shift.module';
 
 
 @Module({
@@ -16,6 +20,10 @@ import { ScheduleModule } from '@nestjs/schedule'
     AuthModule,
     SharedModule,
     InfermedicaModule,
-    PaymentModule],
+    PaymentModule,
+    BookingModule,
+    SpecialtyModule,
+    DoctorModule,
+    ShiftModule],
 })
 export class AppModule { }

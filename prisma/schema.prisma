@@ -50,6 +50,12 @@ enum Gender {
   FEMALE
 }
 
+enum ShiftStatus {
+  AVAILABLE
+  FULL
+  CLOSED
+}
+
 model Users {
   id         String    @id @default(uuid()) @db.Uuid
   full_name  String
@@ -60,6 +66,8 @@ model Users {
   citizen_id String?   @unique
   createdAt  DateTime  @default(now()) @db.Timestamptz()
   updatedAt  DateTime  @default(now()) @updatedAt @db.Timestamptz()
+  doctors    Doctors[]
+  bookings   Booking[]
 
   @@index([full_name])
   @@index([role, gender])
@@ -67,15 +75,71 @@ model Users {
 }
 
 model Transaction {
-  id String @id @default(uuid()) @db.Uuid
-  amount Int 
-  transDate DateTime @default(now()) @db.Timestamptz()
-  transType TransType 
-  docNo Int @unique
-  buyerId String @db.Uuid
-  status TransStatus @default(PENDING)
+  id        String      @id @default(uuid()) @db.Uuid
+  amount    Int
+  transDate DateTime    @default(now()) @db.Timestamptz()
+  transType TransType
+  docNo     Int         @unique
+  buyerId   String      @db.Uuid
+  status    TransStatus @default(PENDING)
+
   @@index([docNo, status])
   @@index([transDate, transType])
   @@index([buyerId])
   @@map("transaction")
+}
+
+model Specialty {
+  id      Int       @id @default(autoincrement())
+  name    String    @unique
+  doctors Doctors[]
+
+  @@index([name])
+  @@map("specialty")
+}
+
+model Doctors {
+  id                        String @id @db.Uuid
+  specialtyId               Int
+  practiceCertificateNumber String @unique
+
+  user      Users     @relation(fields: [id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  specialty Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  shifts    Shift[]
+
+  @@index([practiceCertificateNumber, specialtyId])
+  @@map("doctors")
+}
+
+model Shift {
+  id        String      @id @default(uuid()) @db.Uuid
+  doctorId  String      @db.Uuid
+  date      DateTime    @default(now()) @db.Timestamptz()
+  startTime String
+  endTime   String
+  capacity  Int         @default(10)
+  status    ShiftStatus @default(AVAILABLE)
+
+  doctors Doctors @relation(fields: [doctorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  bookings Booking[]
+
+  @@unique([doctorId, date, startTime, endTime])
+  @@index([doctorId, startTime])
+  @@map("shift")
+}
+
+model Booking {
+  id      String @id @default(uuid()) @db.Uuid
+  userId  String @db.Uuid
+  shiftId String @db.Uuid
+
+  user Users @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  shift Shift @relation(fields: [shiftId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([userId, shiftId])
+  @@index([userId])
+  @@index([shiftId])
+  @@map("booking")
 }
