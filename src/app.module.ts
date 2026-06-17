@@ -9,6 +9,7 @@ import { BookingModule } from './routes/booking/booking.module';
 import { SpecialtyModule } from './routes/specialty/specialty.module';
 import { DoctorModule } from './routes/doctor/doctor.module';
 import { ShiftModule } from './routes/shift/shift.module';
+import { StepModule } from './routes/step/step.module';
 
 
 @Module({
@@ -24,6 +25,7 @@ import { ShiftModule } from './routes/shift/shift.module';
     BookingModule,
     SpecialtyModule,
     DoctorModule,
-    ShiftModule],
+    ShiftModule,
+    StepModule],
 })
 export class AppModule { }

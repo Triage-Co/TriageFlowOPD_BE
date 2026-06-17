@@ -55,11 +55,15 @@ export class BookingService {
         data: {
           userId: createBookingDto.userId,
           shiftId: createBookingDto.shiftId
+        }, include: {
+          shift: true
         }
       })
 
 
+
       if (data) {
+
         await this.pismaClient.shift.update({
           where: {
             id: data.shiftId
@@ -69,6 +73,36 @@ export class BookingService {
             }
           }
         })
+
+        const flowData = await this.pismaClient.flow.create({
+          data: {
+            name: `FLOW_${data.userId}_${(data.shift.date).toISOString().split("T")[0]}`,
+            userId: createBookingDto.userId
+          }
+        })
+        if (!flowData) {
+          return {
+            code: 400,
+            message: "Đã tạo lịch thành công, tạo flow thất bại",
+            status: "error"
+          }
+        } else {
+          const stepData = await this.pismaClient.step.create({
+            data: {
+              name: "Đặt lịch",
+              description: `Đặt lịch khám bệnh ngày ${(data.shift.date).toISOString().split('T')[0]} lúc ${data.shift.startTime}-${data.shift.endTime}`,
+              flowId: flowData.id,
+              number: 1
+            }
+          })
+          if (!stepData) {
+            return {
+              code: 400,
+              message: "Đã tạo lịch thành công, tạo flow thành công, tạo step thất bại",
+              status: "error"
+            }
+          }
+        }
       }
 
       return {
