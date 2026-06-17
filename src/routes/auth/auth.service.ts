@@ -214,7 +214,8 @@ export class AuthService {
             full_name: signUpReqDto.fullName,
             dob: signUpReqDto.dob,
             citizen_id: signUpReqDto.citizen_id,
-            gender: signUpReqDto.gender
+            gender: signUpReqDto.gender,
+            role: signUpReqDto.role
           }
         }
       })
@@ -228,6 +229,7 @@ export class AuthService {
           dob: signUpReqDto.dob,
           gender: signUpReqDto.gender,
           citizen_id: signUpReqDto.citizen_id,
+          role: signUpReqDto.role
         }
       })
 

@@ -1,6 +1,7 @@
 import { IsDate, IsEmail, IsEnum, IsNotEmpty, IsNumber, IsPhoneNumber, IsString, Length, Matches, Max, Min } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
+import { UserRole } from "@prisma/client";
 
 enum GenderType {
     MALE = "MALE",
@@ -133,6 +134,13 @@ export class SignUpReqDto {
     @IsNotEmpty({ message: "Vui Lòng nhập CMND/CCCD." })
     @Matches(/^[0-9]{9}$|^[0-9]{12}$/, { message: "Vui lòng nhập CMND/CCCD hợp lệ." })
     citizen_id: string
+
+    @IsString()
+    @ApiProperty({
+        name: "role",
+        example: "USER"
+    })
+    role: UserRole;
 }
 
 
@@ -195,4 +203,6 @@ export class VerifyOtpDto {
     @IsNotEmpty({ message: "Vui Lòng nhập mật khẩu." })
     @Length(6, 30, { message: "Mật khẩu từ 6 đến 30 ký tự." })
     password: string;
+
+
 }
