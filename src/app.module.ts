@@ -10,6 +10,7 @@ import { SpecialtyModule } from './routes/specialty/specialty.module';
 import { DoctorModule } from './routes/doctor/doctor.module';
 import { ShiftModule } from './routes/shift/shift.module';
 import { StepModule } from './routes/step/step.module';
+import { FlowModule } from './routes/flow/flow.module';
 
 
 @Module({
@@ -26,6 +27,7 @@ import { StepModule } from './routes/step/step.module';
     SpecialtyModule,
     DoctorModule,
     ShiftModule,
-    StepModule],
+    StepModule,
+    FlowModule],
 })
 export class AppModule { }
