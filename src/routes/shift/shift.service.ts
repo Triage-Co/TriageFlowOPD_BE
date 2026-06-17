@@ -93,7 +93,7 @@ export class ShiftService {
     } catch (error) {
       return {
         code: 500,
-        message: error,
+        message: error instanceof Error ? error.message : "Unknown Error",
         status: "error",
       }
     }
@@ -146,7 +146,7 @@ export class ShiftService {
     } catch (error) {
       return {
         code: 500,
-        message: error,
+        message: error instanceof Error ? error.message : "Unknown Error",
         status: "error",
       }
     }
@@ -175,7 +175,7 @@ export class ShiftService {
     } catch (error) {
       return {
         code: 500,
-        message: error,
+        message: error instanceof Error ? error.message : "Unknown Error",
         status: "error",
       }
     }
