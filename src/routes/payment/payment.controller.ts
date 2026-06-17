@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto } from './dto/payment.dto';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
@@ -58,5 +58,21 @@ export class PaymentController {
   })
   webhook(@Body() body: any) {
     return this.paymentService.webhook(body);
+  }
+
+  @Get(":id")
+  @ApiOperation({
+    summary: "Lấy thanh toán theo id"
+  })
+  findOne(@Param("id") id: string) {
+    return this.paymentService.findOne(id);
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: "Lấy toàn bộ thanh toán"
+  })
+  findMany() {
+    return this.paymentService.findMany();
   }
 }

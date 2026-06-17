@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/payment.dto';
 import { PayosConfig } from '../../shared/config/payos.config';
 import { PrismaConfig } from '../../shared/config/prisma.config';
@@ -101,6 +101,58 @@ export class PaymentService {
       })
     } catch (error) {
       this.logger.error("Lỗi khi chạy cron job hủy giao dịch:", error)
+    }
+  }
+
+  async findOne(id: string) {
+    try {
+      const data = await this.prismaClient.transaction.findFirst(
+        {
+          where: {
+            id: id
+          }
+        }
+      )
+
+      if (!data) {
+        throw new BadRequestException("Không tìm thấy giao dịch")
+      }
+
+      return {
+        code: 200,
+        message: "Lấy danh sách thanh toán theo id thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknown error",
+        status: "error"
+      }
+    }
+  }
+
+  async findMany() {
+    try {
+      const data = await this.prismaClient.transaction.findMany()
+
+      if (!data) {
+        throw new BadRequestException("Không tìm thấy giao dịch")
+      }
+
+      return {
+        code: 200,
+        message: "Lấy danh sách thanh toán thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknown error",
+        status: "error"
+      }
     }
   }
 }

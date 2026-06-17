@@ -15,6 +15,10 @@ export class ShiftController {
   findAll() {
     return this.shiftService.findAll();
   }
+  @Get(":id")
+  findOne(@Param("id") id: string) {
+    return this.shiftService.findOne(id);
+  }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateShiftDto: UpdateShiftDto) {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateBookingDto } from './dto/request-booking.dto';
 import { PrismaConfig } from '../../shared/config/prisma.config';
 
@@ -116,6 +116,113 @@ export class BookingService {
         code: 500,
         message: error,
         status: "error",
+      }
+    }
+  }
+
+
+  async findOne(id: string) {
+    try {
+      const data = await this.pismaClient.booking.findFirst(
+        {
+          where: {
+            id: id
+          }, select: {
+            id: true,
+            patient: {
+              select: {
+                id: true,
+                full_name: true,
+                email: true,
+                dob: true,
+                role: true,
+                gender: true,
+                citizen_id: true,
+              }
+            },
+            shift: {
+              select: {
+                date: true,
+                startTime: true,
+                endTime: true,
+                doctors: {
+                  select: {
+                    specialty: {
+                      select: {
+                        name: true
+                      }
+                    },
+                    doctor: {
+                      select: {
+                        full_name: true,
+                        email: true,
+                        gender: true
+                      }
+                    }
+                  }
+                },
+              }
+            }
+          }
+        }
+      )
+
+      if (!data) {
+        throw new BadRequestException("Không tìm thấy lịch hẹn")
+      }
+
+      return {
+        code: 200,
+        message: "Lấy danh sách lịch hẹn theo id thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknown error",
+        status: "error"
+      }
+    }
+  }
+
+  async findMany() {
+    try {
+      const data = await this.pismaClient.booking.findMany(
+        {
+          select: {
+            id: true,
+            shift: {
+              select: {
+                date: true,
+                startTime: true,
+                endTime: true,
+              }
+            },
+            patient: {
+              select: {
+                full_name: true,
+              }
+            }
+          }
+        }
+      )
+
+      if (!data) {
+        throw new BadRequestException("Không tìm thấy lịch hẹn")
+      }
+
+      return {
+        code: 200,
+        message: "Lấy danh sách lịch hẹn thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknown error",
+        status: "error"
       }
     }
   }

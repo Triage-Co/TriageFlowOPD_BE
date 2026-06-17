@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { DoctorService } from './doctor.service';
 import { CreateDoctorDto } from './dto/request-doctor.dto';
 
@@ -16,4 +16,8 @@ export class DoctorController {
     return this.doctorService.findAll();
   }
 
+  @Get(":id")
+  findOne(@Param("id") id: string) {
+    return this.doctorService.findOne(id);
+  }
 }
