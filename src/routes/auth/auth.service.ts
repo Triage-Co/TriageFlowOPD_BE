@@ -388,4 +388,30 @@ export class AuthService {
       message: "Lấy lại mật khẩu thành công",
     }
   }
+
+  async getProfile(id: string) {
+    try {
+      const data = await this.prismaConfig.users.findUnique({
+        where: {
+          id: id
+        }
+      })
+      if (!data) {
+        throw new NotFoundException(`Không tìm thấy người dùng với id ${id}`)
+      }
+      return {
+        code: 200,
+        message: "Lấy người dùng thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknown Error",
+        status: "error"
+      }
+    }
+  }
+
 }

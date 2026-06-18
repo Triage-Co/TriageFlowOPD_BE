@@ -1,7 +1,8 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
-import { ApiBadRequestResponse, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -361,5 +362,15 @@ export class AuthController {
   verifyForgot(@Body() verifyOtpDto: VerifyOtpDto) {
     return this.authService.verifyForgot(verifyOtpDto);
   }
+
+  @Get("/profile")
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
+  getProfile(@Req() req: any) {
+    const { sub } = req.user; //sub == id
+    console.log(sub)
+    return this.authService.getProfile(sub);
+  }
+
 }
 
