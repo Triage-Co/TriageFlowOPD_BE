@@ -38,7 +38,7 @@ export class InfermedicaService {
 
   }
 
-  async diagnoise(triageDto: TriageDto) {
+  async diagnoise(triageDto: TriageDto, numberOfStep: number) {
     try {
 
 
@@ -59,7 +59,7 @@ export class InfermedicaService {
       currentTurn += 1;
       await this.cacheManager.set(cacheKey, currentTurn, 3600000);
 
-      const isOverLimit = currentTurn >= 5 - 1;
+      const isOverLimit = currentTurn >= numberOfStep - 1;
 
       return {
         code: 200,
