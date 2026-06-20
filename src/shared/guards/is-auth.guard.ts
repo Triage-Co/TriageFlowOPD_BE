@@ -35,7 +35,7 @@ export class IsAuthGuard implements CanActivate {
             })
         }
 
-        request['user'] = user;
+        request['user'] = user.user_metadata;
 
         return true;
     }

@@ -214,7 +214,8 @@ export class AuthService {
             full_name: signUpReqDto.fullName,
             dob: signUpReqDto.dob,
             citizen_id: signUpReqDto.citizen_id,
-            gender: signUpReqDto.gender
+            gender: signUpReqDto.gender,
+            role: signUpReqDto.role
           }
         }
       })
@@ -228,6 +229,7 @@ export class AuthService {
           dob: signUpReqDto.dob,
           gender: signUpReqDto.gender,
           citizen_id: signUpReqDto.citizen_id,
+          role: signUpReqDto.role
         }
       })
 
@@ -386,4 +388,30 @@ export class AuthService {
       message: "Lấy lại mật khẩu thành công",
     }
   }
+
+  async getProfile(id: string) {
+    try {
+      const data = await this.prismaConfig.users.findUnique({
+        where: {
+          id: id
+        }
+      })
+      if (!data) {
+        throw new NotFoundException(`Không tìm thấy người dùng với id ${id}`)
+      }
+      return {
+        code: 200,
+        message: "Lấy người dùng thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : "Unknown Error",
+        status: "error"
+      }
+    }
+  }
+
 }
