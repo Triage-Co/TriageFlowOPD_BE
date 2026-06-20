@@ -3,6 +3,7 @@ import { InfermedicaService } from './infermedica.service';
 import { InfermedicaController } from './infermedica.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HttpModule } from "@nestjs/axios"
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   controllers: [InfermedicaController],
@@ -22,7 +23,7 @@ import { HttpModule } from "@nestjs/axios"
           }
         })
       }
-    )
+    ), CacheModule.register()
   ]
 })
 export class InfermedicaModule { }

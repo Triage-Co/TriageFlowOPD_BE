@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiHideProperty, ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsArray, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
 
@@ -75,6 +75,16 @@ export class TriageDto {
     @ValidateNested({ each: true })
     @Type(() => EvidenceDto)
     evidence: EvidenceDto[];
+
+
+    @IsString({ message: "interview_id phải là chuỗi" })
+    @IsOptional()
+    @ApiHideProperty()
+    @ApiProperty({
+        name: "interview_id",
+        example: ""
+    })
+    interview_id?: string;
 }
 
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Ip, Param, Post, Query } from '@nestjs/common';
 import { InfermedicaService } from './infermedica.service';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
@@ -170,8 +170,8 @@ export class InfermedicaController {
     }
   })
   @Post("/diagnoise")
-  diagnoise(@Body() triageDto: TriageDto) {
-    return this.infermedicaService.diagnoise(triageDto);
+  diagnoise(@Body() triageDto: TriageDto, @Query("numberOfStep") numberOfStep: number) {
+    return this.infermedicaService.diagnoise(triageDto, numberOfStep);
   }
 
   @ApiOperation({
