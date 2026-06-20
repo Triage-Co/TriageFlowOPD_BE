@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Ip, Post, Query } from '@nestjs/common';
 import { InfermedicaService } from './infermedica.service';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
 import { ApiBadRequestResponse, ApiOkResponse, ApiOperation } from '@nestjs/swagger';
