@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
+import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, UpdateUserDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
 import { SupabaseConfig } from '../../shared/config/supabase.config';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { BaseResponse } from '../../shared/type/response.type';
@@ -414,4 +414,44 @@ export class AuthService {
     }
   }
 
+  async updateProfile(updateUserDto: UpdateUserDto, id: string) {
+    try {
+      const data = await this.prismaConfig.users.update({
+        where: {
+          id: id
+        }, data: {
+          dob: updateUserDto.dob,
+          full_name: updateUserDto.fullName,
+          gender: updateUserDto.gender,
+        }
+      })
+      if (!data) {
+        throw new BadRequestException("Không thể cập nhật người dùng")
+      }
+      const { error } = await this.supabaseClient.auth.admin.updateUserById(id, {
+        user_metadata: {
+          full_name: updateUserDto.fullName,
+          dob: updateUserDto.dob,
+          gender: updateUserDto.gender,
+        }
+      })
+
+      if (error) {
+        throw new BadRequestException("cập nhật người dùng thất bại")
+      }
+
+      return {
+        code: 200,
+        message: "Cập nhật người dùng thành công",
+        status: "success",
+        data: data
+      }
+    } catch (error) {
+      return {
+        code: 500,
+        message: error,
+        status: "error"
+      }
+    }
+  }
 }

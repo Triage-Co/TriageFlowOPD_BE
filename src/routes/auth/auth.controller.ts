@@ -1,6 +1,6 @@
-import { Controller, Post, Body, UseGuards, Get, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Req, Patch } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
+import { ForgotPasswordDto, RefreshTokenReqDto, SignInReqDto, SignInReqWithOtpDto, SignInWithCitizenIdReqDto, SignOutReqDto, SignUpReqDto, UpdateUserDto, VerifyOtpDto, VerifyOtpReqDto } from './dto/auth-request.dto';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiConflictResponse, ApiInternalServerErrorResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 
@@ -368,9 +368,14 @@ export class AuthController {
   @UseGuards(IsAuthGuard)
   getProfile(@Req() req: any) {
     const { sub } = req.user; //sub == id
-    console.log(sub)
     return this.authService.getProfile(sub);
   }
-
+  @Patch("/update")
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
+  updateUser(@Body() updateUserDto: UpdateUserDto, @Req() req: any) {
+    const { sub } = req.user
+    return this.authService.updateProfile(updateUserDto, sub);
+  }
 }
 

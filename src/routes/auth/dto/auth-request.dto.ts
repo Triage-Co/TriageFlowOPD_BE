@@ -206,3 +206,37 @@ export class VerifyOtpDto {
 
 
 }
+
+export class UpdateUserDto {
+    // @IsNotEmpty({ message: "Vui Lòng nhập số điện thoại." })
+    // @IsPhoneNumber("VN", { message: "Số điện thoại không hợp lệ" })
+    // phone: string;
+
+    @ApiProperty({
+        name: "fullName",
+        example: "Duy Trung"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập họ và tên." })
+    fullName: string;
+
+    @ApiProperty({
+        name: "dob",
+        example: "2003-03-07"
+    })
+    @Type(() => Date)
+    @IsDate({ message: "Phải là ngày tháng hợp lệ" })
+    dob: Date;
+
+
+    @ApiProperty({
+        name: "gender",
+        example: "MALE"
+    })
+    @IsNotEmpty({ message: "Vui Lòng nhập giới tính." })
+    @IsEnum(["MALE", "FEMALE"], {
+        message: "Giới tính phải là MALE hoặc FEMALE."
+    })
+    gender: GenderType;
+
+
+}
