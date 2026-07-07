@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PrismaConfig } from '../../shared/config/prisma.config';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CategoryService {
@@ -12,7 +13,8 @@ export class CategoryService {
       const data = await this.prisma.category.create({
         data: {
           name: createCategoryDto.name,
-          nameLocalized: createCategoryDto.nameLocalized as any,
+          nameLocalized:
+            createCategoryDto.nameLocalized as Prisma.InputJsonValue,
           icon: createCategoryDto.icon,
           sortOrder: createCategoryDto.sortOrder,
         },
@@ -95,7 +97,8 @@ export class CategoryService {
         where: { id },
         data: {
           name: updateCategoryDto.name,
-          nameLocalized: updateCategoryDto.nameLocalized as any,
+          nameLocalized:
+            updateCategoryDto.nameLocalized as Prisma.InputJsonValue,
           icon: updateCategoryDto.icon,
           sortOrder: updateCategoryDto.sortOrder,
         },

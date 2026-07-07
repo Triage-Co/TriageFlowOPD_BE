@@ -15,7 +15,7 @@ export class GeoService {
   private readonly prismaClient: PrismaQueryClient;
 
   constructor(private readonly prisma: PrismaConfig) {
-    this.prismaClient = this.prisma as unknown as PrismaQueryClient;
+    this.prismaClient = this.prisma;
   }
 
   /**
@@ -54,7 +54,11 @@ export class GeoService {
   /**
    * Read a geometry column as a GeoJSON object from the database.
    */
-  async readGeom(table: string, id: string, column: string): Promise<any> {
+  async readGeom(
+    table: string,
+    id: string,
+    column: string,
+  ): Promise<object | null> {
     const result = await this.prismaClient.$queryRawUnsafe<GeomQueryResult[]>(
       `SELECT ST_AsGeoJSON(${column}) AS geom FROM "${table}" WHERE id = $1::uuid`,
       id,
@@ -67,7 +71,7 @@ export class GeoService {
     ) {
       return null;
     }
-    return JSON.parse(result[0].geom);
+    return JSON.parse(result[0].geom) as object;
   }
 
   /**

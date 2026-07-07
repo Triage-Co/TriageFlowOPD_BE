@@ -42,11 +42,19 @@ export class PhysicalRoomService {
       }
 
       const center = createPhysicalRoomDto.centerGeom
-        ? await this.geoService.readGeom('physical_room', data.id, 'center_geom')
+        ? await this.geoService.readGeom(
+            'physical_room',
+            data.id,
+            'center_geom',
+          )
         : null;
 
       const outline = createPhysicalRoomDto.outlineGeom
-        ? await this.geoService.readGeom('physical_room', data.id, 'outline_geom')
+        ? await this.geoService.readGeom(
+            'physical_room',
+            data.id,
+            'outline_geom',
+          )
         : null;
 
       return {

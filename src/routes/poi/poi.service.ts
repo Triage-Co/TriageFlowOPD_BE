@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreatePoiDto } from './dto/create-poi.dto';
 import { UpdatePoiDto } from './dto/update-poi.dto';
 import { PrismaConfig } from '../../shared/config/prisma.config';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PoiService {
@@ -14,12 +15,12 @@ export class PoiService {
           roomId: createPoiDto.roomId,
           categoryId: createPoiDto.categoryId,
           name: createPoiDto.name,
-          nameLocalized: createPoiDto.nameLocalized as any,
+          nameLocalized: createPoiDto.nameLocalized as Prisma.InputJsonValue,
           description: createPoiDto.description,
           keywords: createPoiDto.keywords,
           logoUrl: createPoiDto.logoUrl,
-          contactInfo: createPoiDto.contactInfo as any,
-          openingHours: createPoiDto.openingHours as any,
+          contactInfo: createPoiDto.contactInfo as Prisma.InputJsonValue,
+          openingHours: createPoiDto.openingHours as Prisma.InputJsonValue,
           active: createPoiDto.active,
         },
       });
@@ -40,7 +41,7 @@ export class PoiService {
 
   async findAll(roomId?: string, categoryId?: string) {
     try {
-      const where: any = {};
+      const where: Prisma.PoiWhereInput = {};
       if (roomId) where.roomId = roomId;
       if (categoryId) where.categoryId = categoryId;
 
@@ -123,12 +124,12 @@ export class PoiService {
           roomId: updatePoiDto.roomId,
           categoryId: updatePoiDto.categoryId,
           name: updatePoiDto.name,
-          nameLocalized: updatePoiDto.nameLocalized as any,
+          nameLocalized: updatePoiDto.nameLocalized as Prisma.InputJsonValue,
           description: updatePoiDto.description,
           keywords: updatePoiDto.keywords,
           logoUrl: updatePoiDto.logoUrl,
-          contactInfo: updatePoiDto.contactInfo as any,
-          openingHours: updatePoiDto.openingHours as any,
+          contactInfo: updatePoiDto.contactInfo as Prisma.InputJsonValue,
+          openingHours: updatePoiDto.openingHours as Prisma.InputJsonValue,
           active: updatePoiDto.active,
         },
       });

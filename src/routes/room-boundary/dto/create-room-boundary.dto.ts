@@ -1,6 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BoundaryType } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateRoomBoundaryDto {
   @IsUUID()
