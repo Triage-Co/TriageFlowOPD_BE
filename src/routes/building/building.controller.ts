@@ -13,7 +13,9 @@ import { BuildingService } from './building.service';
 import { CreateBuildingDto } from './dto/create-building.dto';
 import { UpdateBuildingDto } from './dto/update-building.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { IsAdminGuard } from '../../shared/guards/is-admin.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
+import { RoleTypeEnum } from '@prisma/client';
 
 @ApiTags('Building')
 @Controller('building')
@@ -22,7 +24,8 @@ export class BuildingController {
 
   @Post()
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Tạo tòa nhà mới (Admin)' })
   create(@Body() createBuildingDto: CreateBuildingDto) {
     return this.buildingService.create(createBuildingDto);
@@ -46,7 +49,8 @@ export class BuildingController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Cập nhật thông tin tòa nhà (Admin)' })
   update(
     @Param('id') id: string,
@@ -57,7 +61,8 @@ export class BuildingController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Xóa tòa nhà (Admin)' })
   remove(@Param('id') id: string) {
     return this.buildingService.remove(id);

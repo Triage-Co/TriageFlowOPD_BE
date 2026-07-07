@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { CreatePhysicalRoomDto } from './dto/create-physical-room.dto';
 import { UpdatePhysicalRoomDto } from './dto/update-physical-room.dto';
-import { PrismaConfig } from '../../shared/config/prisma.config';
 import { GeoService } from '../../shared/geo/geo.service';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class PhysicalRoomService {
   constructor(
-    private readonly prisma: PrismaConfig,
+    private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
   ) {}
 

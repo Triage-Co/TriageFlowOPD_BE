@@ -1,63 +1,49 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaConfig } from '../config/prisma.config';
 import { User } from '@supabase/supabase-js';
-import { ROLES_KEY } from '../decorator/role.decorator';
+import { AuthErrors } from '../exceptions/auth.exceptions';
+import type { IAccountRepository } from '../interfaces/i-account.repository';
+import { ROLE_KEYS } from '../decorator/role.decorator';
+import { RoleTypeEnum } from '@prisma/client';
 
-@Injectable()
 export class IsRoleGuard implements CanActivate {
   constructor(
-    private reflector: Reflector,
-    private readonly prismaConfig: PrismaConfig,
+    private readonly reflector: Reflector,
+    @Inject('IAccountRepository')
+    private readonly accountRepository: IAccountRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
-      ROLES_KEY,
+    const requiredRole = this.reflector.getAllAndOverride<RoleTypeEnum[]>(
+      ROLE_KEYS,
       [context.getHandler(), context.getClass()],
     );
 
-    if (!requiredRoles) {
+    if (!requiredRole) {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const ctx = context.switchToHttp();
+    const request = ctx.getRequest();
+
     const user: User = request['user'];
-    if (!user || !user.id) {
-      throw new UnauthorizedException({
-        code: 401,
-        status: 'error',
-        message: 'Đã xảy ra lỗi khi xác thực người dùng',
-      });
+
+    if (!user) {
+      throw AuthErrors.Unauthenticated;
     }
 
-    const exitedUser = await this.prismaConfig.users.findUnique({
-      where: { id: user.id },
-      select: { role: true },
-    });
+    const existedAccount = await this.accountRepository.findById(user.id);
+    console.log(existedAccount);
+    const role = existedAccount.role;
 
-    if (!exitedUser) {
-      throw new ForbiddenException({
-        code: 403,
-        status: 'error',
-        message: 'Đã xảy ra lỗi khi lấy thông tin vai trò của người dùng',
-      });
+    if (!role) {
+      throw AuthErrors.RoleNotFound;
     }
 
-    const hasRole = requiredRoles.includes(exitedUser.role);
+    const hasRole = requiredRole.includes(role);
 
     if (!hasRole) {
-      throw new ForbiddenException({
-        code: 403,
-        status: 'error',
-        message: 'Bạn không có quyền truy cập thông tin này',
-      });
+      throw AuthErrors.ForbiddenRole;
     }
 
     return true;

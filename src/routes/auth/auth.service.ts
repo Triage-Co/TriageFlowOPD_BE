@@ -1,344 +1,313 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
-  BadRequestException,
-  ConflictException,
-  HttpException,
-  Injectable,
-  InternalServerErrorException,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import {
-  ForgotPasswordDto,
-  RefreshTokenReqDto,
-  SignInReqDto,
-  SignInReqWithOtpDto,
-  SignInWithCitizenIdReqDto,
-  SignOutReqDto,
+  ForgotPasswordRequestDto,
+  RefreshTokenRequestDto,
+  SignInWithEmailRequestDto,
+  SignInWithOtpRequestDto,
+  SignOutReqRequestDto,
   SignUpReqDto,
-  UpdateUserDto,
-  VerifyOtpDto,
-  VerifyOtpReqDto,
-} from './dto/auth-request.dto';
-import { SupabaseConfig } from '../../shared/config/supabase.config';
-import { SupabaseClient } from '@supabase/supabase-js';
-import { BaseResponse } from '../../shared/type/response.type';
-import { PrismaConfig } from '../../shared/config/prisma.config';
+  UpdateUserRequestDto,
+  VerifyAndResetPasswordRequestDto,
+  VerifyOtpSignInRequestDto,
+} from './dto/request-auth.dto';
+import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
 import {
-  RefreshTokenResDto,
-  SignInResDto,
-  SignUpResDto,
-} from './dto/auth-response.dto';
+  OtpType,
+  SignOutType,
+} from '../../shared/interfaces/i-auth-provider.interface';
+import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.interface';
+import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
+import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
+import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 
 @Injectable()
 export class AuthService {
-  private supabaseClient: SupabaseClient;
   constructor(
-    private readonly supabaseConfig: SupabaseConfig,
-    private readonly prismaConfig: PrismaConfig,
-  ) {
-    this.supabaseClient = this.supabaseConfig.getClient();
-  }
+    @Inject('IAccountRepository')
+    private readonly accountRepository: IAccountRepository,
+    @Inject('IAuthProvider') private readonly authProvider: IAuthProvider,
+    @Inject('IPatientRepository')
+    private readonly patientRepository: IPatientRepository,
+    @Inject('IStaffRepository')
+    private readonly staffRepository: IStaffRepository,
+  ) {}
 
-  async signIn(
-    signInReqDto: SignInReqDto,
-  ): Promise<BaseResponse<SignInResDto>> {
-    const { data, error } = await this.supabaseClient.auth.signInWithPassword({
-      email: signInReqDto.email,
-      password: signInReqDto.password,
+  private readonly logger = new Logger(AuthService.name);
+
+  async signUp(signUpRequestDto: SignUpReqDto) {
+    const { user_name, gender, role, email, password } = signUpRequestDto;
+
+    if (await this.accountRepository.findByEmail(email)) {
+      throw AuthErrors.EmailExists;
+    }
+
+    const { data, error } = await this.authProvider.signUp(email, password, {
+      user_name,
+      gender,
+      role,
     });
 
     if (error) {
-      throw new UnauthorizedException({
-        code: 401,
-        status: 'error',
-        message: 'Email hoặc mật khẩu không chính xác',
-        detail: error.message,
-      });
+      switch (error.code) {
+        case 'email_not_confirmed': {
+          throw AuthErrors.EmailNotConfirmed;
+        }
+        case 'user_banned': {
+          throw AuthErrors.UserBanned;
+        }
+        default: {
+          throw AuthErrors.ProviderError(
+            'Không thể đăng ký tài khoản',
+            error.message,
+          );
+        }
+      }
     }
 
-    return {
-      code: 200,
-      message: 'Đăng nhập thành công',
-      status: 'success',
-      data: {
-        token: data.session?.access_token || '',
-        refreshToken: data.session?.refresh_token || '',
-      },
-    };
-  }
+    if (!data?.user?.id) {
+      throw AuthErrors.ProviderError(
+        'Lỗi hệ thống',
+        'Không lấy được ID người dùng từ hệ thống xác thực',
+      );
+    }
 
-  async signInWithCitizenId(
-    signInWithCitizenIdReqDto: SignInWithCitizenIdReqDto,
-  ): Promise<BaseResponse<SignInResDto>> {
+    const account_id = data.user.id;
+    let isLocalAccountCreated = false;
+
     try {
-      const user = await this.prismaConfig.users.findUnique({
-        where: {
-          citizen_id: signInWithCitizenIdReqDto.citizen_id,
-        },
-        select: {
-          email: true,
-        },
+      const newAccount = await this.accountRepository.create({
+        account_id: account_id,
+        email: email,
+        user_name: user_name,
+        gender: gender,
+        role: role,
       });
 
-      if (!user) {
-        throw new NotFoundException({
-          code: 404,
-          status: 'error',
-          message: 'Không tìm thấy tài khoản với CMND/CCCD này.',
-        });
+      isLocalAccountCreated = true;
+
+      if (role !== 'ADMIN' && role !== 'USER') {
+        await this.staffRepository.create(newAccount.account_id);
       }
 
-      const { data, error } = await this.supabaseClient.auth.signInWithPassword(
-        {
-          email: user.email,
-          password: signInWithCitizenIdReqDto.password,
-        },
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Đăng ký user thành công',
+        data: newAccount,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Lỗi khi tạo user với email: ${email}, đang rollback`,
+        error,
       );
 
-      if (error) {
-        throw new UnauthorizedException({
-          code: 401,
-          status: 'error',
-          message: 'Email hoặc mật khẩu không chính xác',
-          detail: error.message,
-        });
+      if (isLocalAccountCreated) {
+        try {
+          await this.accountRepository.delete(account_id);
+        } catch (error) {
+          this.logger.error(
+            `Không thể xóa account với id: ${account_id}`,
+            error,
+          );
+        }
       }
 
-      return {
-        code: 200,
-        message: 'Đăng nhập thành công',
-        status: 'success',
-        data: {
-          token: data.session?.access_token || '',
-          refreshToken: data.session?.refresh_token || '',
-        },
-      };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
+      try {
+        await this.authProvider.deleteAccount(account_id);
+      } catch (error) {
+        this.logger.error(
+          `Không thể xóa tài khoản supabase với id: ${account_id}`,
+          error,
+        );
       }
 
-      throw new InternalServerErrorException({
-        code: 500,
-        status: 'error',
-        message:
-          'Đã có lỗi hệ thống xảy ra trong quá trình đăng nhập. Vui lòng thử lại sau.',
-        detail: error instanceof Error ? error.message : String(error),
-      });
+      throw error;
     }
   }
 
-  async sendOtp(
-    signInReqWithOtpDto: SignInReqWithOtpDto,
-  ): Promise<BaseResponse<any>> {
-    try {
-      const exitedEmail = await this.prismaConfig.users.findUnique({
-        where: {
-          email: signInReqWithOtpDto.email,
-        },
-      });
+  async signInWithEmail(signInWithEmailRequestDto: SignInWithEmailRequestDto) {
+    const { email, password } = signInWithEmailRequestDto;
 
-      if (!exitedEmail) {
-        throw new NotFoundException({
-          code: 404,
-          status: 'error',
-          message: 'Email không tồn tại',
-        });
-      }
-
-      const { error } = await this.supabaseClient.auth.signInWithOtp({
-        email: signInReqWithOtpDto.email,
-      });
-
-      if (error) {
-        throw new UnauthorizedException({
-          code: 401,
-          status: 'error',
-          message: 'Không thể gửi mã OTP. Vui lòng thử lại',
-          detail: error.message,
-        });
-      }
-      return {
-        code: 200,
-        message: 'Gửi OTP thành công',
-        status: 'success',
-      };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException({
-        code: 500,
-        status: 'error',
-        message:
-          'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
-        detail: error instanceof HttpException ? error.message : String(error),
-      });
+    if (!(await this.accountRepository.findByEmail(email))) {
+      throw AuthErrors.UserNotFoundByEmail(email);
     }
-  }
 
-  async verifyOTP(
-    verifyOtpReqDto: VerifyOtpReqDto,
-  ): Promise<BaseResponse<SignInResDto>> {
-    const { data, error } = await this.supabaseClient.auth.verifyOtp({
-      email: verifyOtpReqDto.email,
-      token: verifyOtpReqDto.otp,
-      type: 'magiclink',
-    });
-
-    if (error) {
-      throw new BadRequestException({
-        code: 401,
-        status: 'error',
-        message: 'Mã OTP không chính xác hoặc đã hết hạn',
-        detail: error.message,
-      });
-    }
-    return {
-      code: 200,
-      message: 'Xác thực OTP thành công',
-      status: 'success',
-      data: {
-        token: data.session?.access_token || '',
-        refreshToken: data.session?.refresh_token || '',
-      },
-    };
-  }
-
-  async signUp(
-    signUpReqDto: SignUpReqDto,
-  ): Promise<BaseResponse<SignUpResDto>> {
-    try {
-      const exitedUser = await this.prismaConfig.users.findUnique({
-        where: {
-          citizen_id: signUpReqDto.citizen_id,
-        },
-      });
-
-      const exitedEmail = await this.prismaConfig.users.findUnique({
-        where: {
-          email: signUpReqDto.email,
-        },
-      });
-
-      if (exitedUser) {
-        throw new ConflictException({
-          code: 409,
-          status: 'error',
-          message: 'CMND/CCCD đã tồn tại trong hệ thống',
-        });
-      }
-
-      if (exitedEmail) {
-        throw new ConflictException({
-          code: 409,
-          status: 'error',
-          message: 'Email đã tồn tại',
-        });
-      }
-
-      const { data, error } = await this.supabaseClient.auth.signUp({
-        email: signUpReqDto.email,
-        password: signUpReqDto.password,
-        options: {
-          data: {
-            full_name: signUpReqDto.fullName,
-            dob: signUpReqDto.dob,
-            citizen_id: signUpReqDto.citizen_id,
-            gender: signUpReqDto.gender,
-            role: signUpReqDto.role,
-          },
-        },
-      });
-
-      const dataUser = await this.prismaConfig.users.create({
-        data: {
-          id: data.user?.id,
-          email: signUpReqDto.email,
-          full_name: signUpReqDto.fullName,
-          dob: signUpReqDto.dob,
-          gender: signUpReqDto.gender,
-          citizen_id: signUpReqDto.citizen_id,
-          role: signUpReqDto.role,
-        },
-      });
-
-      if (!dataUser) {
-        await this.supabaseClient.auth.admin.deleteUser(data.user?.id!);
-
-        throw error;
-      }
-
-      if (error) {
-        throw new BadRequestException({
-          code: 400,
-          status: 'error',
-          message: 'Đăng ký tài khoản thất bại',
-          detail: error.message,
-        });
-      }
-
-      return {
-        code: 201,
-        status: 'success',
-        message: 'Đăng ký tài khoản thành công',
-        data: {
-          email: data.user?.email!,
-          id: data.user?.id!,
-        },
-      };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException({
-        code: 500,
-        status: 'error',
-        message:
-          'Đã có lỗi hệ thống xảy ra trong quá trình đăng ký. Vui lòng thử lại sau.',
-        detail: error instanceof HttpException ? error.message : String(error),
-      });
-    }
-  }
-
-  async signOut(signOutReqDto: SignOutReqDto): Promise<BaseResponse<any>> {
-    const { error } = await this.supabaseClient.auth.admin.signOut(
-      signOutReqDto.token,
-      'local',
+    const { data, error } = await this.authProvider.signInWithPassword(
+      email,
+      password,
     );
 
     if (error) {
-      throw new BadRequestException({
-        code: 400,
-        status: 'error',
-        message: 'Đăng xuất thất bại',
-        detail: error.message,
-      });
+      switch (error.code) {
+        case 'email_not_confirmed':
+          throw AuthErrors.EmailNotConfirmed;
+
+        case 'invalid_credentials':
+          throw AuthErrors.InvalidCredentials;
+
+        default:
+          throw AuthErrors.ProviderError(
+            'Đăng nhập không thành công',
+            `Đăng nhập không thành công: {${error.message}}`,
+          );
+      }
+    }
+
+    if (!data?.session || !data?.user) {
+      throw AuthErrors.ProviderError(
+        'Lỗi hệ thống',
+        'Không lấy được phiên đăng nhập từ máy chủ xác thực',
+      );
     }
 
     return {
       code: 200,
       status: 'success',
-      message: 'Đăng xuất thành công',
+      message: 'đăng nhập thành công',
+      data: {
+        token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        ...data.user.user_metadata,
+      },
     };
   }
 
-  async refreshToken(
-    refreshTokenReqDto: RefreshTokenReqDto,
-  ): Promise<BaseResponse<RefreshTokenResDto>> {
-    const { data, error } = await this.supabaseClient.auth.refreshSession({
-      refresh_token: refreshTokenReqDto.refreshToken,
-    });
+  async signInWithOtp(signInWithOtpRequestDto: SignInWithOtpRequestDto) {
+    const { email } = signInWithOtpRequestDto;
+
+    if (!(await this.accountRepository.findByEmail(email))) {
+      throw AuthErrors.UserNotFoundByEmail(email);
+    }
+
+    const { error } = await this.authProvider.signInWithOtp(email);
 
     if (error) {
-      throw new UnauthorizedException({
-        code: 401,
-        status: 'error',
-        message: 'Phiên đăng nhập đã hết hạn hoặc refresh token không hợp lệ',
-        detail: error.message,
+      throw AuthErrors.SendOtpFailed(error.message);
+    }
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'gửi OTP thành công',
+    };
+  }
+
+  async verifyOtpSignIn(verifyOtpSignInRequestDto: VerifyOtpSignInRequestDto) {
+    const { email, otp } = verifyOtpSignInRequestDto;
+
+    if (!(await this.accountRepository.findByEmail(email))) {
+      throw AuthErrors.UserNotFoundByEmail(email);
+    }
+
+    const { data, error } = await this.authProvider.verifyOtp(
+      email,
+      otp,
+      OtpType.MAGIC_LINK,
+    );
+
+    if (error) {
+      throw AuthErrors.VerifyOtpFailed(error.message);
+    }
+
+    if (!data?.session || !data?.user) {
+      throw AuthErrors.ProviderError(
+        'Lỗi hệ thống',
+        'Không lấy được phiên đăng nhập sau khi xác thực OTP',
+      );
+    }
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'xác thực thành công',
+      data: {
+        access_token: data?.session?.access_token,
+        refresh_token: data?.session?.refresh_token,
+        ...data.user?.user_metadata,
+      },
+    };
+  }
+
+  async forgotPassword(forgotPasswordRequestDto: ForgotPasswordRequestDto) {
+    const { email } = forgotPasswordRequestDto;
+
+    if (!(await this.accountRepository.findByEmail(email))) {
+      throw AuthErrors.UserNotFoundByEmail(email);
+    }
+
+    const { error } = await this.authProvider.resetPasswordForEmail(email);
+
+    if (error) {
+      throw AuthErrors.SendResetPasswordOtpFailed(error.message);
+    }
+
+    return {
+      code: 200,
+      message: 'Gửi OTP thành công',
+      status: 'success',
+    };
+  }
+
+  async verifyAndResetPassword(
+    verifyAndResetPasswordRequestDto: VerifyAndResetPasswordRequestDto,
+  ) {
+    const { email, otp, new_password } = verifyAndResetPasswordRequestDto;
+
+    if (!(await this.accountRepository.findByEmail(email))) {
+      throw AuthErrors.UserNotFoundByEmail(email);
+    }
+
+    const { data, error } = await this.authProvider.verifyOtp(
+      email,
+      otp,
+      OtpType.RECOVERY,
+    );
+
+    if (error) {
+      throw AuthErrors.VerifyOtpFailed(error.message);
+    }
+
+    if (!data?.user?.id) {
+      throw AuthErrors.ProviderError(
+        'Lỗi hệ thống',
+        'Không lấy được thông tin người dùng sau khi xác thực',
+      );
+    }
+
+    const account_id = data.user.id;
+
+    const { data: updateUserData, error: updateUserError } =
+      await this.authProvider.updateUserById(account_id, {
+        password: new_password,
       });
+
+    if (updateUserError) {
+      throw AuthErrors.ResetPasswordFailed(updateUserError.message);
+    }
+
+    return {
+      code: 200,
+      message: 'Cập nhật mật khẩu thành công',
+      status: 'success',
+      data: updateUserData,
+    };
+  }
+
+  async refreshToken(refreshTokenRequestDto: RefreshTokenRequestDto) {
+    const { refreshToken } = refreshTokenRequestDto;
+
+    const { data, error } =
+      await this.authProvider.refreshSession(refreshToken);
+
+    if (error) {
+      throw AuthErrors.TokenRefreshFailed;
+    }
+
+    if (!data.session) {
+      throw AuthErrors.ProviderError(
+        'Lỗi hệ thống',
+        'Không lấy được phiên đăng nhập từ hệ thống',
+      );
     }
 
     return {
@@ -352,131 +321,62 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(
-    forgotPasswordDto: ForgotPasswordDto,
-  ): Promise<BaseResponse<any>> {
-    const exitedEmail = await this.prismaConfig.users.findUnique({
-      where: {
-        email: forgotPasswordDto.email,
-      },
-    });
+  async signOut(signOutRequestDto: SignOutReqRequestDto) {
+    const { token } = signOutRequestDto;
 
-    if (!exitedEmail) {
-      throw new NotFoundException({
-        code: 404,
-        status: 'error',
-        message: 'Email không tồn tại',
-      });
-    }
-
-    const { error } = await this.supabaseClient.auth.resetPasswordForEmail(
-      forgotPasswordDto.email,
-    );
+    const { error } = await this.authProvider.signOut(token, SignOutType.LOCAL);
 
     if (error) {
-      throw new BadRequestException({
-        code: 400,
-        status: 'error',
-        message: 'Gửi mã otp không thành công',
-      });
+      throw AuthErrors.SignOutFailed;
     }
 
     return {
       code: 200,
       status: 'success',
-      message: 'Gửi mã otp thành công',
-    };
-  }
-
-  async verifyForgot(verifyOtpDto: VerifyOtpDto): Promise<BaseResponse<any>> {
-    const { data, error } = await this.supabaseClient.auth.verifyOtp({
-      email: verifyOtpDto.email,
-      token: verifyOtpDto.otp,
-      type: 'recovery',
-    });
-
-    if (error || !data.user) {
-      throw new BadRequestException({
-        code: 400,
-        status: 'error',
-        message: 'Xác thực otp không thành công',
-      });
-    }
-
-    const { error: updateError } =
-      await this.supabaseClient.auth.admin.updateUserById(data.user.id, {
-        password: verifyOtpDto.password,
-      });
-
-    if (updateError) {
-      throw new BadRequestException({
-        code: 400,
-        status: 'error',
-        message: 'Thay đổi mật khẩu không thành công',
-      });
-    }
-
-    return {
-      code: 200,
-      status: 'success',
-      message: 'Lấy lại mật khẩu thành công',
+      message: 'Đăng xuất thành công',
     };
   }
 
   async getProfile(id: string) {
-    try {
-      const data = await this.prismaConfig.users.findUnique({
-        where: {
-          id: id,
-        },
-      });
-      if (!data) {
-        throw new NotFoundException(`Không tìm thấy người dùng với id ${id}`);
-      }
-      return {
-        code: 200,
-        message: 'Lấy người dùng thành công',
-        status: 'success',
-        data: data,
-      };
-    } catch (error) {
-      return {
-        code: 500,
-        message: error instanceof Error ? error.message : 'Unknown Error',
-        status: 'error',
-      };
+    const existedAccout = await this.accountRepository.findById(id);
+
+    if (!existedAccout) {
+      throw AuthErrors.UserNotFoundById(id);
     }
+
+    return {
+      code: 200,
+      message: 'Lấy thông tin người dùng thành công',
+      status: 'success',
+      data: existedAccout,
+    };
   }
 
-  async updateProfile(updateUserDto: UpdateUserDto, id: string) {
+  async updateProfile(id: string, updateUserRequestDto: UpdateUserRequestDto) {
+    const existedAccount = await this.accountRepository.findById(id);
+
+    if (!existedAccount) {
+      throw AuthErrors.UserNotFoundById(id);
+    }
+
+    const { error } = await this.authProvider.updateUserById(
+      id,
+      updateUserRequestDto,
+    );
+
+    if (error) {
+      throw AuthErrors.UpdateProfileFailed(id);
+    }
+
+    let isLocalAccountUpdate = false;
+
     try {
-      const data = await this.prismaConfig.users.update({
-        where: {
-          id: id,
-        },
-        data: {
-          dob: updateUserDto.dob,
-          full_name: updateUserDto.fullName,
-          gender: updateUserDto.gender,
-        },
-      });
-      if (!data) {
-        throw new BadRequestException('Không thể cập nhật người dùng');
-      }
-      const { error } = await this.supabaseClient.auth.admin.updateUserById(
+      const data = await this.accountRepository.update(
         id,
-        {
-          user_metadata: {
-            full_name: updateUserDto.fullName,
-            dob: updateUserDto.dob,
-            gender: updateUserDto.gender,
-          },
-        },
+        updateUserRequestDto,
       );
 
-      if (error) {
-        throw new BadRequestException('cập nhật người dùng thất bại');
-      }
+      isLocalAccountUpdate = true;
 
       return {
         code: 200,
@@ -485,11 +385,26 @@ export class AuthService {
         data: data,
       };
     } catch (error) {
-      return {
-        code: 500,
-        message: error,
-        status: 'error',
-      };
+      this.logger.error(
+        `Lỗi khi cập nhật người dùng với id: ${id}. đang roolback`,
+        error,
+      );
+
+      if (isLocalAccountUpdate) {
+        try {
+          await this.accountRepository.update(id, existedAccount);
+        } catch (error) {
+          this.logger.error('Không thể cập nhật người dùng', error);
+        }
+      }
+
+      try {
+        await this.authProvider.updateUserById(id, existedAccount);
+      } catch (error) {
+        this.logger.error('Không thể cập nhật tài khoảng supabase', error);
+      }
+
+      throw error;
     }
   }
 }

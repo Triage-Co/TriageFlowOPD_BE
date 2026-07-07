@@ -13,7 +13,9 @@ import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { IsAdminGuard } from '../../shared/guards/is-admin.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
+import { RoleTypeEnum } from '@prisma/client';
 
 @ApiTags('Category')
 @Controller('category')
@@ -22,7 +24,8 @@ export class CategoryController {
 
   @Post()
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Tạo danh mục mới (Admin)' })
   create(@Body() createCategoryDto: CreateCategoryDto) {
     return this.categoryService.create(createCategoryDto);
@@ -46,7 +49,7 @@ export class CategoryController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Cập nhật danh mục (Admin)' })
   update(
     @Param('id') id: string,
@@ -57,7 +60,7 @@ export class CategoryController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Xóa danh mục (Admin)' })
   remove(@Param('id') id: string) {
     return this.categoryService.remove(id);

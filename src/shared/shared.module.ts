@@ -1,19 +1,48 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SupabaseConfig } from './config/supabase.config';
-import { PrismaConfig } from './config/prisma.config';
-import { PayosConfig } from './config/payos.config';
 import { GeoService } from './geo/geo.service';
+import { SupabaseService } from './config/supabase.service';
+import { PrismaService } from './config/prisma.service';
+import { PayosService } from './config/payos.service';
+import { SupabaseAuthProvider } from './repositories/supabase-auth.provider';
+import { PrismaAccountRepository } from './repositories/prisma-account.repository';
+import { PrismaPatientRepository } from './repositories/prisma-patient.repository';
+import { PrismaStaffRepository } from './repositories/prisma-staff.repository';
 
 @Global()
 @Module({
   providers: [
     ConfigService,
-    SupabaseConfig,
-    PrismaConfig,
-    PayosConfig,
+    SupabaseService,
+    PrismaService,
+    PayosService,
     GeoService,
+    {
+      provide: 'IAuthProvider',
+      useClass: SupabaseAuthProvider,
+    },
+    {
+      provide: 'IAccountRepository',
+      useClass: PrismaAccountRepository,
+    },
+    {
+      provide: 'IPatientRepository',
+      useClass: PrismaPatientRepository,
+    },
+    {
+      provide: 'IStaffRepository',
+      useClass: PrismaStaffRepository,
+    },
   ],
-  exports: [SupabaseConfig, PrismaConfig, PayosConfig, GeoService],
+  exports: [
+    SupabaseService,
+    PrismaService,
+    PayosService,
+    GeoService,
+    'IAuthProvider',
+    'IAccountRepository',
+    'IPatientRepository',
+    'IStaffRepository',
+  ],
 })
 export class SharedModule {}
