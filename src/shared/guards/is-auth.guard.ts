@@ -4,45 +4,44 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SupabaseConfig } from '../config/supabase.config';
+import { SupabaseService } from '../config/supabase.service';
 
 @Injectable()
 export class IsAuthGuard implements CanActivate {
-  constructor(private readonly supabaseConfig: SupabaseConfig) {}
+  constructor(private readonly supabaseService: SupabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
+    const ctx = context.switchToHttp();
+    const request = ctx.getRequest();
+    const authorization = request.headers.authorization;
 
-    if (!authHeader) {
+    if (!authorization) {
       throw new UnauthorizedException({
-        code: 401,
-        status: 'error',
-        message: 'Chưa có token trong header.',
+        detail: 'Chưa có token trong header',
+        message: 'Lỗi xác thực',
       });
     }
-    const [type, token] = authHeader.split(' ');
+
+    const [type, token] = authorization.split(' ');
     if (type !== 'Bearer' || !token) {
       throw new UnauthorizedException({
-        code: 401,
-        status: 'error',
-        message: 'Định dạng toke không hợp lệ',
+        message: 'Định dạng token không hợp lệ',
+        detail: 'Định dạng token phải là Bearer token',
       });
     }
     const {
       data: { user },
       error,
-    } = await this.supabaseConfig.getClient().auth.getUser(token);
+    } = await this.supabaseService.getClient().auth.getUser(token);
 
     if (error || !user) {
       throw new UnauthorizedException({
-        code: 401,
-        status: 'error',
         message: 'Token không hợp lệ hoặc đã hết hạn.',
+        detail: error?.message,
       });
     }
 
-    request['user'] = user.user_metadata;
+    request['user'] = user;
 
     return true;
   }
