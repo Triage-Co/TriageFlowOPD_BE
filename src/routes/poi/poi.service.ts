@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { CreatePoiDto } from './dto/create-poi.dto';
 import { UpdatePoiDto } from './dto/update-poi.dto';
 import { PrismaConfig } from '../../shared/config/prisma.config';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '.prisma/client';
 
 @Injectable()
 export class PoiService {
-  constructor(private readonly prisma: PrismaConfig) {}
+  constructor(private readonly prisma: PrismaConfig) { }
 
   async create(createPoiDto: CreatePoiDto) {
     try {
