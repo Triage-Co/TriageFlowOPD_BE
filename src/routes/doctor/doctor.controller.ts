@@ -4,7 +4,7 @@ import { CreateDoctorDto } from './dto/request-doctor.dto';
 
 @Controller('doctor')
 export class DoctorController {
-  constructor(private readonly doctorService: DoctorService) { }
+  constructor(private readonly doctorService: DoctorService) {}
 
   @Post()
   create(@Body() createDoctorDto: CreateDoctorDto) {
@@ -16,8 +16,8 @@ export class DoctorController {
     return this.doctorService.findAll();
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string) {
+  @Get(':id')
+  findOne(@Param('id') id: string) {
     return this.doctorService.findOne(id);
   }
 }

@@ -4,29 +4,26 @@ import { PrismaConfig } from '../../shared/config/prisma.config';
 
 @Injectable()
 export class ShiftService {
-
-  constructor(private readonly pismaClient: PrismaConfig) { }
-
+  constructor(private readonly pismaClient: PrismaConfig) {}
 
   async create(createShiftDto: CreateShiftDto) {
     try {
-
       const exitedShift = await this.pismaClient.shift.findUnique({
         where: {
           doctorId_date_startTime_endTime: {
             doctorId: createShiftDto.doctorId,
             date: createShiftDto.date,
             startTime: createShiftDto.startTime,
-            endTime: createShiftDto.endTime
-          }
-        }
-      })
+            endTime: createShiftDto.endTime,
+          },
+        },
+      });
       if (exitedShift) {
         return {
           code: 404,
           message: `Ca trực ${createShiftDto.startTime} - ${createShiftDto.endTime} của bác sĩ với id ${createShiftDto.doctorId} đã tồn tại trong hệ thống`,
-          status: "error"
-        }
+          status: 'error',
+        };
       }
 
       const data = await this.pismaClient.shift.create({
@@ -35,21 +32,21 @@ export class ShiftService {
           date: createShiftDto.date,
           startTime: createShiftDto.startTime,
           endTime: createShiftDto.endTime,
-          capacity: createShiftDto.capacity
-        }
-      })
+          capacity: createShiftDto.capacity,
+        },
+      });
       return {
         code: 200,
-        message: "Thêm ca trực thành công",
-        status: "success",
-        data: data
+        message: 'Thêm ca trực thành công',
+        status: 'success',
+        data: data,
       };
     } catch (error) {
       return {
         code: 500,
         message: error,
-        status: "error",
-      }
+        status: 'error',
+      };
     }
   }
 
@@ -67,35 +64,34 @@ export class ShiftService {
               id: true,
               specialty: {
                 select: {
-                  name: true
-                }
+                  name: true,
+                },
               },
               doctor: {
                 select: {
                   full_name: true,
-                }
-              }
-            }
+                },
+              },
+            },
           },
           status: true,
-
-        }
+        },
       });
       if (!data) {
-        throw new BadRequestException("Danh sách ca trực rỗng")
+        throw new BadRequestException('Danh sách ca trực rỗng');
       }
       return {
         code: 200,
-        message: "Lấy toàn bộ ca trực thành công",
-        status: "success",
-        data: data
+        message: 'Lấy toàn bộ ca trực thành công',
+        status: 'success',
+        data: data,
       };
     } catch (error) {
       return {
         code: 500,
-        message: error instanceof Error ? error.message : "Unknown Error",
-        status: "error",
-      }
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
     }
   }
 
@@ -103,7 +99,7 @@ export class ShiftService {
     try {
       const data = await this.pismaClient.shift.findFirst({
         where: {
-          id: id
+          id: id,
         },
         select: {
           id: true,
@@ -116,8 +112,8 @@ export class ShiftService {
               id: true,
               specialty: {
                 select: {
-                  name: true
-                }
+                  name: true,
+                },
               },
               doctor: {
                 select: {
@@ -127,28 +123,28 @@ export class ShiftService {
                   dob: true,
                   email: true,
                   gender: true,
-                }
-              }
-            }
+                },
+              },
+            },
           },
           status: true,
-        }
+        },
       });
       if (!data) {
-        throw new BadRequestException("Danh sách ca trực rỗng")
+        throw new BadRequestException('Danh sách ca trực rỗng');
       }
       return {
         code: 200,
-        message: "Lấy toàn bộ ca trực thành công",
-        status: "success",
-        data: data
+        message: 'Lấy toàn bộ ca trực thành công',
+        status: 'success',
+        data: data,
       };
     } catch (error) {
       return {
         code: 500,
-        message: error instanceof Error ? error.message : "Unknown Error",
-        status: "error",
-      }
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
     }
   }
 
@@ -160,25 +156,24 @@ export class ShiftService {
           date: updateShiftDto.date,
           startTime: updateShiftDto.startTime,
           endTime: updateShiftDto.endTime,
-          capacity: updateShiftDto.capacity
+          capacity: updateShiftDto.capacity,
         },
         where: {
-          id: id
-        }
-      })
+          id: id,
+        },
+      });
       return {
         code: 200,
-        message: "Thêm ca trực thành công",
-        status: "success",
-        data: data
+        message: 'Thêm ca trực thành công',
+        status: 'success',
+        data: data,
       };
     } catch (error) {
       return {
         code: 500,
-        message: error instanceof Error ? error.message : "Unknown Error",
-        status: "error",
-      }
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
     }
   }
-
 }

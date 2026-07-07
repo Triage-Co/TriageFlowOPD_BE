@@ -1,10 +1,18 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { SpecialtyService } from './specialty.service';
 import { CreateSpecialtyDto } from './dto/request-specialty.dto';
 
 @Controller('specialty')
 export class SpecialtyController {
-  constructor(private readonly specialtyService: SpecialtyService) { }
+  constructor(private readonly specialtyService: SpecialtyService) {}
 
   @Post()
   create(@Body() createSpecialtyDto: CreateSpecialtyDto) {
@@ -15,6 +23,4 @@ export class SpecialtyController {
   findAll() {
     return this.specialtyService.findAll();
   }
-
-
 }
