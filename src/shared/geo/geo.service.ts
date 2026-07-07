@@ -18,6 +18,31 @@ export class GeoService {
     this.prismaClient = this.prisma as unknown as PrismaQueryClient;
   }
 
+  /**
+   * Update a geometry column using either WKT or GeoJSON string.
+   */
+  async updateGeom(
+    table: string,
+    id: string,
+    column: string,
+    geomStr: string,
+  ): Promise<void> {
+    const trimmed = geomStr.trim();
+    const isGeoJSON = trimmed.startsWith('{') || trimmed.startsWith('[');
+    if (isGeoJSON) {
+      await this.prismaClient.$queryRawUnsafe(
+        `UPDATE "${table}" SET "${column}" = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) WHERE id = $2::uuid`,
+        geomStr,
+        id,
+      );
+    } else {
+      await this.prismaClient.$queryRawUnsafe(
+        `UPDATE "${table}" SET "${column}" = ST_GeomFromText($1, 4326) WHERE id = $2::uuid`,
+        geomStr,
+        id,
+      );
+    }
+  }
 
   /**
    * Convert longitude and latitude into Well-Known Text (WKT) representation.
@@ -29,7 +54,11 @@ export class GeoService {
   /**
    * Read a geometry column as a GeoJSON object from the database.
    */
-  async readGeom(table: string, id: string, column: string): Promise<any> {
+  async readGeom(
+    table: string,
+    id: string,
+    column: string,
+  ): Promise<object | null> {
     const result = await this.prismaClient.$queryRawUnsafe<GeomQueryResult[]>(
       `SELECT ST_AsGeoJSON(${column}) AS geom FROM "${table}" WHERE id = $1::uuid`,
       id,
@@ -42,7 +71,7 @@ export class GeoService {
     ) {
       return null;
     }
-    return JSON.parse(result[0].geom);
+    return JSON.parse(result[0].geom) as object;
   }
 
   /**

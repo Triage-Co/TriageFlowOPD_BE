@@ -4,6 +4,7 @@ import { User } from '@supabase/supabase-js';
 import { AuthErrors } from '../exceptions/auth.exceptions';
 import type { IAccountRepository } from '../interfaces/i-account.repository';
 import { ROLE_KEYS } from '../decorator/role.decorator';
+import { RoleTypeEnum } from '@prisma/client';
 
 export class IsRoleGuard implements CanActivate {
   constructor(
@@ -13,10 +14,10 @@ export class IsRoleGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const requiredRole = this.reflector.getAllAndOverride<string[]>(ROLE_KEYS, [
-      context.getHandler,
-      context.getClass,
-    ]);
+    const requiredRole = this.reflector.getAllAndOverride<RoleTypeEnum[]>(
+      ROLE_KEYS,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!requiredRole) {
       return true;
@@ -32,6 +33,7 @@ export class IsRoleGuard implements CanActivate {
     }
 
     const existedAccount = await this.accountRepository.findById(user.id);
+    console.log(existedAccount);
     const role = existedAccount.role;
 
     if (!role) {
