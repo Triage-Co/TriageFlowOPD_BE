@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaConfig } from '../config/prisma.config';
+import { PrismaService } from '../config/prisma.service';
 
 interface GeomQueryResult {
   geom: string | null;
@@ -14,7 +14,7 @@ interface PrismaQueryClient {
 export class GeoService {
   private readonly prismaClient: PrismaQueryClient;
 
-  constructor(private readonly prisma: PrismaConfig) {
+  constructor(private readonly prisma: PrismaService) {
     this.prismaClient = this.prisma as unknown as PrismaQueryClient;
   }
 
