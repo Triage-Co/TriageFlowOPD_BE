@@ -1,4 +1,204 @@
 import { Injectable } from '@nestjs/common';
+import { CreateRoomBoundaryDto } from './dto/create-room-boundary.dto';
+import { UpdateRoomBoundaryDto } from './dto/update-room-boundary.dto';
+import { PrismaConfig } from '../../shared/config/prisma.config';
+import { GeoService } from '../../shared/geo/geo.service';
 
 @Injectable()
-export class RoomBoundaryService {}
+export class RoomBoundaryService {
+  constructor(
+    private readonly prisma: PrismaConfig,
+    private readonly geoService: GeoService,
+  ) {}
+
+  async create(createRoomBoundaryDto: CreateRoomBoundaryDto) {
+    try {
+      const data = await this.prisma.roomBoundary.create({
+        data: {
+          roomId: createRoomBoundaryDto.roomId,
+          seqNo: createRoomBoundaryDto.seqNo,
+          boundaryType: createRoomBoundaryDto.boundaryType,
+          adjacentRoomId: createRoomBoundaryDto.adjacentRoomId,
+          hasWall: createRoomBoundaryDto.hasWall,
+          doorId: createRoomBoundaryDto.doorId,
+        },
+      });
+
+      if (createRoomBoundaryDto.lineGeom) {
+        await this.geoService.updateGeom(
+          'room_boundary',
+          data.id,
+          'line_geom',
+          createRoomBoundaryDto.lineGeom,
+        );
+      }
+
+      const line = createRoomBoundaryDto.lineGeom
+        ? await this.geoService.readGeom('room_boundary', data.id, 'line_geom')
+        : null;
+
+      return {
+        code: 201,
+        message: 'Thêm đường biên thành công',
+        status: 'success',
+        data: { ...data, lineGeom: line },
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
+    }
+  }
+
+  async findAll(roomId?: string) {
+    try {
+      const data = await this.prisma.roomBoundary.findMany({
+        where: roomId ? { roomId } : {},
+      });
+
+      const processedData = await Promise.all(
+        data.map(async (boundary) => {
+          const line = await this.geoService.readGeom(
+            'room_boundary',
+            boundary.id,
+            'line_geom',
+          );
+          return { ...boundary, lineGeom: line };
+        }),
+      );
+
+      return {
+        code: 200,
+        message: 'Lấy danh sách đường biên thành công',
+        status: 'success',
+        data: processedData,
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
+    }
+  }
+
+  async findOne(id: string) {
+    try {
+      const data = await this.prisma.roomBoundary.findUnique({
+        where: { id },
+      });
+      if (!data) {
+        return {
+          code: 404,
+          message: `Không tìm thấy đường biên với id ${id}`,
+          status: 'error',
+        };
+      }
+
+      const line = await this.geoService.readGeom(
+        'room_boundary',
+        data.id,
+        'line_geom',
+      );
+
+      return {
+        code: 200,
+        message: 'Lấy thông tin đường biên thành công',
+        status: 'success',
+        data: { ...data, lineGeom: line },
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
+    }
+  }
+
+  async update(id: string, updateRoomBoundaryDto: UpdateRoomBoundaryDto) {
+    try {
+      const boundary = await this.prisma.roomBoundary.findUnique({
+        where: { id },
+      });
+      if (!boundary) {
+        return {
+          code: 404,
+          message: `Không tìm thấy đường biên với id ${id}`,
+          status: 'error',
+        };
+      }
+
+      const data = await this.prisma.roomBoundary.update({
+        where: { id },
+        data: {
+          roomId: updateRoomBoundaryDto.roomId,
+          seqNo: updateRoomBoundaryDto.seqNo,
+          boundaryType: updateRoomBoundaryDto.boundaryType,
+          adjacentRoomId: updateRoomBoundaryDto.adjacentRoomId,
+          hasWall: updateRoomBoundaryDto.hasWall,
+          doorId: updateRoomBoundaryDto.doorId,
+        },
+      });
+
+      if (updateRoomBoundaryDto.lineGeom) {
+        await this.geoService.updateGeom(
+          'room_boundary',
+          data.id,
+          'line_geom',
+          updateRoomBoundaryDto.lineGeom,
+        );
+      }
+
+      const line = await this.geoService.readGeom(
+        'room_boundary',
+        data.id,
+        'line_geom',
+      );
+
+      return {
+        code: 200,
+        message: 'Cập nhật đường biên thành công',
+        status: 'success',
+        data: { ...data, lineGeom: line },
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
+    }
+  }
+
+  async remove(id: string) {
+    try {
+      const boundary = await this.prisma.roomBoundary.findUnique({
+        where: { id },
+      });
+      if (!boundary) {
+        return {
+          code: 404,
+          message: `Không tìm thấy đường biên với id ${id}`,
+          status: 'error',
+        };
+      }
+      await this.prisma.roomBoundary.delete({
+        where: { id },
+      });
+      return {
+        code: 200,
+        message: 'Xóa đường biên thành công',
+        status: 'success',
+      };
+    } catch (error) {
+      return {
+        code: 500,
+        message: error instanceof Error ? error.message : 'Unknown Error',
+        status: 'error',
+      };
+    }
+  }
+}
