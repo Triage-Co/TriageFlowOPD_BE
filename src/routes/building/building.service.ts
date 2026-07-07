@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { CreateBuildingDto } from './dto/create-building.dto';
 import { UpdateBuildingDto } from './dto/update-building.dto';
-import { PrismaConfig } from '../../shared/config/prisma.config';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class BuildingService {
-  constructor(private readonly prisma: PrismaConfig) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createBuildingDto: CreateBuildingDto) {
     try {

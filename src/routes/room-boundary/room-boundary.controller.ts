@@ -9,12 +9,19 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RoomBoundaryService } from './room-boundary.service';
 import { CreateRoomBoundaryDto } from './dto/create-room-boundary.dto';
 import { UpdateRoomBoundaryDto } from './dto/update-room-boundary.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { IsAdminGuard } from '../../shared/guards/is-admin.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { RoleTypeEnum } from '@prisma/client';
+import { roles } from '../../shared/decorator/role.decorator';
 
 @ApiTags('RoomBoundary')
 @Controller('room-boundary')
@@ -23,7 +30,8 @@ export class RoomBoundaryController {
 
   @Post()
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Tạo đường biên mới (Admin)' })
   create(@Body() createRoomBoundaryDto: CreateRoomBoundaryDto) {
     return this.roomBoundaryService.create(createRoomBoundaryDto);
@@ -48,7 +56,8 @@ export class RoomBoundaryController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Cập nhật đường biên (Admin)' })
   update(
     @Param('id') id: string,
@@ -59,7 +68,8 @@ export class RoomBoundaryController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Xóa đường biên (Admin)' })
   remove(@Param('id') id: string) {
     return this.roomBoundaryService.remove(id);

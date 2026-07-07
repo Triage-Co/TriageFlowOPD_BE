@@ -4,6 +4,8 @@ import { config } from 'dotenv';
 config();
 
 class EnvClass {
+  @IsString({ message: 'Thiếu  DIRECT_URL TRONG FILE .ENV' })
+  DIRECT_URL: string;
   @IsString({ message: 'Thiếu DATABASE_URL TRONG FILE .ENV' })
   DATABASE_URL: string;
   @IsString({ message: 'Thiếu SUPABASE_KEY TRONG FILE .ENV' })

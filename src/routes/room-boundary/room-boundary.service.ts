@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { CreateRoomBoundaryDto } from './dto/create-room-boundary.dto';
 import { UpdateRoomBoundaryDto } from './dto/update-room-boundary.dto';
-import { PrismaConfig } from '../../shared/config/prisma.config';
 import { GeoService } from '../../shared/geo/geo.service';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class RoomBoundaryService {
   constructor(
-    private readonly prisma: PrismaConfig,
+    private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
   ) {}
 
