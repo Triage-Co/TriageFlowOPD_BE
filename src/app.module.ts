@@ -21,6 +21,7 @@ import { PoiModule } from './routes/poi/poi.module';
 import { NodeModule } from './routes/node/node.module';
 import { EdgeModule } from './routes/edge/edge.module';
 import { ConnectorModule } from './routes/connector/connector.module';
+import { GraphModule } from './routes/graph/graph.module';
 import { FeatureTemplateModule } from './routes/feature-template/feature-template.module';
 import { PlacedFeatureModule } from './routes/placed-feature/placed-feature.module';
 import { BlockageModule } from './routes/blockage/blockage.module';
@@ -51,6 +52,7 @@ import { BlockageModule } from './routes/blockage/blockage.module';
     NodeModule,
     EdgeModule,
     ConnectorModule,
+    GraphModule,
     FeatureTemplateModule,
     PlacedFeatureModule,
     BlockageModule,

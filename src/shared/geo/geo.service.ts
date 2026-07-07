@@ -60,7 +60,7 @@ export class GeoService {
     column: string,
   ): Promise<object | null> {
     const result = await this.prismaClient.$queryRawUnsafe<GeomQueryResult[]>(
-      `SELECT ST_AsGeoJSON(${column}) AS geom FROM "${table}" WHERE id = $1::uuid`,
+      `SELECT ST_AsGeoJSON("${column}") AS geom FROM "${table}" WHERE id = $1::uuid`,
       id,
     );
     if (
@@ -86,10 +86,35 @@ export class GeoService {
       SELECT id, room_code as "roomCode", room_label as "roomLabel"
       FROM "physical_room"
       WHERE ST_DWithin(
-        center_geom::geography,
+        "centerGeom"::geography,
         ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography,
         ${radiusMeters}
       )
     `;
+  }
+
+  /**
+   * Fetch a geometry column as a GeoJSON Feature array (all rows) for a floor.
+   */
+  async readAllGeoms(
+    table: string,
+    floorId: string,
+    column: string,
+  ): Promise<any[]> {
+    const idColumn = table === 'floor' ? 'id' : 'floorId';
+    const result = await this.prismaClient.$queryRawUnsafe<any[]>(
+      `SELECT *, ST_AsGeoJSON("${column}") AS geom FROM "${table}" WHERE "${idColumn}" = $1::uuid`,
+      floorId,
+    );
+    return result.map((row) => {
+      const geom = row.geom ? JSON.parse(row.geom) : null;
+      // Remove raw geometry string/object and return as a GeoJSON Feature
+      const { [column]: _, geom: __, ...properties } = row;
+      return {
+        type: 'Feature',
+        geometry: geom,
+        properties: properties,
+      };
+    });
   }
 }

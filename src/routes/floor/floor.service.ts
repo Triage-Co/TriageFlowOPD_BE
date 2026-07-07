@@ -28,13 +28,13 @@ export class FloorService {
         await this.geoService.updateGeom(
           'floor',
           data.id,
-          'outline_geom',
+          'outlineGeom',
           createFloorDto.outlineGeom,
         );
       }
 
       const outline = createFloorDto.outlineGeom
-        ? await this.geoService.readGeom('floor', data.id, 'outline_geom')
+        ? await this.geoService.readGeom('floor', data.id, 'outlineGeom')
         : null;
 
       return {
@@ -63,7 +63,7 @@ export class FloorService {
           const outline = await this.geoService.readGeom(
             'floor',
             floor.id,
-            'outline_geom',
+            'outlineGeom',
           );
           return { ...floor, outlineGeom: outline };
         }),
@@ -100,7 +100,7 @@ export class FloorService {
       const outline = await this.geoService.readGeom(
         'floor',
         data.id,
-        'outline_geom',
+        'outlineGeom',
       );
 
       return {
@@ -147,7 +147,7 @@ export class FloorService {
         await this.geoService.updateGeom(
           'floor',
           data.id,
-          'outline_geom',
+          'outlineGeom',
           updateFloorDto.outlineGeom,
         );
       }
@@ -155,7 +155,7 @@ export class FloorService {
       const outline = await this.geoService.readGeom(
         'floor',
         data.id,
-        'outline_geom',
+        'outlineGeom',
       );
 
       return {
