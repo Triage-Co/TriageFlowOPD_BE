@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { BoundaryType } from '@prisma/client';
+import { BoundaryType } from '.prisma/client';
 import {
   IsBoolean,
   IsEnum,
