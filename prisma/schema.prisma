@@ -414,6 +414,21 @@ model Flow_Rules_Config {
   @@map("flow_rules_config")
 }
 
+model Transaction {
+  id        String          @id @default(uuid()) @db.Uuid
+  amount    Int
+  transDate DateTime        @default(now()) @db.Timestamptz()
+  transType TransTypeEnum
+  docNo     Int             @unique
+  buyerId   String          @db.Uuid
+  status    TransStatusEnum @default(PENDING)
+
+  @@index([docNo, status])
+  @@index([transDate, transType])
+  @@index([buyerId])
+  @@map("transaction")
+}
+
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum RoomType {

@@ -18,6 +18,9 @@ import { BlockageModule } from './routes/blockage/blockage.module';
 import { AuthModule } from './routes/auth/auth.module';
 import { ShiftModule } from './routes/shift/shift.module';
 import { RoomModule } from './routes/room/room.module';
+import { TriageConfigModule } from './routes/triage_config/triage_config.module';
+import { TransactionModule } from './routes/transaction/transaction.module';
+import { BookingModule } from './routes/booking/booking.module';
 
 @Module({
   imports: [
@@ -42,6 +45,9 @@ import { RoomModule } from './routes/room/room.module';
     AuthModule,
     ShiftModule,
     RoomModule,
+    TriageConfigModule,
+    TransactionModule,
+    BookingModule,
   ],
 })
 export class AppModule {}
