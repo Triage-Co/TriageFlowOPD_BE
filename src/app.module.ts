@@ -16,6 +16,8 @@ import { FeatureTemplateModule } from './routes/feature-template/feature-templat
 import { PlacedFeatureModule } from './routes/placed-feature/placed-feature.module';
 import { BlockageModule } from './routes/blockage/blockage.module';
 import { AuthModule } from './routes/auth/auth.module';
+import { ShiftModule } from './routes/shift/shift.module';
+import { RoomModule } from './routes/room/room.module';
 
 @Module({
   imports: [
@@ -38,6 +40,8 @@ import { AuthModule } from './routes/auth/auth.module';
     PlacedFeatureModule,
     BlockageModule,
     AuthModule,
+    ShiftModule,
+    RoomModule,
   ],
 })
 export class AppModule {}

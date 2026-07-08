@@ -28,6 +28,8 @@ export class IsRoleGuard implements CanActivate {
 
     const user: User = request['user'];
 
+    console.log(user);
+
     if (!user) {
       throw AuthErrors.Unauthenticated;
     }
