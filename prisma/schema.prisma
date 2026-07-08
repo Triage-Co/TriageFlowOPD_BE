@@ -196,10 +196,8 @@ model Shift {
 
   slots Slot[]
 
-  staff Staff @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade)
-
-  room           Room?         @relation(fields: [roomRoom_id], references: [room_id])
-  roomRoom_id    String?       @db.Uuid
+  staff          Staff         @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade)
+  room           Room          @relation(fields: [room_id], references: [room_id])
   physicalRoom   PhysicalRoom? @relation(fields: [physicalRoomId], references: [id])
   physicalRoomId String?       @db.Uuid
 

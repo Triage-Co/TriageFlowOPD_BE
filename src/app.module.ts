@@ -21,6 +21,7 @@ import { RoomModule } from './routes/room/room.module';
 import { TriageConfigModule } from './routes/triage_config/triage_config.module';
 import { TransactionModule } from './routes/transaction/transaction.module';
 import { BookingModule } from './routes/booking/booking.module';
+import { InfermedicaModule } from './routes/infermedica/infermedica.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { BookingModule } from './routes/booking/booking.module';
     TriageConfigModule,
     TransactionModule,
     BookingModule,
+    InfermedicaModule,
   ],
 })
 export class AppModule {}

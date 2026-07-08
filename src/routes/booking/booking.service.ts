@@ -306,13 +306,16 @@ export class BookingService {
       });
     }
 
+    console.log(exitedTriageInfor.specialty_id);
     const currentDate = new Date();
     const currentHours = `${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
+
+    console.log(currentHours);
 
     const availableSlots = await this.SLOT.findMany({
       where: {
         start_time: {
-          gte: currentHours, // Chỉ lấy các slot từ giờ hiện tại trở đi
+          gte: currentHours,
         },
         capacity: {
           gt: 0,
