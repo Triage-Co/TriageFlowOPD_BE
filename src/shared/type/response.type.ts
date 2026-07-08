@@ -1,12 +1,15 @@
-import { ApiProperty } from '@nestjs/swagger';
-
-export class BaseResponse<T> {
-  @ApiProperty()
+export type SuccessResponse<T> = {
   code: number;
-  @ApiProperty()
-  status: 'success' | 'error';
-  @ApiProperty()
+  status: 'success';
   message: string;
-  @ApiProperty()
-  data?: T;
-}
+  data: T;
+};
+
+export type ErrorResponse = {
+  code: number;
+  status: 'error';
+  message: string;
+  detail?: unknown;
+};
+
+export type ResponseType<T> = SuccessResponse<T> | ErrorResponse;

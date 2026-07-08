@@ -16,6 +16,12 @@ import { FeatureTemplateModule } from './routes/feature-template/feature-templat
 import { PlacedFeatureModule } from './routes/placed-feature/placed-feature.module';
 import { BlockageModule } from './routes/blockage/blockage.module';
 import { AuthModule } from './routes/auth/auth.module';
+import { ShiftModule } from './routes/shift/shift.module';
+import { RoomModule } from './routes/room/room.module';
+import { TriageConfigModule } from './routes/triage_config/triage_config.module';
+import { TransactionModule } from './routes/transaction/transaction.module';
+import { BookingModule } from './routes/booking/booking.module';
+import { InfermedicaModule } from './routes/infermedica/infermedica.module';
 
 @Module({
   imports: [
@@ -38,6 +44,12 @@ import { AuthModule } from './routes/auth/auth.module';
     PlacedFeatureModule,
     BlockageModule,
     AuthModule,
+    ShiftModule,
+    RoomModule,
+    TriageConfigModule,
+    TransactionModule,
+    BookingModule,
+    InfermedicaModule,
   ],
 })
 export class AppModule {}

@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
   extensions = [postgis]
 }
 
@@ -119,7 +119,10 @@ model Patient {
   createdAt           DateTime       @default(now()) @db.Timestamptz()
   updatedAt           DateTime       @default(now()) @updatedAt @db.Timestamptz()
 
-  account Account @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  bookings       Booking[]
+  patientAnwsers Patient_Anwser[]
+  medicalRecords Medical_Record[]
 
   @@index([full_name, account_id, dob])
   @@map("patient")
@@ -136,6 +139,8 @@ model Staff {
   account Account @relation(fields: [staff_id], references: [account_id], onDelete: Cascade)
 
   specialty Specialty? @relation(fields: [specialty_id], references: [specialty_id], onDelete: Cascade)
+  shifts    Shift[]
+  steps     Step[]
 
   @@index([license_number, specialty_id])
   @@map("staff")
@@ -149,11 +154,277 @@ model Specialty {
   createdAt      DateTime @default(now()) @db.Timestamptz()
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz()
 
-  staffs Staff[]
+  staffs             Staff[]
+  triageInformations Triage_Information[]
+  rooms              Room[]
 
   @@index([specialty_code])
   @@index([specialty_name])
   @@map("specialty")
+}
+
+model Slot {
+  slot_id      String         @id @default(uuid()) @db.Uuid
+  slot_index   Int?
+  shift_id     String         @db.Uuid
+  start_time   String
+  end_time     String
+  capacity     Int            @default(10)
+  max_capacity Int            @default(10)
+  status       SlotStatusEnum @default(AVAILABLE)
+  createdAt    DateTime       @default(now()) @db.Timestamptz()
+  updatedAt    DateTime       @default(now()) @updatedAt @db.Timestamptz()
+
+  shift    Shift     @relation(fields: [shift_id], references: [shift_id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([start_time, end_time])
+  @@index([status])
+  @@map("slot")
+}
+
+model Shift {
+  shift_id   String   @id @default(uuid()) @db.Uuid
+  staff_id   String   @db.Uuid
+  room_id    String   @db.Uuid
+  date       DateTime @db.Timestamptz()
+  start_time String
+  end_time   String
+
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  slots Slot[]
+
+  staff          Staff         @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade)
+  room           Room          @relation(fields: [room_id], references: [room_id])
+  physicalRoom   PhysicalRoom? @relation(fields: [physicalRoomId], references: [id])
+  physicalRoomId String?       @db.Uuid
+
+  @@index([date, start_time, end_time])
+  @@map("shift")
+}
+
+model Booking {
+  booking_id String            @id @default(uuid()) @db.Uuid
+  patient_id String            @db.Uuid
+  slot_id    String            @db.Uuid
+  status     BookingStatusEnum @default(AVAILABLE)
+
+  patient       Patient         @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  slot          Slot            @relation(fields: [slot_id], references: [slot_id], onDelete: Cascade)
+  flows         Flow[]
+  prescriptions Prescription[]
+  serviceOrders Service_Order[]
+
+  @@map("booking")
+}
+
+model Flow {
+  flow_id    String         @id @default(uuid()) @db.Uuid
+  booking_id String         @db.Uuid
+  status     FlowStatusEnum @default(PENDING)
+
+  booking       Booking        @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  steps         Step[]
+  prescriptions Prescription[]
+
+  @@map("flow")
+}
+
+model Room {
+  room_id          String  @id @default(uuid()) @db.Uuid
+  room_name        String
+  physical_room_id String? @db.Uuid
+  specialty_id     String? @db.Uuid
+  shifts           Shift[]
+
+  specialty     Specialty?    @relation(fields: [specialty_id], references: [specialty_id])
+  physical_room PhysicalRoom? @relation(fields: [physical_room_id], references: [id], onDelete: SetNull)
+  steps         Step[]
+
+  @@map("room")
+}
+
+model Step {
+  step_id        String             @id @default(uuid()) @db.Uuid
+  flow_id        String?            @db.Uuid
+  room_id        String?            @db.Uuid
+  staff_id       String?            @db.Uuid
+  next_step_id   String?            @db.Uuid
+  step_status    StepStatusEnum     @default(PENDING)
+  docNo          Int?
+  payment_status PaymentStatusEnum?
+
+  flow   Flow?   @relation(fields: [flow_id], references: [flow_id])
+  room   Room?   @relation(fields: [room_id], references: [room_id])
+  staff  Staff?  @relation(fields: [staff_id], references: [staff_id])
+  queues Queue[]
+
+  nextStep       Step?         @relation("StepSequence", fields: [next_step_id], references: [step_id])
+  previousStep   Step[]        @relation("StepSequence")
+  physicalRoom   PhysicalRoom? @relation(fields: [physicalRoomId], references: [id])
+  physicalRoomId String?       @db.Uuid
+
+  @@map("step")
+}
+
+model Queue {
+  queue_id     String          @id @default(uuid()) @db.Uuid
+  step_id      String          @db.Uuid
+  queue_number String
+  status       QueueStatusEnum @default(PENDING)
+
+  step     Step       @relation(fields: [step_id], references: [step_id])
+  moveLogs Move_Log[]
+
+  @@map("queue")
+}
+
+model Move_Log {
+  log_id      String  @id @default(uuid()) @db.Uuid
+  queue_id    String? @db.Uuid
+  action_type String?
+
+  queue Queue? @relation(fields: [queue_id], references: [queue_id], onDelete: Cascade)
+
+  @@map("move_log")
+}
+
+model Prescription {
+  prescription_id String  @id @default(uuid()) @db.Uuid
+  booking_id      String? @db.Uuid
+  flow_id         String? @db.Uuid
+  prescribed_by   String? @db.Uuid
+
+  booking             Booking?              @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  flow                Flow?                 @relation(fields: [flow_id], references: [flow_id], onDelete: Cascade)
+  prescriptionDetails Prescription_Detail[]
+
+  @@map("prescription")
+}
+
+model Prescription_Detail {
+  prescription_detail_id String  @id @default(uuid()) @db.Uuid
+  prescription_id        String? @db.Uuid
+  medicine_id            String? @db.Uuid
+  dosage_instruction     String?
+
+  prescription Prescription? @relation(fields: [prescription_id], references: [prescription_id])
+  medicine     Medicine?     @relation(fields: [medicine_id], references: [medicine_id])
+
+  @@map("prescription_detail")
+}
+
+model Medicine {
+  medicine_id         String                @id @default(uuid()) @db.Uuid
+  medicine_name       String?
+  unit                String?
+  prescriptionDetails Prescription_Detail[]
+
+  @@map("medicine")
+}
+
+model Service {
+  service_id          String                 @id @default(uuid()) @db.Uuid
+  service_code        String?
+  service_name        String?
+  price               Int
+  serviceOrderDetails Service_Order_Detail[]
+
+  @@map("service")
+}
+
+model Service_Order_Detail {
+  service_order_detail_id String  @id @default(uuid()) @db.Uuid
+  service_order_id        String? @db.Uuid
+  service_id              String? @db.Uuid
+  quantity                Int?
+
+  order   Service_Order? @relation(fields: [service_order_id], references: [service_order])
+  service Service?       @relation(fields: [service_id], references: [service_id])
+
+  @@map("service_order_detail")
+}
+
+model Service_Order {
+  service_order       String                 @id @default(uuid()) @db.Uuid
+  booking_id          String?                @db.Uuid
+  status              String?
+  total_amount        Int?
+  serviceOrderDetails Service_Order_Detail[]
+
+  booking Booking? @relation(fields: [booking_id], references: [booking_id])
+
+  @@map("service_order")
+}
+
+model Patient_Anwser {
+  patient_anwser_id  String  @id @default(uuid()) @db.Uuid
+  patient_id         String? @db.Uuid
+  citizen_id         String?
+  questionnaire_data Json?   @db.JsonB
+  interview_token    String? @unique
+
+  patient            Patient?             @relation(fields: [patient_id], references: [patient_id])
+  triageInformations Triage_Information[]
+
+  @@map("patient_anwser")
+}
+
+model Triage_Information {
+  triage_information_id String  @id @default(uuid()) @db.Uuid
+  answer_id             String? @db.Uuid
+  specialty_id          String? @db.Uuid
+  interview_token       String? @unique
+  suggested_priority    Int?
+
+  answer    Patient_Anwser? @relation(fields: [answer_id], references: [patient_anwser_id])
+  specialty Specialty?      @relation(fields: [specialty_id], references: [specialty_id])
+
+  @@map("triage_information")
+}
+
+model Medical_Record {
+  medical_record_id String  @id @default(uuid()) @db.Uuid
+  patient_id        String? @db.Uuid
+  clinical_history  Json    @db.JsonB
+  allergies         Json    @db.JsonB
+
+  patient Patient? @relation(fields: [patient_id], references: [patient_id])
+
+  @@map("medical_record")
+}
+
+model Triage_Config {
+  triage_config String  @id @default(uuid()) @db.Uuid
+  rule_key      String?
+  rule_value    Json?   @db.JsonB
+
+  @@map("triage_config")
+}
+
+model Flow_Rules_Config {
+  flow_rules_config_id String @id @default(uuid()) @db.Uuid
+  conditions           Json?  @db.JsonB
+  actions_to_generate  Json?  @db.JsonB
+
+  @@map("flow_rules_config")
+}
+
+model Transaction {
+  id        String          @id @default(uuid()) @db.Uuid
+  amount    Int
+  transDate DateTime        @default(now()) @db.Timestamptz()
+  transType TransTypeEnum
+  docNo     Int             @unique
+  buyerId   String          @db.Uuid
+  status    TransStatusEnum @default(PENDING)
+
+  @@index([docNo, status])
+  @@index([transDate, transType])
+  @@index([buyerId])
+  @@map("transaction")
 }
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -262,6 +533,9 @@ model PhysicalRoom {
   placedFeatures     PlacedFeature[]
   doorsAsRoomA       Door[]          @relation("DoorRoomA")
   doorsAsRoomB       Door[]          @relation("DoorRoomB")
+  shifts             Shift[]
+  steps              Step[]
+  rooms              Room[]
 
   @@unique([floorId, roomCode])
   @@index([floorId])

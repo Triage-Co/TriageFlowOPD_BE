@@ -8,6 +8,7 @@ import { SupabaseAuthProvider } from './repositories/supabase-auth.provider';
 import { PrismaAccountRepository } from './repositories/prisma-account.repository';
 import { PrismaPatientRepository } from './repositories/prisma-patient.repository';
 import { PrismaStaffRepository } from './repositories/prisma-staff.repository';
+import { PrismaRoomRepository } from './repositories/prisma-room.repository';
 
 @Global()
 @Module({
@@ -33,6 +34,10 @@ import { PrismaStaffRepository } from './repositories/prisma-staff.repository';
       provide: 'IStaffRepository',
       useClass: PrismaStaffRepository,
     },
+    {
+      provide: 'IRoomRepository',
+      useClass: PrismaRoomRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -43,6 +48,7 @@ import { PrismaStaffRepository } from './repositories/prisma-staff.repository';
     'IAccountRepository',
     'IPatientRepository',
     'IStaffRepository',
+    'IRoomRepository',
   ],
 })
 export class SharedModule {}
