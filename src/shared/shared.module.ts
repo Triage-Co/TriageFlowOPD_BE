@@ -38,6 +38,10 @@ import { PrismaRoomRepository } from './repositories/prisma-room.repository';
       provide: 'IRoomRepository',
       useClass: PrismaRoomRepository,
     },
+    {
+      provide: 'IPatientRepository',
+      useClass: PrismaPatientRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -49,6 +53,7 @@ import { PrismaRoomRepository } from './repositories/prisma-room.repository';
     'IPatientRepository',
     'IStaffRepository',
     'IRoomRepository',
+    'IPatientRepository',
   ],
 })
 export class SharedModule {}

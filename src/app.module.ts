@@ -22,6 +22,8 @@ import { TriageConfigModule } from './routes/triage_config/triage_config.module'
 import { TransactionModule } from './routes/transaction/transaction.module';
 import { BookingModule } from './routes/booking/booking.module';
 import { InfermedicaModule } from './routes/infermedica/infermedica.module';
+import { PatientModule } from './routes/patient/patient.module';
+import { DoctorModule } from './routes/doctor/doctor.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { InfermedicaModule } from './routes/infermedica/infermedica.module';
     TransactionModule,
     BookingModule,
     InfermedicaModule,
+    PatientModule,
+    DoctorModule,
   ],
 })
 export class AppModule {}
