@@ -126,7 +126,7 @@ export class BookingService {
           'https://www.youtube.com/watch?v=d2icAj6DPZI&list=RDd2icAj6DPZI&start_radio=1',
         returnUrl:
           'https://www.youtube.com/watch?v=d2icAj6DPZI&list=RDd2icAj6DPZI&start_radio=1',
-        clientId: createBookingRequestDto.patient_id,
+        clientId: exitedPatient.account_id,
         transType: 'APPOINTMENT_PAYMENT',
       });
 
