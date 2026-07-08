@@ -11,7 +11,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { GraphGenerationService } from './graph.service';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { IsAdminGuard } from '../../shared/guards/is-admin.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
+import { RoleTypeEnum } from '@prisma/client';
 import { IsArray, IsNumber, IsOptional } from 'class-validator';
 
 export class LinkConnectorDto {
@@ -34,7 +36,8 @@ export class GraphController {
   @Post(':floorId/generate')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Auto-generate navigation graph for a floor (Admin)' })
   async generate(@Param('floorId') floorId: string) {
     const data = await this.graphService.generateGraph(floorId);
@@ -63,7 +66,8 @@ export class GraphController {
   @Post('connector/:connectorId/link')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard, IsAdminGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Link inter-floor connector nodes across served floors (Admin)' })
   async link(
     @Param('connectorId') connectorId: string,

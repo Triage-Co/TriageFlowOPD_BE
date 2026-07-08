@@ -4,8 +4,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { IsAuthGuard } from './../src/shared/guards/is-auth.guard';
-import { IsAdminGuard } from './../src/shared/guards/is-admin.guard';
-import { PrismaConfig } from './../src/shared/config/prisma.config';
+import { IsRoleGuard } from './../src/shared/guards/is-role.guard';
+import { PrismaService } from './../src/shared/config/prisma.service';
 import { GeoService } from './../src/shared/geo/geo.service';
 import { RoomType, ConnectorType, NodeType } from '@prisma/client';
 
@@ -44,7 +44,7 @@ class MockAdminGuard implements CanActivate {
 
 describe('Spatial & Graph API (e2e)', () => {
   let app: INestApplication<App>;
-  let prisma: PrismaConfig;
+  let prisma: PrismaService;
   let geoService: GeoService;
 
   // Track created entities for manual database cleanup
@@ -109,14 +109,14 @@ describe('Spatial & Graph API (e2e)', () => {
     })
       .overrideGuard(IsAuthGuard)
       .useClass(MockAuthGuard)
-      .overrideGuard(IsAdminGuard)
+      .overrideGuard(IsRoleGuard)
       .useClass(MockAdminGuard)
       .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
 
-    prisma = app.get(PrismaConfig);
+    prisma = app.get(PrismaService);
     geoService = app.get(GeoService);
   });
 

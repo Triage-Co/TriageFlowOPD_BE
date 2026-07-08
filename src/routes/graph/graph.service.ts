@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaConfig } from '../../shared/config/prisma.config';
+import { PrismaService } from '../../shared/config/prisma.service';
 import { GeoService } from '../../shared/geo/geo.service';
 import * as turf from '@turf/turf';
 import { NodeType, ConnectorType } from '@prisma/client';
@@ -8,7 +8,7 @@ import { Polygon, MultiPolygon } from 'geojson';
 @Injectable()
 export class GraphGenerationService {
   constructor(
-    private readonly prisma: PrismaConfig,
+    private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
   ) {}
 
