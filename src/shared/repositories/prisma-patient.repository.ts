@@ -5,6 +5,13 @@ import { IPatientRepository } from '../interfaces/i-patient.repository';
 @Injectable()
 export class PrismaPatientRepository implements IPatientRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findOneWithPatientId(patient_id: string): Promise<any> {
+    return this.prismaService.patient.findUnique({
+      where: {
+        patient_id: patient_id,
+      },
+    });
+  }
   update(account_id: string, patient_id: string, data: any): Promise<any> {
     return this.prismaService.patient.update({
       data: {

@@ -24,6 +24,7 @@ import { BookingModule } from './routes/booking/booking.module';
 import { InfermedicaModule } from './routes/infermedica/infermedica.module';
 import { PatientModule } from './routes/patient/patient.module';
 import { DoctorModule } from './routes/doctor/doctor.module';
+import { NotificationModule } from './routes/notification/notification.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { DoctorModule } from './routes/doctor/doctor.module';
     InfermedicaModule,
     PatientModule,
     DoctorModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}
