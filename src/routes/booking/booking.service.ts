@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,6 +12,8 @@ import {
 import { PrismaService } from '../../shared/config/prisma.service';
 import { PrismaClient } from '@prisma/client';
 import { TransactionService } from '../transaction/transaction.service';
+import type { INotificationRepository } from '../../shared/interfaces/i-notification.repository';
+import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
 
 @Injectable()
 export class BookingService {
@@ -27,6 +30,10 @@ export class BookingService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly transactionService: TransactionService,
+    @Inject('INotificationRepository')
+    private readonly notificationRepository: INotificationRepository,
+    @Inject('IPatientRepository')
+    private readonly patientRepository: IPatientRepository,
   ) {
     this.BOOKING = this.prismaService.booking;
     this.SHIFT = this.prismaService.shift;
@@ -171,6 +178,7 @@ export class BookingService {
       const step = await this.STEP.findUnique({
         where: { step_id: step_id },
         include: {
+          room: true,
           queues: true,
           flow: {
             include: {
@@ -235,6 +243,13 @@ export class BookingService {
           queue_number: generateNumber + '',
         },
       });
+
+      if (createQueueData) {
+        await this.notificationRepository.create({
+          account_id: step.staff_id,
+          message: `Bạn có lượt khám mới lúc ${findSlotData?.start_time} tại phòng ${step.room?.room_name} với số ${createQueueData.queue_number}`,
+        });
+      }
 
       return {
         code: 200,

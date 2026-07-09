@@ -427,6 +427,16 @@ model Transaction {
   @@map("transaction")
 }
 
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  account_id String   @db.Uuid
+  message    String
+  create_at  DateTime @default(now()) @db.Timestamptz()
+  update_at  DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  @@map("notification")
+}
+
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum RoomType {
