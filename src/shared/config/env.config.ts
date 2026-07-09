@@ -24,6 +24,12 @@ class EnvClass {
   PAYOS_CHECKSUM_KEY: string;
   @IsString({ message: 'Thiếu PAYOS_API_KEY TRONG FILE .ENV' })
   PAYOS_API_KEY: string;
+  @IsString({ message: 'Thiếu VNPT_TOKEN_KEY TRONG FILE .ENV' })
+  VNPT_TOKEN_KEY: string;
+  @IsString({ message: 'Thiếu VNPT_TOKEN_ID TRONG FILE .ENV' })
+  VNPT_TOKEN_ID: string;
+  @IsString({ message: 'Thiếu VNPT_ACCESS_TOKEN TRONG FILE .ENV' })
+  VNPT_ACCESS_TOKEN: string;
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);
