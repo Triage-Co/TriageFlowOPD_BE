@@ -1,13 +1,10 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Delete,
-  Req,
-} from '@nestjs/common';
+import { Controller, Get, Param, Delete, Req, UseGuards } from '@nestjs/common';
 import { NotificationService } from './notification.service';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
-
+@ApiBearerAuth()
+@UseGuards(IsAuthGuard)
 @Controller('notification')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
