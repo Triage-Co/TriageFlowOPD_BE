@@ -28,13 +28,13 @@ export class RoomBoundaryService {
         await this.geoService.updateGeom(
           'room_boundary',
           data.id,
-          'line_geom',
+          'lineGeom',
           createRoomBoundaryDto.lineGeom,
         );
       }
 
       const line = createRoomBoundaryDto.lineGeom
-        ? await this.geoService.readGeom('room_boundary', data.id, 'line_geom')
+        ? await this.geoService.readGeom('room_boundary', data.id, 'lineGeom')
         : null;
 
       return {
@@ -63,7 +63,7 @@ export class RoomBoundaryService {
           const line = await this.geoService.readGeom(
             'room_boundary',
             boundary.id,
-            'line_geom',
+            'lineGeom',
           );
           return { ...boundary, lineGeom: line };
         }),
@@ -100,7 +100,7 @@ export class RoomBoundaryService {
       const line = await this.geoService.readGeom(
         'room_boundary',
         data.id,
-        'line_geom',
+        'lineGeom',
       );
 
       return {
@@ -147,7 +147,7 @@ export class RoomBoundaryService {
         await this.geoService.updateGeom(
           'room_boundary',
           data.id,
-          'line_geom',
+          'lineGeom',
           updateRoomBoundaryDto.lineGeom,
         );
       }
@@ -155,7 +155,7 @@ export class RoomBoundaryService {
       const line = await this.geoService.readGeom(
         'room_boundary',
         data.id,
-        'line_geom',
+        'lineGeom',
       );
 
       return {

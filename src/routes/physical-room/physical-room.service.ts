@@ -27,7 +27,7 @@ export class PhysicalRoomService {
         await this.geoService.updateGeom(
           'physical_room',
           data.id,
-          'center_geom',
+          'centerGeom',
           createPhysicalRoomDto.centerGeom,
         );
       }
@@ -36,7 +36,7 @@ export class PhysicalRoomService {
         await this.geoService.updateGeom(
           'physical_room',
           data.id,
-          'outline_geom',
+          'outlineGeom',
           createPhysicalRoomDto.outlineGeom,
         );
       }
@@ -45,7 +45,7 @@ export class PhysicalRoomService {
         ? await this.geoService.readGeom(
             'physical_room',
             data.id,
-            'center_geom',
+            'centerGeom',
           )
         : null;
 
@@ -53,7 +53,7 @@ export class PhysicalRoomService {
         ? await this.geoService.readGeom(
             'physical_room',
             data.id,
-            'outline_geom',
+            'outlineGeom',
           )
         : null;
 
@@ -83,12 +83,12 @@ export class PhysicalRoomService {
           const center = await this.geoService.readGeom(
             'physical_room',
             room.id,
-            'center_geom',
+            'centerGeom',
           );
           const outline = await this.geoService.readGeom(
             'physical_room',
             room.id,
-            'outline_geom',
+            'outlineGeom',
           );
           return { ...room, centerGeom: center, outlineGeom: outline };
         }),
@@ -125,12 +125,12 @@ export class PhysicalRoomService {
       const center = await this.geoService.readGeom(
         'physical_room',
         data.id,
-        'center_geom',
+        'centerGeom',
       );
       const outline = await this.geoService.readGeom(
         'physical_room',
         data.id,
-        'outline_geom',
+        'outlineGeom',
       );
 
       return {
@@ -176,7 +176,7 @@ export class PhysicalRoomService {
         await this.geoService.updateGeom(
           'physical_room',
           data.id,
-          'center_geom',
+          'centerGeom',
           updatePhysicalRoomDto.centerGeom,
         );
       }
@@ -185,7 +185,7 @@ export class PhysicalRoomService {
         await this.geoService.updateGeom(
           'physical_room',
           data.id,
-          'outline_geom',
+          'outlineGeom',
           updatePhysicalRoomDto.outlineGeom,
         );
       }
@@ -193,12 +193,12 @@ export class PhysicalRoomService {
       const center = await this.geoService.readGeom(
         'physical_room',
         data.id,
-        'center_geom',
+        'centerGeom',
       );
       const outline = await this.geoService.readGeom(
         'physical_room',
         data.id,
-        'outline_geom',
+        'outlineGeom',
       );
 
       return {
