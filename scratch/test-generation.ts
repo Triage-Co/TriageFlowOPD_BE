@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { GraphGenerationService } from '../src/routes/graph/graph.service';
-import { PrismaConfig } from '../src/shared/config/prisma.config';
 import { GeoService } from '../src/shared/geo/geo.service';
 import { RoomType } from '@prisma/client';
+import { PrismaService } from '../src/shared/config/prisma.service';
 
 // Helper to convert meter dimensions to degree coordinates (roughly centered on Hanoi)
 const latDegreePerMeter = 1.0 / 111139.0;
@@ -35,7 +35,7 @@ async function main() {
   console.log("Initializing NestJS application context...");
   const app = await NestFactory.createApplicationContext(AppModule);
   const graphService = app.get(GraphGenerationService);
-  const prisma = app.get(PrismaConfig);
+  const prisma = app.get(PrismaService);
   const geoService = app.get(GeoService);
 
   console.log("Cleaning up previous test data...");
