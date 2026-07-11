@@ -35,7 +35,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   async signUp(signUpRequestDto: SignUpReqDto) {
-    const { user_name, gender, role, email, password } = signUpRequestDto;
+    const { user_name, gender, email, password } = signUpRequestDto;
 
     if (await this.accountRepository.findByEmail(email)) {
       throw AuthErrors.EmailExists;
@@ -44,7 +44,7 @@ export class AuthService {
     const { data, error } = await this.authProvider.signUp(email, password, {
       user_name,
       gender,
-      role,
+      role: "USER",
     });
 
     if (error) {
@@ -80,14 +80,10 @@ export class AuthService {
         email: email,
         user_name: user_name,
         gender: gender,
-        role: role,
+        role: "USER",
       });
 
       isLocalAccountCreated = true;
-
-      if (role !== 'ADMIN' && role !== 'USER') {
-        await this.staffRepository.create(newAccount.account_id);
-      }
 
       return {
         code: 200,

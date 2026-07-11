@@ -9,6 +9,20 @@ import { SupabaseService } from '../config/supabase.service';
 @Injectable()
 export class SupabaseAuthProvider implements IAuthProvider {
   constructor(private readonly supabaseService: SupabaseService) {}
+  adminCreateAccount(data: any): Promise<any> {
+    return this.supabaseService.getClient().auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: {
+        gender: data.gender,
+        role: data.role,
+        user_name: data.user_name,
+        email: data.email,
+        phone: data.phone
+      },
+    });
+  }
 
   signUp(email: string, password: string, metadata: any): Promise<any> {
     return this.supabaseService.getClient().auth.signUp({
@@ -62,4 +76,5 @@ export class SupabaseAuthProvider implements IAuthProvider {
   deleteAccount(accountId: string): Promise<any> {
     return this.supabaseService.getClient().auth.admin.deleteUser(accountId);
   }
+
 }

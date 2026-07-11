@@ -1,7 +1,6 @@
 import { Optional } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { GenderTypeEnum, RoleTypeEnum } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { GenderTypeEnum} from '@prisma/client';
 import {
   IsDate,
   IsEmail,
@@ -51,13 +50,6 @@ export class SignUpReqDto {
   })
   @Optional()
   phone?: string;
-
-  @IsEnum(RoleTypeEnum)
-  @ApiProperty({
-    name: 'role',
-    example: 'USER',
-  })
-  role: RoleTypeEnum;
 }
 
 export class SignInWithEmailRequestDto {
@@ -175,18 +167,11 @@ export class SignOutReqRequestDto {
 export class UpdateUserRequestDto {
   @IsString()
   @ApiProperty({
-    name: 'full_name',
+    name: 'user_name',
     example: 'Dương Minh',
   })
-  full_name: string;
+  user_name: string;
 
-  @IsDate()
-  @Type(() => Date)
-  @ApiProperty({
-    name: 'dob',
-    example: '03-07-2003',
-  })
-  dob?: Date;
 
   @IsEnum(GenderTypeEnum)
   @ApiProperty({

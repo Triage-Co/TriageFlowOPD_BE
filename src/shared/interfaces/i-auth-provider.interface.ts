@@ -25,4 +25,5 @@ export interface IAuthProvider {
   refreshSession(refresh_token: string): Promise<any>;
   signOut(token: string, type: SignOutType): Promise<any>;
   deleteAccount(accountId: string): Promise<any>;
+  adminCreateAccount(data: any): Promise<any>;
 }

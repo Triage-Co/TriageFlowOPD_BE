@@ -130,6 +130,7 @@ model Patient {
 
 model Staff {
   staff_id         String   @id @db.Uuid
+  full_name        String
   license_number   String?
   experience_years Int?
   specialty_id     String?  @db.Uuid
@@ -251,22 +252,40 @@ model Step {
   flow_id        String?            @db.Uuid
   room_id        String?            @db.Uuid
   staff_id       String?            @db.Uuid
-  next_step_id   String?            @db.Uuid
   step_status    StepStatusEnum     @default(PENDING)
   docNo          Int?
   payment_status PaymentStatusEnum?
+
+  parent_step_id String? @db.Uuid
+  parent_step    Step?   @relation("StepHierarchy", fields: [parent_step_id], references: [step_id])
+  sub_step       Step[]  @relation("StepHierarchy")
 
   flow   Flow?   @relation(fields: [flow_id], references: [flow_id])
   room   Room?   @relation(fields: [room_id], references: [room_id])
   staff  Staff?  @relation(fields: [staff_id], references: [staff_id])
   queues Queue[]
 
-  nextStep       Step?         @relation("StepSequence", fields: [next_step_id], references: [step_id])
-  previousStep   Step[]        @relation("StepSequence")
-  physicalRoom   PhysicalRoom? @relation(fields: [physicalRoomId], references: [id])
-  physicalRoomId String?       @db.Uuid
+  physicalRoom   PhysicalRoom?     @relation(fields: [physicalRoomId], references: [id])
+  physicalRoomId String?           @db.Uuid
+  dependencies   Step_Dependency[] @relation("StepNeedsToWait")
+  dependedBy     Step_Dependency[] @relation("StepIsDependedOn")
 
   @@map("step")
+}
+
+model Step_Dependency {
+  id String @id @default(uuid()) @db.Uuid
+
+  step_id String @db.Uuid
+
+  depends_on_step_id String @db.Uuid
+
+  step Step @relation("StepNeedsToWait", fields: [step_id], references: [step_id], onDelete: Cascade)
+
+  dependsOnStep Step @relation("StepIsDependedOn", fields: [depends_on_step_id], references: [step_id], onDelete: Cascade)
+
+  @@unique([step_id, depends_on_step_id])
+  @@map("step_dependency")
 }
 
 model Queue {
