@@ -25,15 +25,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 case "P2002": {
                     status = HttpStatus.CONFLICT;
                     message = "Lỗi trùng lập dữ liệu";
-                    const target = exception.meta?.target as string[];
-                    detail = `Dữ liệu đã tồn tại ở các trường: ${target ? target.join(', ') : 'không xác định'}`;
+                    const meta = exception.meta as any;
+
+
+                    const index = meta?.driverAdapterError?.cause?.constraint.fields;
+
+
+                    // const target = exception.meta?.target as string[];
+                    detail = `Dữ liệu đã tồn tại ở các trường: ${index || 'không xác định'}`;
                     break;
                 }
                 case "P2003": {
                     status = HttpStatus.BAD_REQUEST;
-                    message = "Lỗi khóa ngoại";
-                    const fieldName = exception.meta?.field_name;
-                    detail = `Không thể tham chiếu dữ liệu ở trường: ${fieldName || 'không xác định'}`;
+                    const meta = exception.meta as any;
+
+                    const index = meta?.driverAdapterError?.cause?.constraint?.index;
+
+                    const field = index?.replace(/^step_/, "").replace(/_fkey$/, "");
+
+                    detail = `Không thể tham chiếu dữ liệu ở trường: ${field ?? "không xác định"}`;
+
                     break;
                 }
                 case "P2007": {
@@ -51,7 +62,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
                 default: {
                     status = HttpStatus.BAD_REQUEST;
                     message = "Lỗi truy vấn cơ sở dữ liệu";
-                    detail = `exception.code`;
+                    detail = `${exception.message}`;
                     break;
                 }
             }

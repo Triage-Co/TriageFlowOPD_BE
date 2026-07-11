@@ -138,7 +138,7 @@ export class BookingService {
       });
 
       if (!('data' in createPaymentData)) {
-        throw new BadRequestException(createPaymentData.message);
+        return (createPaymentData?.detail as any).error?.desc || createFlowData;
       }
 
       const createStepData = await this.STEP.create({

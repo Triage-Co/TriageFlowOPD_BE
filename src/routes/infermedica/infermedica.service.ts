@@ -324,6 +324,7 @@ export class InfermedicaService {
           params: {
             'age.value': Number(searchDto.age),
             phrase: searchDto.phrase,
+            max_results: 999
           },
         }),
       );

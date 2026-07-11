@@ -27,6 +27,8 @@ import { PatientModule } from './routes/patient/patient.module';
 import { DoctorModule } from './routes/doctor/doctor.module';
 import { NotificationModule } from './routes/notification/notification.module';
 import { VnptModule } from './routes/vnpt/vnpt.module';
+import { StepModule } from './routes/step/step.module';
+import { StaffModule } from './routes/staff/staff.module';
 
 @Module({
   imports: [
@@ -35,6 +37,11 @@ import { VnptModule } from './routes/vnpt/vnpt.module';
     }),
     ScheduleModule.forRoot(),
     SharedModule,
+    AuthModule,
+    StaffModule,
+    ShiftModule,
+    RoomModule,
+    BookingModule,
     BuildingModule,
     FloorModule,
     PhysicalRoomModule,
@@ -49,17 +56,14 @@ import { VnptModule } from './routes/vnpt/vnpt.module';
     FeatureTemplateModule,
     PlacedFeatureModule,
     BlockageModule,
-    AuthModule,
-    ShiftModule,
-    RoomModule,
     TriageConfigModule,
     TransactionModule,
-    BookingModule,
     InfermedicaModule,
     PatientModule,
     DoctorModule,
     NotificationModule,
-    VnptModule
+    VnptModule,
+    StepModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
