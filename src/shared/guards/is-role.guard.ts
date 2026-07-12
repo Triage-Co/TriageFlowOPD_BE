@@ -45,7 +45,7 @@ export class IsRoleGuard implements CanActivate {
     const hasRole = requiredRole.includes(role);
 
     if (!hasRole) {
-      throw AuthErrors.ForbiddenRole;
+      throw AuthErrors.ForbiddenRole(requiredRole);
     }
 
     return true;
