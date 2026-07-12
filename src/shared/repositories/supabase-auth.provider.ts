@@ -5,10 +5,33 @@ import {
   SignOutType,
 } from '../interfaces/i-auth-provider.interface';
 import { SupabaseService } from '../config/supabase.service';
+import { BanReqDto } from '../../routes/account/dto/req-account.dto';
 
 @Injectable()
 export class SupabaseAuthProvider implements IAuthProvider {
   constructor(private readonly supabaseService: SupabaseService) {}
+  ban(account_id: string, banReqDto: BanReqDto): Promise<any> {
+    let banDuration = '';
+
+    const { hours, minutes } = banReqDto;
+
+    if (hours > 0) banDuration += `${hours}h`;
+
+    if (minutes > 0) banDuration += `${minutes}m`;
+
+    return this.supabaseService
+      .getClient()
+      .auth.admin.updateUserById(account_id, {
+        ban_duration: banDuration,
+      });
+  }
+  unBan(account_id: string): Promise<any> {
+    return this.supabaseService
+      .getClient()
+      .auth.admin.updateUserById(account_id, {
+        ban_duration: 'none',
+      });
+  }
   adminCreateAccount(data: any): Promise<any> {
     return this.supabaseService.getClient().auth.admin.createUser({
       email: data.email,
@@ -19,7 +42,7 @@ export class SupabaseAuthProvider implements IAuthProvider {
         role: data.role,
         user_name: data.user_name,
         email: data.email,
-        phone: data.phone
+        phone: data.phone,
       },
     });
   }
@@ -76,5 +99,4 @@ export class SupabaseAuthProvider implements IAuthProvider {
   deleteAccount(accountId: string): Promise<any> {
     return this.supabaseService.getClient().auth.admin.deleteUser(accountId);
   }
-
 }

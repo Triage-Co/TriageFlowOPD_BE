@@ -4,4 +4,5 @@ export interface IAccountRepository {
   update(account_id: string, data: any): Promise<any>;
   create(data: any): Promise<any>;
   delete(id: string): Promise<any>;
+  findAll(): Promise<any>;
 }

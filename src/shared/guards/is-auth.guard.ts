@@ -15,8 +15,6 @@ export class IsAuthGuard implements CanActivate {
     const request = ctx.getRequest();
     const authorization = request.headers.authorization;
 
-    console.log(authorization);
-
     if (!authorization) {
       throw new UnauthorizedException({
         detail: 'Chưa có token trong header',
