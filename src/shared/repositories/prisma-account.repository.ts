@@ -4,7 +4,11 @@ import { PrismaService } from '../config/prisma.service';
 
 @Injectable()
 export class PrismaAccountRepository implements IAccountRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
+  findAll(): Promise<any> {
+    return this.prismaService.account.findMany();
+  }
+
   delete(id: string): Promise<any> {
     return this.prismaService.account.delete({
       where: {
@@ -38,8 +42,8 @@ export class PrismaAccountRepository implements IAccountRepository {
       },
       omit: {
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
   }
 
@@ -50,8 +54,8 @@ export class PrismaAccountRepository implements IAccountRepository {
       },
       omit: {
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
   }
 }

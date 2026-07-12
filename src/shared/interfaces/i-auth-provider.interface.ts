@@ -1,3 +1,5 @@
+import { BanReqDto } from '../../routes/account/dto/req-account.dto';
+
 export enum OtpType {
   EMAIL = 'email',
   EMAIL_CHANGE = 'email_change',
@@ -26,4 +28,7 @@ export interface IAuthProvider {
   signOut(token: string, type: SignOutType): Promise<any>;
   deleteAccount(accountId: string): Promise<any>;
   adminCreateAccount(data: any): Promise<any>;
+  ban(account_id: string, banReqDto: BanReqDto): Promise<any>;
+  unBan(account_id: string): Promise<any>;
+
 }

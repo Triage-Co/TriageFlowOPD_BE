@@ -44,7 +44,7 @@ export class AuthService {
     const { data, error } = await this.authProvider.signUp(email, password, {
       user_name,
       gender,
-      role: "USER",
+      role: 'USER',
     });
 
     if (error) {
@@ -80,7 +80,7 @@ export class AuthService {
         email: email,
         user_name: user_name,
         gender: gender,
-        role: "USER",
+        role: 'USER',
       });
 
       isLocalAccountCreated = true;
@@ -141,10 +141,13 @@ export class AuthService {
         case 'invalid_credentials':
           throw AuthErrors.InvalidCredentials;
 
+        case 'user_banned':
+          throw AuthErrors.UserBanned;
+        
         default:
           throw AuthErrors.ProviderError(
             'Đăng nhập không thành công',
-            `Đăng nhập không thành công: {${error.message}}`,
+            `Đăng nhập không thành công: {${error.code}}`,
           );
       }
     }

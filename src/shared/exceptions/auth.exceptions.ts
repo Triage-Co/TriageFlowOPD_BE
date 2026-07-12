@@ -101,6 +101,12 @@ export const AuthErrors = {
       'Cập nhật thông tin thất bại',
       `Cập nhật thông tin người dùng với id: ${account_id} không thành công`,
     ),
+  UserListNotFound: () =>
+    new AuthException(
+      HttpStatus.NOT_FOUND,
+      'Không tìm thấy dữ liệu',
+      'Không tìm thấy người dùng nào trong hệ thống.',
+    ),
   Unauthenticated: new AuthException(
     HttpStatus.UNAUTHORIZED,
     'Không lấy được thông tin người dùng',
@@ -116,6 +122,18 @@ export const AuthErrors = {
       HttpStatus.FORBIDDEN,
       'Không đủ quyền truy cập',
       `${role ? `chỉ có ${role} mới thực hiện được hành động này` : 'Bạn không có quyền thực hiện hành động này.'}`,
+    ),
+  UnlockAccountFailed: (accountId: string) =>
+    new AuthException(
+      HttpStatus.BAD_REQUEST,
+      'Mở khóa tài khoản không thành công',
+      `Không thể mở khóa tài khoản với account id: ${accountId}.`,
+    ),
+  LockAccountFailed: (accountId: string) =>
+    new AuthException(
+      HttpStatus.LOCKED,
+      'khóa tài khoản không thành công',
+      `Không thể khóa tài khoản với account id: ${accountId}.`,
     ),
   ProviderError: (action: string, detail: string) =>
     new AuthException(HttpStatus.BAD_REQUEST, `Lỗi ${action}`, detail),
