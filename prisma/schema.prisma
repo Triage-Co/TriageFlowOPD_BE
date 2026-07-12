@@ -98,6 +98,7 @@ model Account {
   role       RoleTypeEnum   @default(USER)
   gender     GenderTypeEnum @default(MALE)
   phone      String?
+  is_banned  Boolean        @default(false)
   createdAt  DateTime       @default(now()) @db.Timestamptz()
   updatedAt  DateTime       @default(now()) @updatedAt @db.Timestamptz()
 
