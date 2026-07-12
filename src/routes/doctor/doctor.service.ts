@@ -69,9 +69,9 @@ export class DoctorService {
         });
       }
 
-      console.log(existedSpecialtyCode);
 
       let data: Prisma.InputJsonValue;
+
 
       if (!dateTimeStr) {
         data = await this.STAFF.findMany({
@@ -80,6 +80,7 @@ export class DoctorService {
             specialty: true,
             shifts: {
               select: {
+                date: true,
                 slots: true,
               },
             },
@@ -96,15 +97,25 @@ export class DoctorService {
         });
       } else {
         const dateTime = new Date(dateTimeStr);
+
+        const start = new Date(dateTime);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(dateTime);
+        end.setHours(23, 59, 59, 999);
+
         data = await this.STAFF.findMany({
           include: {
             account: true,
             specialty: true,
             shifts: {
               where: {
-                date: dateTime,
+                date: {
+                  gte: start,
+                  lte: end,
+                },
               },
               select: {
+                date: true,
                 slots: true,
               },
             },
@@ -116,7 +127,10 @@ export class DoctorService {
             },
             shifts: {
               some: {
-                date: dateTime,
+                date: {
+                  gte: start,
+                  lte: end,
+                },
               },
             },
           },
@@ -306,8 +320,6 @@ export class DoctorService {
   }
 
   async getPatients(staff_id: string, dateStr?: string) {
-    console.log(staff_id);
-
     try {
       const whereCondition: any = {
         step: {
