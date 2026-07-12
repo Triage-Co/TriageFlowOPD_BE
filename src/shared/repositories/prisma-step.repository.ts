@@ -5,6 +5,57 @@ import { IStepRepository } from '../interfaces/i-step.repository';
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
   constructor(private readonly prismaService: PrismaService) {}
+
+  findByIdAndAccountId(account_id: string, id: string): Promise<any> {
+    return this.prismaService.step.findFirst({
+      where: {
+        step_id: id,
+        flow: {
+          booking: {
+            patient: {
+              account_id: account_id,
+            },
+          },
+        },
+      },
+      omit: {
+        flow_id: true,
+        staff_id: true,
+        room_id: true,
+      },
+      include: {
+        queues: true,
+        staff: true,
+        flow: {
+          select: {
+            booking: {
+              select: {
+                slot: {
+                  select: {
+                    start_time: true,
+                    end_time: true,
+                    shift: {
+                      select: {
+                        date: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        sub_step: true,
+      },
+    });
+  }
+  findById(id: string): Promise<any> {
+    return this.prismaService.step.findUnique({
+      where: {
+        step_id: id,
+      },
+    });
+  }
   findSubStepsByParentId(parentId: string): Promise<any> {
     return this.prismaService.step.findMany({
       where: {
@@ -73,14 +124,6 @@ export class PrismaStepRepository implements IStepRepository {
 
   findAll(): Promise<any> {
     return this.prismaService.step.findMany();
-  }
-
-  findById(id: string): Promise<any> {
-    return this.prismaService.step.findUnique({
-      where: {
-        step_id: id,
-      },
-    });
   }
 
   delete(id: string): Promise<any> {

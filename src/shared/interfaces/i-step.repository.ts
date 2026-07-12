@@ -6,7 +6,7 @@ export interface IStepRepository {
   findAll(): Promise<any>;
   findById(id: string): Promise<any>;
   delete(id: string): Promise<any>;
-
+  findByIdAndAccountId(account_id: string, id: string): Promise<any>;
   findSubStepsByParentId(parentId: string): Promise<any>;
 
   findDependentSteps(stepId: string): Promise<any>;
