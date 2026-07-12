@@ -5,6 +5,13 @@ import { PrismaService } from '../config/prisma.service';
 @Injectable()
 export class PrismaRoomRepository implements IRoomRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  createMany(data: any): Promise<any> {
+    return this.prismaService.room.createMany({
+      data: {
+        ...data,
+      },
+    });
+  }
 
   create(data: any): Promise<any> {
     return this.prismaService.room.create({

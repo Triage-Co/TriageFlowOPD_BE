@@ -23,6 +23,16 @@ export class RoomService {
       data: data,
     };
   }
+  async createMany(createRoomRequestDto: CreateRoomRequestDto[]) {
+    const data = await this.roomRepository.create(createRoomRequestDto);
+
+    return {
+      code: 200,
+      message: 'Tạo phòng thành công',
+      status: 'success',
+      data: data,
+    };
+  }
 
   async findAll() {
     const data = await this.roomRepository.findAll();
