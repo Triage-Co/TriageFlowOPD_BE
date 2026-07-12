@@ -85,10 +85,10 @@ enum QueueStatusEnum {
 
 enum StepStatusEnum {
   PENDING
-  CACCELLED
-  IN_PRORESS
-  COMPPLETED
+  IN_PROGRESS
+  COMPLETED
   DECLINED
+  CANCELLED
 }
 
 model Account {

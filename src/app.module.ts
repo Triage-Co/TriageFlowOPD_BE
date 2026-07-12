@@ -42,6 +42,7 @@ import { StaffModule } from './routes/staff/staff.module';
     ShiftModule,
     RoomModule,
     BookingModule,
+    StepModule,
     BuildingModule,
     FloorModule,
     PhysicalRoomModule,
@@ -63,7 +64,6 @@ import { StaffModule } from './routes/staff/staff.module';
     DoctorModule,
     NotificationModule,
     VnptModule,
-    StepModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

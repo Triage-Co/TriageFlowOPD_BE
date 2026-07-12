@@ -5,6 +5,27 @@ import { IStepRepository } from '../interfaces/i-step.repository';
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findSubStepsByParentId(parentId: string): Promise<any> {
+    return this.prismaService.step.findMany({
+      where: {
+        parent_step_id: parentId,
+      },
+    });
+  }
+  findDependentSteps(stepId: string): Promise<any> {
+    return this.prismaService.step_Dependency.findMany({
+      where: {
+        depends_on_step_id: stepId,
+      },
+    });
+  }
+  findDependenciesOfStep(stepId: string): Promise<any> {
+    return this.prismaService.step_Dependency.findMany({
+      where: {
+        step_id: stepId,
+      },
+    });
+  }
   createDependency(
     waitingStepId: string,
     requiredStepId: string,
@@ -27,6 +48,7 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+
   createSubStep(data: any): Promise<any> {
     return this.prismaService.step.create({
       data: {
