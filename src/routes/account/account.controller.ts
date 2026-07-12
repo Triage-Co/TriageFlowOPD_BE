@@ -6,12 +6,20 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { AccountService } from './account.service';
 import { BanReqDto, CreateAccountDto } from './dto/req-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('account')
+@ApiBearerAuth()
+@roles('ADMIN')
+@UseGuards(IsAuthGuard, IsRoleGuard)
 export class AccountController {
   constructor(private readonly accountService: AccountService) {}
 

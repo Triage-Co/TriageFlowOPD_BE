@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { RoleTypeEnum } from '@prisma/client';
 
 export class AuthException extends HttpException {
   constructor(status: HttpStatus, message: string, detail: string) {
@@ -110,11 +111,12 @@ export const AuthErrors = {
     'Không lấy được vai trò người dùng',
     'Xảy ra lỗi khi lấy vai trò của người dùng',
   ),
-  ForbiddenRole: new AuthException(
-    HttpStatus.FORBIDDEN,
-    'Không đủ quyền truy cập',
-    'Bạn không có quyền thực hiện hành động này.',
-  ),
+  ForbiddenRole: (role: RoleTypeEnum[]) =>
+    new AuthException(
+      HttpStatus.FORBIDDEN,
+      'Không đủ quyền truy cập',
+      `${role ? `chỉ có ${role} mới thực hiện được hành động này` : 'Bạn không có quyền thực hiện hành động này.'}`,
+    ),
   ProviderError: (action: string, detail: string) =>
     new AuthException(HttpStatus.BAD_REQUEST, `Lỗi ${action}`, detail),
 };
