@@ -1,33 +1,37 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { StepService } from './step.service';
-import { CreateParentStepReqDto, CreateSubStepReqDto } from './dto/req-step.dto';
+import {
+  CreateDependencyReqDto,
+  CreateParentStepReqDto,
+  CreateSubStepReqDto,
+} from './dto/req-step.dto';
 
 @Controller('step')
 export class StepController {
-  constructor(private readonly stepService: StepService) { }
+  constructor(private readonly stepService: StepService) {}
 
-  @Post("parent")
+  @Post('parent')
   createParentStep(@Body() createParentStepReqDto: CreateParentStepReqDto) {
     return this.stepService.createParentStep(createParentStepReqDto);
   }
-  @Post("sub")
+  @Post('sub')
   createSubStep(@Body() createSubStepReqDto: CreateSubStepReqDto) {
     return this.stepService.createSubStep(createSubStepReqDto);
   }
-
-  @Get()
-  findAll() {
-    return this.stepService.findAll();
+  @Post('dependency')
+  createDependency(@Body() createDependencyReqDto: CreateDependencyReqDto) {
+    return this.stepService.createDependency(createDependencyReqDto);
   }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.stepService.findOne(+id);
-  }
-
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.stepService.remove(+id);
+  @Patch(':step_id/complete')
+  completeStep(@Param('step_id') stepId: string) {
+    return this.stepService.completeStep(stepId);
   }
 }
