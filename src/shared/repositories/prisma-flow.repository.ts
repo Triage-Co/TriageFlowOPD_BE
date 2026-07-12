@@ -3,10 +3,47 @@ import { IRoomRepository } from '../interfaces/i-room.repository';
 import { PrismaService } from '../config/prisma.service';
 import { IFlowRepository } from '../interfaces/i-flow.repository';
 
+const flowIncludeQuery = {
+  steps: {
+    include: {
+      dependencies: true,
+      room: true,
+      sub_step: {
+        include: {
+          room: true,
+          dependencies: true,
+        },
+      },
+      parent_step: {
+        include: {
+          room: true,
+          dependencies: true,
+        },
+      },
+    },
+  },
+};
+
 @Injectable()
 export class PrismaFlowRepository implements IFlowRepository {
   constructor(private readonly prismaService: PrismaService) {}
-  findAll(account_id: string): Promise<any> {
+
+
+  findAll(): Promise<any> {
+    return this.prismaService.flow.findMany({
+      include: flowIncludeQuery
+    });
+  }
+
+  findById(flow_id: string): Promise<any> {
+    return this.prismaService.flow.findUnique({
+      where: {
+        flow_id: flow_id,
+      },
+      
+    });
+  }
+  findAllByAccountId(account_id: string): Promise<any> {
     return this.prismaService.flow.findMany({
       where: {
         booking: {
@@ -15,26 +52,7 @@ export class PrismaFlowRepository implements IFlowRepository {
           },
         },
       },
-      include: {
-        steps: {
-          include: {
-            dependencies: true,
-            room: true,
-            sub_step: {
-              include: {
-                room: true,
-                dependencies: true,
-              },
-            },
-            parent_step: {
-              include: {
-                room: true,
-                dependencies: true,
-              },
-            },
-          },
-        },
-      },
+      include: flowIncludeQuery,
     });
   }
   findByStepId(account_id: string, id: string): Promise<any> {
@@ -51,26 +69,7 @@ export class PrismaFlowRepository implements IFlowRepository {
           },
         },
       },
-      include: {
-        steps: {
-          include: {
-            dependencies: true,
-            room: true,
-            sub_step: {
-              include: {
-                room: true,
-                dependencies: true,
-              },
-            },
-            parent_step: {
-              include: {
-                room: true,
-                dependencies: true,
-              },
-            },
-          },
-        },
-      },
+      include: flowIncludeQuery,
     });
   }
 }

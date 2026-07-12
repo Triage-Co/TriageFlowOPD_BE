@@ -14,6 +14,8 @@ import { CreateFlowDto } from './dto/create-flow.dto';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
 
 @Controller('flow')
 @ApiBearerAuth()
@@ -21,19 +23,33 @@ import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 export class FlowController {
   constructor(private readonly flowService: FlowService) {}
 
-  @Get(':step_id')
+  @Get()
+  @roles('ADMIN', 'DOCTOR', 'NURSE', 'ANCILLARY_STAFFS', 'RECEPTIONIST')
+  @UseGuards(IsRoleGuard)
+  async findAll() {
+    return this.flowService.findAll();
+  }
+
+  @Get(':id')
+  @roles('ADMIN', 'DOCTOR', 'NURSE', 'ANCILLARY_STAFFS', 'RECEPTIONIST')
+  @UseGuards(IsRoleGuard)
+  findOne(@Param('id') id: string) {
+    return this.flowService.findOne(id);
+  }
+
+  @Get('account/step/:step_id')
   @ApiOperation({
-    description: 'Tìm flow theo step id',
+    description: 'Tìm flow theo step id của user',
   })
-  findOne(@Req() req: any, @Param('step_id') step_id: string) {
+  findByStepId(@Req() req: any, @Param('step_id') step_id: string) {
     return this.flowService.findOneByStepId(req.user.id, step_id);
   }
 
-  @Get()
+  @Get('account')
   @ApiOperation({
-    description: 'Tìm tất cả flow theo step id',
+    description: 'Tìm tất cả flow theo step id của user',
   })
-  findAll(@Req() req: any) {
-    return this.flowService.findAll(req.user.id);
+  findAllByAccountId(@Req() req: any) {
+    return this.flowService.findAllByAccountId(req.user.id);
   }
 }

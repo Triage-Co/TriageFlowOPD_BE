@@ -8,6 +8,35 @@ export class FlowService {
   constructor(
     @Inject('IFlowRepository') private readonly flowRepository: IFlowRepository,
   ) {}
+
+  
+
+  async findAll() {
+    const data = await this.flowRepository.findAll();
+    return {
+      code: 200,
+      message: 'Thành công',
+      status: 'success',
+      data: data,
+    };
+  }
+
+  async findOne(flow_id: string) {
+    const data = await this.flowRepository.findById(flow_id);
+    if (!data) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy flow',
+        detail: `Không tìm thấy flow với id ${flow_id}`,
+      });
+    }
+    return {
+      code: 200,
+      message: 'Thành công',
+      status: 'success',
+      data: data,
+    };
+  }
+
   async findOneByStepId(account_id: string, id: string) {
     const data = await this.flowRepository.findByStepId(account_id, id);
     if (!data) {
@@ -25,9 +54,8 @@ export class FlowService {
     };
   }
 
-  async findAll(account_id: string) {
-    const data = await this.flowRepository.findAll(account_id);
-
+  async findAllByAccountId(account_id: string) {
+    const data = await this.flowRepository.findAllByAccountId(account_id);
 
     return {
       code: 200,
