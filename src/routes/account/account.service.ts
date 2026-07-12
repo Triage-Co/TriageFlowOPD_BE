@@ -19,9 +19,6 @@ export class AccountService {
   async findAll() {
     const data = await this.accountRepository.findAll();
 
-    if (data.length <= 0) {
-      throw AuthErrors.UserListNotFound();
-    }
     return {
       code: 200,
       status: 'success',
