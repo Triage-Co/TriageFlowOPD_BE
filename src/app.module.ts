@@ -30,6 +30,7 @@ import { VnptModule } from './routes/vnpt/vnpt.module';
 import { StepModule } from './routes/step/step.module';
 import { StaffModule } from './routes/staff/staff.module';
 import { AccountModule } from './routes/account/account.module';
+import { FlowModule } from './routes/flow/flow.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { AccountModule } from './routes/account/account.module';
     NotificationModule,
     VnptModule,
     AccountModule,
+    FlowModule,
   ],
 })
 export class AppModule {}
