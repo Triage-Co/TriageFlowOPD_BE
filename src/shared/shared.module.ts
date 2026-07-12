@@ -11,7 +11,7 @@ import { PrismaStaffRepository } from './repositories/prisma-staff.repository';
 import { PrismaRoomRepository } from './repositories/prisma-room.repository';
 import { PrismaNotificationRepository } from './repositories/prisma-notification.repository';
 import { PrismaStepRepository } from './repositories/prisma-step.repository';
-import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
+import { PrismaFlowRepository } from './repositories/prisma-flow.repository';
 
 @Global()
 @Module({
@@ -54,8 +54,8 @@ import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
       useClass: PrismaStepRepository,
     },
     {
-      provide: 'IQueueRepository',
-      useClass: PrismaQueueRepository,
+      provide: 'IFlowRepository',
+      useClass: PrismaFlowRepository,
     },
   ],
   exports: [
@@ -71,7 +71,7 @@ import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
     'IPatientRepository',
     'INotificationRepository',
     'IStepRepository',
-    'IQueueRepository',
+    'IFlowRepository',
   ],
 })
 export class SharedModule {}
