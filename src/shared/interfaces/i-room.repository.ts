@@ -4,4 +4,5 @@ export interface IRoomRepository {
   findAll(): Promise<any>;
   findById(id: string): Promise<any>;
   delete(id: string): Promise<any>;
+  createMany(data: any): Promise<any>;
 }

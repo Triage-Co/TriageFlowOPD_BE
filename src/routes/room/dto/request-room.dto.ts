@@ -11,7 +11,7 @@ export class CreateRoomRequestDto {
 
     @IsUUID()
     @IsOptional()
-    space_id?: string
+    physical_room_id?: string
 
     @IsUUID()
     @ApiProperty({
@@ -20,6 +20,7 @@ export class CreateRoomRequestDto {
     })
     specialty_id?: string
 }
+
 
 export class UpdateRoomRequestDto extends PartialType(CreateRoomRequestDto) { }
 

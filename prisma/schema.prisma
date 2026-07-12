@@ -132,9 +132,9 @@ model Patient {
 model Staff {
   staff_id         String   @id @db.Uuid
   full_name        String
-  license_number   String?
-  experience_years Int?
-  specialty_id     String?  @db.Uuid
+  license_number   String   @default("N/A")
+  experience_years Int      @default(0)
+  specialty_id     String?  @db.Uuid 
   createdAt        DateTime @default(now()) @db.Timestamptz()
   updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz()
 
