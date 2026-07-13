@@ -26,6 +26,9 @@ export class FlowController {
   @Get()
   @roles('ADMIN', 'DOCTOR', 'NURSE', 'ANCILLARY_STAFFS', 'RECEPTIONIST')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Tìm tất cả flow theo của staff và admin',
+  })
   async findAll() {
     return this.flowService.findAll();
   }
@@ -33,13 +36,16 @@ export class FlowController {
   @Get(':id')
   @roles('ADMIN', 'DOCTOR', 'NURSE', 'ANCILLARY_STAFFS', 'RECEPTIONIST')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Tìm flow theo step id của staff và admin',
+  })
   findOne(@Param('id') id: string) {
     return this.flowService.findOne(id);
   }
 
   @Get('account/step/:step_id')
   @ApiOperation({
-    description: 'Tìm flow theo step id của user',
+    summary: 'Tìm flow theo step id của user',
   })
   findByStepId(@Req() req: any, @Param('step_id') step_id: string) {
     return this.flowService.findOneByStepId(req.user.id, step_id);
@@ -47,7 +53,7 @@ export class FlowController {
 
   @Get('account')
   @ApiOperation({
-    description: 'Tìm tất cả flow theo step id của user',
+    summary: 'Tìm tất cả flow theo step id của user',
   })
   findAllByAccountId(@Req() req: any) {
     return this.flowService.findAllByAccountId(req.user.id);

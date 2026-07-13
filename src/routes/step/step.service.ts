@@ -62,12 +62,25 @@ export class StepService {
     const data = await this.stepRepository.findByIdAndAccountId(account_id, id);
 
     if (!data) {
-      throw StepErrors.StepListNotFoundByIdAndAccountId(account_id, id);
+      throw StepErrors.StepNotFoundByIdAndAccountId(account_id,id);
     }
     return {
       code: 200,
       status: 'success',
-      message: 'Lấy tất cả bước thành công',
+      message: 'Lấy bước thành công',
+      data: data,
+    };
+  }
+  async findById(id: string) {
+    const data = await this.stepRepository.findById(id);
+
+    if (!data) {
+      throw StepErrors.StepNotFoundById(id);
+    }
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy bước thành công',
       data: data,
     };
   }
