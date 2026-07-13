@@ -21,11 +21,18 @@ export const StepErrors = {
       `Không tìm thấy bước nào trong hệ thống của người dùng: ${account_id}.`,
     );
   },
-  StepListNotFoundByIdAndAccountId: (account_id: string, step_id: string) => {
+  StepNotFoundByIdAndAccountId: (account_id: string, step_id: string) => {
     throw new StepException(
       HttpStatus.NOT_FOUND,
       'Không tìm thấy dữ liệu',
       `Không tìm thấy bước với id: ${step_id} nào trong hệ thống của người dùng: ${account_id}.`,
+    );
+  },
+  StepNotFoundById: (step_id: string) => {
+    throw new StepException(
+      HttpStatus.NOT_FOUND,
+      'Không tìm thấy dữ liệu',
+      `Không tìm thấy bước với id: ${step_id} nào trong hệ thống.`,
     );
   },
   ProviderError: (action: string, detail: string) =>

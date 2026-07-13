@@ -36,6 +36,11 @@ export class PrismaStepRepository implements IStepRepository {
                     end_time: true,
                     shift: {
                       select: {
+                        room: {
+                          include: {
+                            specialty: true,
+                          },
+                        },
                         date: true,
                       },
                     },
@@ -53,6 +58,40 @@ export class PrismaStepRepository implements IStepRepository {
     return this.prismaService.step.findUnique({
       where: {
         step_id: id,
+      },
+      omit: {
+        flow_id: true,
+        staff_id: true,
+        room_id: true,
+      },
+      include: {
+        queues: true,
+        staff: true,
+        flow: {
+          select: {
+            booking: {
+              select: {
+                slot: {
+                  select: {
+                    start_time: true,
+                    end_time: true,
+                    shift: {
+                      select: {
+                        room: {
+                          include: {
+                            specialty: true,
+                          },
+                        },
+                        date: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        sub_step: true,
       },
     });
   }
