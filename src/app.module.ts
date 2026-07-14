@@ -31,6 +31,7 @@ import { StepModule } from './routes/step/step.module';
 import { StaffModule } from './routes/staff/staff.module';
 import { AccountModule } from './routes/account/account.module';
 import { FlowModule } from './routes/flow/flow.module';
+import { SpecialtyModule } from './routes/specialty/specialty.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { FlowModule } from './routes/flow/flow.module';
     VnptModule,
     AccountModule,
     FlowModule,
+    SpecialtyModule,
   ],
 })
 export class AppModule {}
