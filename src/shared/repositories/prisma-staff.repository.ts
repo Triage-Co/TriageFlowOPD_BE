@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IStaffRepository } from '../interfaces/i-staff.repository';
+import { RoleTypeEnum } from '@prisma/client';
 
 @Injectable()
 export class PrismaStaffRepository implements IStaffRepository {
   constructor(private readonly prismaService: PrismaService) {}
+
   update(id: string, data: any): Promise<any> {
     return this.prismaService.staff.update({
       where: {

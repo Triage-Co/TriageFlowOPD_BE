@@ -1,3 +1,5 @@
+import { RoleTypeEnum } from "@prisma/client";
+
 export interface IStaffRepository {
   create(data: any): Promise<any>;
   update(id: string, data: any): Promise<any>;
