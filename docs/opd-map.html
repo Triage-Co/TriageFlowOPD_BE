@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bản đồ Khoa Khám Bệnh – Bệnh viện</title>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+
+      /* Zone colours */
+      --noi: #1c6ef3;
+      --noi-soft: rgba(28,110,243,.15);
+      --noi-border: rgba(28,110,243,.5);
+
+      --ngoai: #e85d04;
+      --ngoai-soft: rgba(232,93,4,.12);
+      --ngoai-border: rgba(232,93,4,.45);
+
+      --san: #b5179e;
+      --san-soft: rgba(181,23,158,.12);
+      --san-border: rgba(181,23,158,.45);
+
+      --chuyenkhoa: #06d6a0;
+      --chuyenkhoa-soft: rgba(6,214,160,.1);
+      --chuyenkhoa-border: rgba(6,214,160,.4);
+
+      --phuchoi: #ffd166;
+      --phuchoi-soft: rgba(255,209,102,.1);
+      --phuchoi-border: rgba(255,209,102,.4);
+
+      --nhi: #ef476f;
+      --nhi-soft: rgba(239,71,111,.12);
+      --nhi-border: rgba(239,71,111,.45);
+    }
+
+    body {
+      font-family: 'Be Vietnam Pro', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ──── HEADER ──── */
+    header {
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .header-icon {
+      width: 48px; height: 48px;
+      background: linear-gradient(135deg, #1c6ef3, #06d6a0);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 20px rgba(28,110,243,.4);
+    }
+    header h1 { font-size: 1.5rem; font-weight: 800; line-height: 1.2; }
+    header h1 span { color: var(--muted); font-weight: 400; font-size: 0.95rem; display: block; margin-top: 2px; }
+
+    /* ──── LEGEND ──── */
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      padding: 16px 40px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.78rem; font-weight: 500;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .legend-item:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ──── MAIN LAYOUT ──── */
+    main { padding: 32px 40px; max-width: 1600px; margin: 0 auto; }
+
+    /* Entrance corridor */
+    .entrance-strip {
+      background: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.07), rgba(255,255,255,.04));
+      border: 1px dashed rgba(255,255,255,.15);
+      border-radius: 12px;
+      padding: 14px 24px;
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 28px;
+      font-size: 0.85rem; color: var(--muted);
+    }
+    .entrance-strip strong { color: var(--text); font-size: 0.95rem; }
+    .arrow { font-size: 1.4rem; color: var(--muted); }
+
+    /* Desk items (reception / tiếp nhận) */
+    .desk-row {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .desk {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 0.78rem; font-weight: 500;
+      cursor: default;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .desk:hover { background: rgba(255,255,255,.09); transform: translateY(-2px); }
+    .desk-icon { font-size: 1rem; }
+    .desk.reception { border-color: rgba(255,209,102,.4); color: #ffd166; background: rgba(255,209,102,.08); }
+    .desk.triage    { border-color: rgba(239,71,111,.4);  color: #ef476f; background: rgba(239,71,111,.08); }
+
+    /* ──── ZONES GRID ──── */
+    .zones-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 1100px) { .zones-grid { grid-template-columns: repeat(2,1fr); } }
+    @media (max-width: 700px)  { .zones-grid { grid-template-columns: 1fr; } }
+
+    /* ──── ZONE CARD ──── */
+    .zone {
+      border-radius: 18px;
+      border: 1px solid var(--zone-border, var(--border));
+      background: var(--zone-bg, var(--surface));
+      overflow: hidden;
+      transition: box-shadow .25s, transform .25s;
+      position: relative;
+    }
+    .zone:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 1px var(--zone-border);
+    }
+
+    .zone-header {
+      padding: 16px 20px 12px;
+      display: flex; align-items: flex-start; gap: 14px;
+      background: var(--zone-header-bg, rgba(255,255,255,.04));
+      border-bottom: 1px solid var(--zone-border, var(--border));
+    }
+    .zone-emoji { font-size: 1.8rem; line-height: 1; }
+    .zone-meta { flex: 1; }
+    .zone-name { font-size: 1rem; font-weight: 700; margin-bottom: 2px; }
+    .zone-code { font-size: 0.72rem; font-weight: 500; opacity: .7; letter-spacing: .04em; }
+    .zone-count {
+      background: var(--zone-border, var(--border));
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.72rem; font-weight: 600;
+      white-space: nowrap;
+      align-self: flex-start;
+    }
+
+    .zone-body { padding: 14px 16px 16px; }
+
+    /* ──── ROOM GRID inside zone ──── */
+    .room-grid {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-top: 10px;
+    }
+    .room {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 9px 13px;
+      font-size: 0.76rem;
+      cursor: pointer;
+      transition: all .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .room::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--zone-accent, transparent);
+      opacity: 0;
+      transition: opacity .2s;
+    }
+    .room:hover::before { opacity: 1; }
+    .room:hover { border-color: var(--zone-border, var(--border)); transform: scale(1.04); z-index: 2; }
+    .room-code { color: var(--muted); font-size: 0.68rem; font-weight: 600; letter-spacing: .05em; display: block; margin-bottom: 2px; position: relative; }
+    .room-name { font-weight: 600; position: relative; line-height: 1.3; }
+
+    /* Tooltip */
+    .room[title]:hover::after {
+      content: attr(title);
+      position: absolute; bottom: calc(100% + 8px); left: 50%;
+      transform: translateX(-50%);
+      background: #1c2128; border: 1px solid var(--border);
+      color: var(--text); font-size: 0.72rem;
+      padding: 5px 10px; border-radius: 6px;
+      white-space: nowrap; z-index: 50;
+      pointer-events: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,.5);
+    }
+
+    /* ──── CORRIDOR (hallway lines) ──── */
+    .corridor-label {
+      font-size: 0.72rem; color: var(--muted);
+      display: flex; align-items: center; gap: 8px; margin: 6px 0 12px;
+    }
+    .corridor-label::before, .corridor-label::after {
+      content: ''; flex: 1; height: 1px;
+      background: var(--border);
+    }
+
+    /* Special: span-2 zone */
+    .span-2 { grid-column: span 2; }
+    @media (max-width: 700px) { .span-2 { grid-column: span 1; } }
+
+    /* Floating stats bar */
+    .stats-bar {
+      display: flex; flex-wrap: wrap; gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 20px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .stat-num { font-size: 1.6rem; font-weight: 800; line-height: 1; }
+    .stat-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
+
+    /* Highlight pulse */
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(28,110,243,.6); }
+      70% { box-shadow: 0 0 0 10px rgba(28,110,243,0); }
+      100% { box-shadow: 0 0 0 0 rgba(28,110,243,0); }
+    }
+    .room.highlight { animation: pulse 1.5s ease-out 3; border-color: var(--zone-border); }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header>
+  <div class="header-icon">🏥</div>
+  <div>
+    <h1>Bản đồ Khoa Khám Bệnh
+      <span>Outpatient Department (OPD) – Tầng 2 Khối G2</span>
+    </h1>
+  </div>
+</header>
+
+<!-- ═══ LEGEND ═══ -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#1c6ef3"></div>Khu Nội Khoa</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#e85d04"></div>Khu Ngoại Khoa</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#b5179e"></div>Khu Sản – Phụ Khoa</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#06d6a0"></div>Khu Chuyên Khoa</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ef476f"></div>Khu Nhi Khoa</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffd166"></div>Khu Phục Hồi – Cổ Truyền</div>
+  <div class="legend-item" style="border-style:dashed">🩺 Bàn Tiếp Nhận Bệnh</div>
+</div>
+
+<main>
+
+  <!-- ═══ ENTRANCE ═══ -->
+  <div class="entrance-strip">
+    <span class="arrow">🚶</span>
+    <div>
+      <strong>Cổng vào Khoa Khám Bệnh</strong> &nbsp;·&nbsp;
+      Sảnh chờ trung tâm &nbsp;·&nbsp; Thang máy & Cầu thang bộ
+    </div>
+    <span class="arrow" style="margin-left:auto">⬆</span>
+  </div>
+
+  <!-- ═══ STATS ═══ -->
+  <div class="stats-bar">
+    <div class="stat"><div class="stat-num" style="color:#1c6ef3">47</div><div class="stat-label">Phòng khám<br>tổng cộng</div></div>
+    <div class="stat"><div class="stat-num" style="color:#06d6a0">6</div><div class="stat-label">Khu chức năng</div></div>
+    <div class="stat"><div class="stat-num" style="color:#ffd166">6</div><div class="stat-label">Bàn Tiếp Nhận<br>Bệnh</div></div>
+    <div class="stat"><div class="stat-num" style="color:#ef476f">2</div><div class="stat-label">Tầng<br>(G2.2 & G2.4+)</div></div>
+  </div>
+
+
+
+
+  <!-- ═══ ZONES GRID ═══ -->
+  <div class="zones-grid">
+
+    <!-- ─── KHU 1: NỘI KHOA ─── -->
+    <div class="zone span-2"
+         style="--zone-bg:var(--noi-soft);--zone-border:var(--noi-border);--zone-header-bg:rgba(28,110,243,.18);--zone-accent:rgba(28,110,243,.06);">
+      <div class="zone-header">
+        <div class="zone-emoji">🫀</div>
+        <div class="zone-meta">
+          <div class="zone-name" style="color:#5b9cf6">Khu A – Nội Khoa Tổng Hợp</div>
+          <div class="zone-code">KHU A &nbsp;·&nbsp; Dãy G2.2</div>
+        </div>
+        <div class="zone-count" style="background:rgba(28,110,243,.3);color:#5b9cf6">22 phòng</div>
+      </div>
+      <div class="zone-body">
+        <div class="desk-row">
+          <div class="desk triage">🩺 Bàn Tiếp Nhận Nội Khoa</div>
+        </div>
+        <div class="corridor-label">Hành lang Khu A</div>
+        <div class="room-grid">
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.6 – Nội tim mạch 1"><span class="room-code">G2.2.6</span><span class="room-name">Nội tim mạch 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.7 – Nội tim mạch 2"><span class="room-code">G2.2.7</span><span class="room-name">Nội tim mạch 2</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.8 – Nội tim mạch 3"><span class="room-code">G2.2.8</span><span class="room-name">Nội tim mạch 3</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.9 – Nội tim mạch 4"><span class="room-code">G2.2.9</span><span class="room-name">Nội tim mạch 4</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.10 – Nội tim mạch 5"><span class="room-code">G2.2.10</span><span class="room-name">Nội tim mạch 5</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.12 – Tim mạch can thiệp 1"><span class="room-code">G2.2.12</span><span class="room-name">Tim mạch can thiệp 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.13 – Tim mạch can thiệp 2"><span class="room-code">G2.2.13</span><span class="room-name">Tim mạch can thiệp 2</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.11 – Nội cơ xương khớp"><span class="room-code">G2.2.11</span><span class="room-name">Nội cơ xương khớp</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.14 – Nội tiết 1"><span class="room-code">G2.2.14</span><span class="room-name">Nội tiết 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.15 – Nội tiết 2"><span class="room-code">G2.2.15</span><span class="room-name">Nội tiết 2</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.16 – Nội tiết 3"><span class="room-code">G2.2.16</span><span class="room-name">Nội tiết 3</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.25 – Nội thận"><span class="room-code">G2.2.25</span><span class="room-name">Nội thận</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.26 – Nội tiêu hóa 1"><span class="room-code">G2.2.26</span><span class="room-name">Nội tiêu hóa 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.27 – Nội tiêu hóa 2"><span class="room-code">G2.2.27</span><span class="room-name">Nội tiêu hóa 2</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.22 – Nội thần kinh 1"><span class="room-code">G2.2.22</span><span class="room-name">Nội thần kinh 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.23 – Nội thần kinh 2"><span class="room-code">G2.2.23</span><span class="room-name">Nội thần kinh 2</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.28 – Nội hô hấp 1"><span class="room-code">G2.2.28</span><span class="room-name">Nội hô hấp 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.18 – Nội tổng quát 1"><span class="room-code">G2.2.18</span><span class="room-name">Nội tổng quát 1</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.19 – Nội tổng quát 2"><span class="room-code">G2.2.19</span><span class="room-name">Nội tổng quát 2</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.20 – Nội tổng quát 3"><span class="room-code">G2.2.20</span><span class="room-name">Nội tổng quát 3</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.40 – Huyết học"><span class="room-code">G2.2.40</span><span class="room-name">Huyết học</span></div>
+          <div class="room" style="--zone-border:var(--noi-border)" title="G2.2.24 – Bệnh truyền nhiễm"><span class="room-code">G2.2.24</span><span class="room-name">Bệnh truyền nhiễm</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── KHU 2: NHI KHOA ─── -->
+    <div class="zone"
+         style="--zone-bg:var(--nhi-soft);--zone-border:var(--nhi-border);--zone-header-bg:rgba(239,71,111,.18);--zone-accent:rgba(239,71,111,.06);">
+      <div class="zone-header">
+        <div class="zone-emoji">🧸</div>
+        <div class="zone-meta">
+          <div class="zone-name" style="color:#ef476f">Khu B – Nhi Khoa &amp; Tâm Thần</div>
+          <div class="zone-code">KHU B &nbsp;·&nbsp; Dãy G2.2</div>
+        </div>
+        <div class="zone-count" style="background:rgba(239,71,111,.3);color:#ef476f">3 phòng</div>
+      </div>
+      <div class="zone-body">
+        <div class="desk-row">
+          <div class="desk triage">🩺 Bàn Tiếp Nhận Nhi</div>
+        </div>
+        <div class="corridor-label">Hành lang Khu B</div>
+        <div class="room-grid">
+          <div class="room" style="--zone-border:var(--nhi-border)" title="G2.2.34 – Nhi 1"><span class="room-code">G2.2.34</span><span class="room-name">Nhi 1</span></div>
+          <div class="room" style="--zone-border:var(--nhi-border)" title="G2.2.35 – Nhi 2"><span class="room-code">G2.2.35</span><span class="room-name">Nhi 2</span></div>
+          <div class="room" style="--zone-border:var(--nhi-border)" title="G2.2.33 – Sức khỏe tâm thần"><span class="room-code">G2.2.33</span><span class="room-name">Sức khỏe tâm thần</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── KHU 3: NGOẠI KHOA ─── -->
+    <div class="zone"
+         style="--zone-bg:var(--ngoai-soft);--zone-border:var(--ngoai-border);--zone-header-bg:rgba(232,93,4,.18);--zone-accent:rgba(232,93,4,.06);">
+      <div class="zone-header">
+        <div class="zone-emoji">🔪</div>
+        <div class="zone-meta">
+          <div class="zone-name" style="color:#f4845f">Khu C – Ngoại Khoa Tổng Hợp</div>
+          <div class="zone-code">KHU C &nbsp;·&nbsp; Dãy G2.4</div>
+        </div>
+        <div class="zone-count" style="background:rgba(232,93,4,.3);color:#f4845f">7 phòng</div>
+      </div>
+      <div class="zone-body">
+        <div class="desk-row">
+          <div class="desk triage">🩺 Bàn Tiếp Nhận Ngoại</div>
+        </div>
+        <div class="corridor-label">Hành lang Khu C</div>
+        <div class="room-grid">
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.12 – Ngoại tổng quát 1"><span class="room-code">G2.4.12</span><span class="room-name">Ngoại tổng quát 1</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.14 – Ngoại tiết niệu"><span class="room-code">G2.4.14</span><span class="room-name">Ngoại tiết niệu</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.15 – Ngoại lồng ngực"><span class="room-code">G2.4.15</span><span class="room-name">Ngoại lồng ngực</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.16 – Ngoại thần kinh 1"><span class="room-code">G2.4.16</span><span class="room-name">Ngoại thần kinh 1</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.17 – Ngoại thần kinh 2"><span class="room-code">G2.4.17</span><span class="room-name">Ngoại thần kinh 2</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.18 – Ngoại ung bướu"><span class="room-code">G2.4.18</span><span class="room-name">Ngoại ung bướu</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.1 – Chấn thương chỉnh hình 1"><span class="room-code">G2.4.1</span><span class="room-name">Chấn thương chỉnh hình 1</span></div>
+          <div class="room" style="--zone-border:var(--ngoai-border)" title="G2.4.2 – Chấn thương chỉnh hình 2"><span class="room-code">G2.4.2</span><span class="room-name">Chấn thương chỉnh hình 2</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── KHU 4: CHUYÊN KHOA ─── -->
+    <div class="zone"
+         style="--zone-bg:var(--chuyenkhoa-soft);--zone-border:var(--chuyenkhoa-border);--zone-header-bg:rgba(6,214,160,.14);--zone-accent:rgba(6,214,160,.06);">
+      <div class="zone-header">
+        <div class="zone-emoji">👁️</div>
+        <div class="zone-meta">
+          <div class="zone-name" style="color:#06d6a0">Khu D – Chuyên Khoa Đặc Biệt</div>
+          <div class="zone-code">KHU D &nbsp;·&nbsp; Dãy G2.4</div>
+        </div>
+        <div class="zone-count" style="background:rgba(6,214,160,.25);color:#06d6a0">9 phòng</div>
+      </div>
+      <div class="zone-body">
+        <div class="desk-row">
+          <div class="desk triage">🩺 Bàn Tiếp Nhận Chuyên Khoa</div>
+        </div>
+        <div class="corridor-label">Hành lang Khu D</div>
+        <div class="room-grid">
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.8 – Mắt 1"><span class="room-code">G2.4.8</span><span class="room-name">Mắt 1</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.11 – Mắt 2"><span class="room-code">G2.4.11</span><span class="room-name">Mắt 2</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.24 – Tai mũi họng 1"><span class="room-code">G2.4.24</span><span class="room-name">Tai mũi họng 1</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.25 – Tai mũi họng 2"><span class="room-code">G2.4.25</span><span class="room-name">Tai mũi họng 2</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.28 – Răng hàm mặt 1"><span class="room-code">G2.4.28</span><span class="room-name">Răng hàm mặt 1</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.29 – Răng hàm mặt 2"><span class="room-code">G2.4.29</span><span class="room-name">Răng hàm mặt 2</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.4 – Da liễu 1"><span class="room-code">G2.4.4</span><span class="room-name">Da liễu 1</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.5 – Da liễu 2"><span class="room-code">G2.4.5</span><span class="room-name">Da liễu 2</span></div>
+          <div class="room" style="--zone-border:var(--chuyenkhoa-border)" title="G2.4.6 – Da liễu 3"><span class="room-code">G2.4.6</span><span class="room-name">Da liễu 3</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── KHU 5: SẢN PHỤ KHOA ─── -->
+    <div class="zone"
+         style="--zone-bg:var(--san-soft);--zone-border:var(--san-border);--zone-header-bg:rgba(181,23,158,.18);--zone-accent:rgba(181,23,158,.06);">
+      <div class="zone-header">
+        <div class="zone-emoji">🤰</div>
+        <div class="zone-meta">
+          <div class="zone-name" style="color:#c77dff">Khu E – Sản &amp; Phụ Khoa</div>
+          <div class="zone-code">KHU E &nbsp;·&nbsp; Dãy G2.4</div>
+        </div>
+        <div class="zone-count" style="background:rgba(181,23,158,.3);color:#c77dff">3 phòng</div>
+      </div>
+      <div class="zone-body">
+        <div class="desk-row">
+          <div class="desk triage">🩺 Bàn Tiếp Nhận Sản Phụ Khoa</div>
+        </div>
+        <div class="corridor-label">Hành lang Khu E</div>
+        <div class="room-grid">
+          <div class="room" style="--zone-border:var(--san-border)" title="G2.4.23 – Khám thai 1"><span class="room-code">G2.4.23</span><span class="room-name">Khám thai 1</span></div>
+          <div class="room" style="--zone-border:var(--san-border)" title="G2.4.21 – Phụ khoa"><span class="room-code">G2.4.21</span><span class="room-name">Phụ khoa</span></div>
+          <div class="room" style="--zone-border:var(--san-border)" title="G2.4.34 – Đơn vị tiêm chủng"><span class="room-code">G2.4.34</span><span class="room-name">Đơn vị tiêm chủng</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── KHU 6: PHỤC HỒI & CỔ TRUYỀN ─── -->
+    <div class="zone"
+         style="--zone-bg:var(--phuchoi-soft);--zone-border:var(--phuchoi-border);--zone-header-bg:rgba(255,209,102,.12);--zone-accent:rgba(255,209,102,.06);">
+      <div class="zone-header">
+        <div class="zone-emoji">🧘</div>
+        <div class="zone-meta">
+          <div class="zone-name" style="color:#ffd166">Khu F – Phục Hồi Chức Năng &amp; Y Học Cổ Truyền</div>
+          <div class="zone-code">KHU F &nbsp;·&nbsp; G2.6 / G2.7</div>
+        </div>
+        <div class="zone-count" style="background:rgba(255,209,102,.25);color:#ffd166">2 phòng</div>
+      </div>
+      <div class="zone-body">
+        <div class="desk-row">
+          <div class="desk triage">🩺 Bàn Tiếp Nhận PHCN &amp; Cổ Truyền</div>
+        </div>
+        <div class="corridor-label">Hành lang Khu F</div>
+        <div class="room-grid">
+          <div class="room" style="--zone-border:var(--phuchoi-border)" title="G2.6.1 – Vật lý trị liệu – PHCN"><span class="room-code">G2.6.1</span><span class="room-name">Vật lý trị liệu – PHCN</span></div>
+          <div class="room" style="--zone-border:var(--phuchoi-border)" title="G2.7.1 – Y học cổ truyền"><span class="room-code">G2.7.1</span><span class="room-name">Y học cổ truyền</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /zones-grid -->
+
+  <!-- ═══ FOOTER ═══ -->
+  <div style="margin-top:40px; padding-top:20px; border-top:1px solid var(--border); text-align:center; color:var(--muted); font-size:0.75rem; line-height:1.8;">
+    <p>Bản đồ Khoa Khám Bệnh – TriageFlowOPD &nbsp;·&nbsp; Tổng <strong style="color:var(--text)">47 phòng</strong> thuộc <strong style="color:var(--text)">6 khu chức năng</strong></p>
+    <p style="margin-top:4px; opacity:.6;">Hover lên phòng để xem chi tiết &nbsp;·&nbsp; Click vào legend để lọc (sắp có)</p>
+  </div>
+
+</main>
+
+<script>
+  // Simple highlight: click a legend item to briefly pulse its zone
+  document.querySelectorAll('.legend-item').forEach((item, i) => {
+    item.addEventListener('click', () => {
+      const zones = document.querySelectorAll('.zone');
+      if (i < zones.length) {
+        const rooms = zones[i].querySelectorAll('.room');
+        rooms.forEach(r => {
+          r.classList.remove('highlight');
+          void r.offsetWidth; // reflow
+          r.classList.add('highlight');
+        });
+        zones[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  });
+</script>
+</body>
+</html>

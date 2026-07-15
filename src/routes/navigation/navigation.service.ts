@@ -5,6 +5,7 @@ import { PrismaService } from '../../shared/config/prisma.service';
 import { GeoService } from '../../shared/geo/geo.service';
 import { GetRouteDto, RouteLocationType } from './dto/get-route.dto';
 import * as turf from '@turf/turf';
+import { get3DMapHtml } from './navigation-3d.template';
 
 @Injectable()
 export class NavigationService {
@@ -403,4 +404,13 @@ export class NavigationService {
     const floorDiff = Math.abs(nodeA.floorNumber - nodeB.floorNumber);
     return dist + floorDiff * 4.0;
   }
+
+  /**
+   * Get 3D map view compiled with ThreeJS.
+   */
+  async getBuilding3dMap(buildingId: string): Promise<string> {
+    const buildingMap = await this.getBuildingMap(buildingId);
+    return get3DMapHtml(buildingMap);
+  }
 }
+
