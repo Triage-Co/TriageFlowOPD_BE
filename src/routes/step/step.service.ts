@@ -11,6 +11,7 @@ import {
 } from './dto/req-step.dto';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import { StepStatusEnum } from '@prisma/client';
+import { StepErrors } from '../../shared/exceptions/step.exceptions';
 
 @Injectable()
 export class StepService {
@@ -52,6 +53,34 @@ export class StepService {
       code: '200',
       status: 'success',
       message: 'Tạo liên kết bước thành công',
+      data: data,
+    };
+  }
+
+
+  async findByIdAndAccountId(account_id: string, id: string) {
+    const data = await this.stepRepository.findByIdAndAccountId(account_id, id);
+
+    if (!data) {
+      throw StepErrors.StepNotFoundByIdAndAccountId(account_id,id);
+    }
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy bước thành công',
+      data: data,
+    };
+  }
+  async findById(id: string) {
+    const data = await this.stepRepository.findById(id);
+
+    if (!data) {
+      throw StepErrors.StepNotFoundById(id);
+    }
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy bước thành công',
       data: data,
     };
   }

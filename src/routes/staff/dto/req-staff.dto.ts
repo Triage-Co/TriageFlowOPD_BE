@@ -84,7 +84,6 @@ export class CreateStaffReqDto {
         description: "Số điện thoại",
     })
     @IsString()
-    @IsNotEmpty()
     phone: string;
 
     @ApiProperty({
@@ -93,7 +92,6 @@ export class CreateStaffReqDto {
         description: "Số chứng chỉ hành nghề",
     })
     @IsString()
-    @IsNotEmpty()
     license_number: string;
 
     @ApiProperty({
@@ -112,6 +110,5 @@ export class CreateStaffReqDto {
         description: "Mã chuyên khoa",
     })
     @IsUUID()
-    @IsNotEmpty()
     specialty_id: string;
 }

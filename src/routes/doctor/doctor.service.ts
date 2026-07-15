@@ -69,9 +69,7 @@ export class DoctorService {
         });
       }
 
-
       let data: Prisma.InputJsonValue;
-
 
       if (!dateTimeStr) {
         data = await this.STAFF.findMany({
@@ -250,10 +248,16 @@ export class DoctorService {
   }
   async findOneWithSlotAndDate(id: string, dateTimeStr: string) {
     try {
-      const dateTime = new Date(dateTimeStr);
+      const start = new Date(dateTimeStr);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(dateTimeStr);
+      end.setHours(23, 59, 59, 999);
       const existedShift = await this.SHIFT.findFirst({
         where: {
-          date: dateTime,
+          date: {
+            gte: start,
+            lte: end,
+          },
           staff: {
             staff_id: id,
             account: {
@@ -269,7 +273,7 @@ export class DoctorService {
       if (!existedShift) {
         throw new NotFoundException({
           message: 'Bác sĩ không có lịch làm  việc',
-          detail: `Bác sĩ không có có lịch làm việc trong ngày ${dateTime}`,
+          detail: `Bác sĩ không có có lịch làm việc trong ngày ${dateTimeStr}`,
         });
       }
 
@@ -282,7 +286,7 @@ export class DoctorService {
       if (!existedSlot) {
         throw new NotFoundException({
           message: 'Không tìm thấy ca trực',
-          detail: `Bác sĩ không có có ca trực trong ngày ${dateTime}`,
+          detail: `Bác sĩ không có có ca trực trong ngày ${dateTimeStr}`,
         });
       }
       const data = await this.STAFF.findFirst({

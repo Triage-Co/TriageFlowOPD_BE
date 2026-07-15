@@ -178,7 +178,11 @@ export class BookingService {
       const step = await this.STEP.findUnique({
         where: { step_id: step_id },
         include: {
-          room: true,
+          room: {
+            include: {
+              specialty: true,
+            },
+          },
           queues: true,
           flow: {
             include: {
@@ -206,7 +210,11 @@ export class BookingService {
           code: 200,
           status: 'success',
           message: 'Bạn đã có số thứ tự',
-          data: step.queues,
+          data: {
+            queue_number: step.queues,
+            room: step.room?.room_name,
+            specialty: step.room?.specialty?.specialty_name,
+          },
         };
       }
 
