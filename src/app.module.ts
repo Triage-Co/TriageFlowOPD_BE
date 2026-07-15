@@ -31,8 +31,23 @@ import { StepModule } from './routes/step/step.module';
 import { StaffModule } from './routes/staff/staff.module';
 import { AccountModule } from './routes/account/account.module';
 
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
+import { NavigationModule } from './routes/navigation/navigation.module';
+
 @Module({
   imports: [
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: async () => {
+        const store = await redisStore({
+          url: process.env.REDIS_URL,
+        });
+        return {
+          store,
+        };
+      },
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -66,6 +81,7 @@ import { AccountModule } from './routes/account/account.module';
     NotificationModule,
     VnptModule,
     AccountModule,
+    NavigationModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

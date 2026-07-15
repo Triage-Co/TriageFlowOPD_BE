@@ -30,6 +30,8 @@ class EnvClass {
   VNPT_TOKEN_ID: string;
   @IsString({ message: 'Thiếu VNPT_ACCESS_TOKEN TRONG FILE .ENV' })
   VNPT_ACCESS_TOKEN: string;
+  @IsString({ message: 'Thiếu REDIS_URL TRONG FILE .ENV' })
+  REDIS_URL: string;
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

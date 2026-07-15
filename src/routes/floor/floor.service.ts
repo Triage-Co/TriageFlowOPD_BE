@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { CreateFloorDto } from './dto/create-floor.dto';
 import { UpdateFloorDto } from './dto/update-floor.dto';
 import { GeoService } from '../../shared/geo/geo.service';
@@ -9,7 +11,8 @@ export class FloorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
-  ) {}
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) { }
 
   async create(createFloorDto: CreateFloorDto) {
     try {
@@ -36,6 +39,8 @@ export class FloorService {
       const outline = createFloorDto.outlineGeom
         ? await this.geoService.readGeom('floor', data.id, 'outlineGeom')
         : null;
+
+      await this.cacheManager.del(`building_map:${data.buildingId}`);
 
       return {
         code: 201,
@@ -158,6 +163,8 @@ export class FloorService {
         'outlineGeom',
       );
 
+      await this.cacheManager.del(`building_map:${data.buildingId}`);
+
       return {
         code: 200,
         message: 'Cập nhật tầng thành công',
@@ -188,6 +195,7 @@ export class FloorService {
       await this.prisma.floor.delete({
         where: { id },
       });
+      await this.cacheManager.del(`building_map:${floor.buildingId}`);
       return {
         code: 200,
         message: 'Xóa tầng thành công',
