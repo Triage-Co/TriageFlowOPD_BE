@@ -24,22 +24,25 @@ export class PrismaPatientRepository implements IPatientRepository {
     });
   }
 
-  findAll(account_id: string): Promise<any> {
+  findAll(account_id?: string): Promise<any> {
     return this.prismaService.patient.findMany({
       where: {
-        account_id: account_id,
+        ...(account_id && { account_id: account_id }),
       },
     });
   }
 
-  findOne(account_id: string, patient_id: string): Promise<any> {
-    return this.prismaService.patient.findUnique({
+  findOne(patient_id: string, account_id?: string): Promise<any> {
+    return this.prismaService.patient.findFirst({
       where: {
         patient_id: patient_id,
-        account_id: account_id,
+        ...(account_id && {
+          account_id: account_id,
+        }),
       },
     });
   }
+  
   delete(account_id: string, patient_id: string): Promise<any> {
     return this.prismaService.patient.delete({
       where: {

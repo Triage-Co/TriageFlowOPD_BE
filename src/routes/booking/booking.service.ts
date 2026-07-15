@@ -211,9 +211,10 @@ export class BookingService {
           status: 'success',
           message: 'Bạn đã có số thứ tự',
           data: {
-            queue_number: step.queues,
-            room: step.room?.room_name,
-            specialty: step.room?.specialty?.specialty_name,
+            slot: step.flow?.booking.slot,
+            room: step.room,
+            specialty: step.room?.specialty,
+            queue: step.queues,
           },
         };
       }
@@ -250,6 +251,27 @@ export class BookingService {
           step_id: step_id,
           queue_number: generateNumber + '',
         },
+        include: {
+          step: {
+            include: {
+              room: {
+                include: {
+                  specialty: true,
+                },
+              },
+              queues: true,
+              flow: {
+                include: {
+                  booking: {
+                    include: {
+                      slot: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       if (createQueueData) {
@@ -263,7 +285,12 @@ export class BookingService {
         code: 200,
         status: 'success',
         message: 'Bạn đã thanh toán',
-        data: createQueueData,
+        data: {
+          slot: createQueueData.step.flow?.booking.slot,
+          room: createQueueData.step.room,
+          specialty: createQueueData.step.room?.specialty,
+          queue: createQueueData.step.queues,
+        },
       };
     } catch (error) {
       throw error;

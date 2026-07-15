@@ -152,7 +152,7 @@ export class InfermedicaService {
               await this.PATIENT_ANWSER.create({
                 data: {
                   citizen_id: citizen_id,
-                  patient_id: exitedUser.account_id,
+                  patient_id: exitedUser.patient_id,
                   questionnaire_data:
                     triageDto as unknown as Prisma.InputJsonObject,
                   interview_token: data.interview_token || null,

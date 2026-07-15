@@ -1,12 +1,13 @@
 import { Optional } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { GenderTypeEnum} from '@prisma/client';
+import { GenderTypeEnum } from '@prisma/client';
 import {
   IsDate,
   IsEmail,
   IsEnum,
   IsNotEmpty,
   IsString,
+  IsUrl,
   Matches,
 } from 'class-validator';
 
@@ -172,7 +173,6 @@ export class UpdateUserRequestDto {
   })
   user_name: string;
 
-
   @IsEnum(GenderTypeEnum)
   @ApiProperty({
     name: 'gender',
@@ -189,4 +189,13 @@ export class UpdateUserRequestDto {
   })
   @Optional()
   phone?: string;
+
+  @IsUrl()
+  @ApiProperty({
+    name: 'avatar',
+    example:
+      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQeRmIK-W5sIz_tViBzl03LTCe8HJuLk79fzIWmYmxJEQ&s=10',
+  })
+  @Optional()
+  avatar?: string;
 }
