@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { GeoService } from '../../shared/geo/geo.service';
 import * as turf from '@turf/turf';
@@ -10,7 +12,8 @@ export class GraphGenerationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
-  ) {}
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) { }
 
   /**
    * Deterministically generate the navigation graph for a given floor.
@@ -480,6 +483,8 @@ export class GraphGenerationService {
       where: { fromNode: { floorId } },
     });
 
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+
     return {
       nodesCreated: totalNodes,
       edgesCreated: totalEdges,
@@ -658,6 +663,8 @@ export class GraphGenerationService {
 
       linksCreated += 2;
     }
+
+    await this.cacheManager.del(`building_map:${connector.buildingId}`);
 
     return {
       message: 'Connector linked successfully',

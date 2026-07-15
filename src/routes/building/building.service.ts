@@ -1,11 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { CreateBuildingDto } from './dto/create-building.dto';
 import { UpdateBuildingDto } from './dto/update-building.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class BuildingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) { }
 
   async create(createBuildingDto: CreateBuildingDto) {
     try {
@@ -98,6 +103,8 @@ export class BuildingService {
           organizationId: updateBuildingDto.organizationId,
         },
       });
+      await this.cacheManager.del(`building_map:${id}`);
+
       return {
         code: 200,
         message: 'Cập nhật tòa nhà thành công',
@@ -128,6 +135,8 @@ export class BuildingService {
       await this.prisma.building.delete({
         where: { id },
       });
+      await this.cacheManager.del(`building_map:${id}`);
+
       return {
         code: 200,
         message: 'Xóa tòa nhà thành công',

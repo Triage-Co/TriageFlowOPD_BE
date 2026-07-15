@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { CreateRoomBoundaryDto } from './dto/create-room-boundary.dto';
 import { UpdateRoomBoundaryDto } from './dto/update-room-boundary.dto';
 import { GeoService } from '../../shared/geo/geo.service';
@@ -9,7 +11,8 @@ export class RoomBoundaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
-  ) {}
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) { }
 
   async create(createRoomBoundaryDto: CreateRoomBoundaryDto) {
     try {
@@ -36,6 +39,8 @@ export class RoomBoundaryService {
       const line = createRoomBoundaryDto.lineGeom
         ? await this.geoService.readGeom('room_boundary', data.id, 'lineGeom')
         : null;
+
+      await this.clearBuildingCacheByRoomId(data.roomId);
 
       return {
         code: 201,
@@ -158,6 +163,8 @@ export class RoomBoundaryService {
         'lineGeom',
       );
 
+      await this.clearBuildingCacheByRoomId(data.roomId);
+
       return {
         code: 200,
         message: 'Cập nhật đường biên thành công',
@@ -188,6 +195,7 @@ export class RoomBoundaryService {
       await this.prisma.roomBoundary.delete({
         where: { id },
       });
+      await this.clearBuildingCacheByRoomId(boundary.roomId);
       return {
         code: 200,
         message: 'Xóa đường biên thành công',
@@ -199,6 +207,22 @@ export class RoomBoundaryService {
         message: error instanceof Error ? error.message : 'Unknown Error',
         status: 'error',
       };
+    }
+  }
+
+  private async clearBuildingCacheByRoomId(roomId: string) {
+    const room = await this.prisma.physicalRoom.findUnique({
+      where: { id: roomId },
+      select: { floorId: true },
+    });
+    if (room) {
+      const floor = await this.prisma.floor.findUnique({
+        where: { id: room.floorId },
+        select: { buildingId: true },
+      });
+      if (floor) {
+        await this.cacheManager.del(`building_map:${floor.buildingId}`);
+      }
     }
   }
 }

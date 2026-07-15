@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { CreatePhysicalRoomDto } from './dto/create-physical-room.dto';
 import { UpdatePhysicalRoomDto } from './dto/update-physical-room.dto';
 import { GeoService } from '../../shared/geo/geo.service';
@@ -9,7 +11,8 @@ export class PhysicalRoomService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
-  ) {}
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) { }
 
   async create(createPhysicalRoomDto: CreatePhysicalRoomDto) {
     try {
@@ -43,19 +46,21 @@ export class PhysicalRoomService {
 
       const center = createPhysicalRoomDto.centerGeom
         ? await this.geoService.readGeom(
-            'physical_room',
-            data.id,
-            'centerGeom',
-          )
+          'physical_room',
+          data.id,
+          'centerGeom',
+        )
         : null;
 
       const outline = createPhysicalRoomDto.outlineGeom
         ? await this.geoService.readGeom(
-            'physical_room',
-            data.id,
-            'outlineGeom',
-          )
+          'physical_room',
+          data.id,
+          'outlineGeom',
+        )
         : null;
+
+      await this.clearBuildingCacheByFloorId(data.floorId);
 
       return {
         code: 201,
@@ -201,6 +206,8 @@ export class PhysicalRoomService {
         'outlineGeom',
       );
 
+      await this.clearBuildingCacheByFloorId(data.floorId);
+
       return {
         code: 200,
         message: 'Cập nhật phòng thành công',
@@ -231,6 +238,7 @@ export class PhysicalRoomService {
       await this.prisma.physicalRoom.delete({
         where: { id },
       });
+      await this.clearBuildingCacheByFloorId(room.floorId);
       return {
         code: 200,
         message: 'Xóa phòng thành công',
@@ -242,6 +250,16 @@ export class PhysicalRoomService {
         message: error instanceof Error ? error.message : 'Unknown Error',
         status: 'error',
       };
+    }
+  }
+
+  private async clearBuildingCacheByFloorId(floorId: string) {
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+      select: { buildingId: true },
+    });
+    if (floor) {
+      await this.cacheManager.del(`building_map:${floor.buildingId}`);
     }
   }
 }

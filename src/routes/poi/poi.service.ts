@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { CreatePoiDto } from './dto/create-poi.dto';
 import { UpdatePoiDto } from './dto/update-poi.dto';
 import { Prisma } from '@prisma/client';
@@ -6,7 +8,10 @@ import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class PoiService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) { }
 
   async create(createPoiDto: CreatePoiDto) {
     try {
@@ -24,6 +29,7 @@ export class PoiService {
           active: createPoiDto.active,
         },
       });
+      await this.clearBuildingCacheByRoomId(data.roomId);
       return {
         code: 201,
         message: 'Thêm POI thành công',
@@ -133,6 +139,7 @@ export class PoiService {
           active: updatePoiDto.active,
         },
       });
+      await this.clearBuildingCacheByRoomId(data.roomId);
       return {
         code: 200,
         message: 'Cập nhật POI thành công',
@@ -163,6 +170,7 @@ export class PoiService {
       await this.prisma.poi.delete({
         where: { id },
       });
+      await this.clearBuildingCacheByRoomId(poi.roomId);
       return {
         code: 200,
         message: 'Xóa POI thành công',
@@ -174,6 +182,22 @@ export class PoiService {
         message: error instanceof Error ? error.message : 'Unknown Error',
         status: 'error',
       };
+    }
+  }
+
+  private async clearBuildingCacheByRoomId(roomId: string) {
+    const room = await this.prisma.physicalRoom.findUnique({
+      where: { id: roomId },
+      select: { floorId: true },
+    });
+    if (room) {
+      const floor = await this.prisma.floor.findUnique({
+        where: { id: room.floorId },
+        select: { buildingId: true },
+      });
+      if (floor) {
+        await this.cacheManager.del(`building_map:${floor.buildingId}`);
+      }
     }
   }
 }

@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Building Map – TriageFlowOPD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Be Vietnam Pro', sans-serif;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+    }
+    
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* UI Overlay */
+    .ui-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 360px;
+      background: rgba(15, 22, 42, 0.8);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .sidebar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-icon {
+      font-size: 24px;
+      background: linear-gradient(135deg, #3b82f6, #10b981);
+      width: 42px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    .brand-title h1 {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    .brand-title p {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #6b7280;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .building-info {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 14px;
+      border-radius: 10px;
+    }
+    .building-info h2 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .building-info p {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .stat-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: #3b82f6;
+    }
+    .stat-label {
+      font-size: 10px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .zone-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .zone-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .zone-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .zone-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Selected Details Box */
+    .detail-card {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+      padding: 16px;
+      border-radius: 12px;
+      display: none;
+    }
+    .detail-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #60a5fa;
+      margin-bottom: 4px;
+    }
+    .detail-card p {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+    }
+    .detail-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    /* Help overlay */
+    .help-overlay {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      background: rgba(15, 22, 42, 0.7);
+      backdrop-filter: blur(8px);
+      padding: 12px 18px;
+      border-radius: 30px;
+      font-size: 11px;
+      color: #9ca3af;
+      display: flex;
+      gap: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .help-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* 3D Label Sprites */
+    .room-label-container {
+      position: absolute;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .room-label {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      color: #f3f4f6;
+      white-space: nowrap;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+  <div id="label-container" class="room-label-container"></div>
+
+  <div class="ui-overlay">
+    <!-- Sidebar Left -->
+    <div class="sidebar interactive">
+      <div class="brand">
+        <div class="brand-icon">🏥</div>
+        <div class="brand-title">
+          <h1>TriageFlowOPD</h1>
+          <p>Mô Phỏng Không Gian 3D</p>
+        </div>
+      </div>
+
+      <div class="building-info">
+        <h2 id="b-name">Tòa Nhà</h2>
+        <p id="b-address">Địa chỉ</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-val" id="stat-rooms">0</div>
+          <div class="stat-label">Phòng Khám</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" id="stat-desks" style="color: #10b981;">0</div>
+          <div class="stat-label">Bàn Tiếp Nhận</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Danh Sách Khu Khám</div>
+        <div class="zone-list" id="zone-list"></div>
+      </div>
+
+      <div class="detail-card" id="detail-card">
+        <h3 id="detail-title">Tên phòng</h3>
+        <p id="detail-code">Mã phòng</p>
+        <p id="detail-desc">Mô tả chi tiết phòng khám</p>
+        <span class="detail-badge" id="detail-zone">Khu khám</span>
+      </div>
+    </div>
+
+    <!-- Help Bottom Right -->
+    <div class="help-overlay">
+      <div class="help-item">🖱️ Chuột trái: Xoay</div>
+      <div class="help-item">🖱️ Chuột phải: Di chuyển</div>
+      <div class="help-item">⚙️ Cuộn chuột: Phóng to/thu nhỏ</div>
+    </div>
+  </div>
+
+  <!-- Load Three.js, OrbitControls via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <script>
+    // Embed building map data directly
+    const MAP_DATA = {"building":{"id":"17854b86-79d1-4c60-b776-784742c2597e","name":"Tòa G2 – Khoa Khám Bệnh","addressLabel":"Khoa Khám Bệnh – Tầng 2 Khối G2","totalFloors":1,"organizationId":"00000000-0000-0000-0000-000000000001","createdAt":"2026-07-15T16:08:47.070Z","updatedAt":"2026-07-15T16:08:47.070Z"},"floors":[{"id":"4193e567-597a-4579-b415-ea2104231924","buildingId":"17854b86-79d1-4c60-b776-784742c2597e","floorNumber":1,"floorPlanImageUrl":null,"widthMeters":120,"heightMeters":80,"scalePixelsPerMeter":10,"createdAt":"2026-07-15T16:08:47.121Z","updatedAt":"2026-07-15T16:08:47.121Z","outlineGeom":{"type":"Polygon","coordinates":[[[0,0],[0,0.00072372],[0.001077973,0.00072372],[0.001077973,0],[0,0]]]},"rooms":[{"id":"d4a4063b-0243-4937-83de-fc95b28c170e","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.27","roomLabel":"Nội tiêu hóa 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:56.222Z","updatedAt":"2026-07-15T16:08:56.222Z","centerGeom":{"type":"Point","coordinates":[0.00011678,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000098814,0.000438755],[0.000098814,0.000483988],[0.000134747,0.000483988],[0.000134747,0.000438755],[0.000098814,0.000438755]]]},"boundaries":[{"id":"343f4d7b-0d3e-4185-a5a2-4eb894cf48fd","roomId":"d4a4063b-0243-4937-83de-fc95b28c170e","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000098814,0.000438755],[0.000098814,0.000483988]]}},{"id":"23338090-6bcc-41c3-8cb9-a91f410728ac","roomId":"d4a4063b-0243-4937-83de-fc95b28c170e","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"e01ac552-b29b-4baf-b3d1-8dd8908ccccd","lineGeom":{"type":"LineString","coordinates":[[0.000098814,0.000483988],[0.000134747,0.000483988]]}},{"id":"21d40165-b914-43d4-a24b-addf4996ead8","roomId":"d4a4063b-0243-4937-83de-fc95b28c170e","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000134747,0.000483988],[0.000134747,0.000438755]]}},{"id":"9b20ae9d-84ca-48f3-af45-46c2072b888d","roomId":"d4a4063b-0243-4937-83de-fc95b28c170e","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000134747,0.000438755],[0.000098814,0.000438755]]}}],"pois":[]},{"id":"fe437aa7-afe6-409a-bb0d-923f195d5a99","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.6","roomLabel":"Nội tim mạch 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:47.434Z","updatedAt":"2026-07-15T16:08:47.434Z","centerGeom":{"type":"Point","coordinates":[0.000035932,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000017966,0.000388999],[0.000017966,0.000434232],[0.000053899,0.000434232],[0.000053899,0.000388999],[0.000017966,0.000388999]]]},"boundaries":[{"id":"07fef623-5dcd-4792-b137-5729271515fe","roomId":"fe437aa7-afe6-409a-bb0d-923f195d5a99","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000017966,0.000388999],[0.000017966,0.000434232]]}},{"id":"c05fac5a-a65b-40cc-9cc5-0989accbc1d3","roomId":"fe437aa7-afe6-409a-bb0d-923f195d5a99","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000017966,0.000434232],[0.000053899,0.000434232]]}},{"id":"2d35e443-9cbe-47a4-98ef-47b13bcb895a","roomId":"fe437aa7-afe6-409a-bb0d-923f195d5a99","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000053899,0.000434232],[0.000053899,0.000388999]]}},{"id":"ac7195fc-6cd5-46d4-8a52-261bdfa5fd40","roomId":"fe437aa7-afe6-409a-bb0d-923f195d5a99","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"931970aa-c18e-4a26-bd8c-c43e7e6e0c9d","lineGeom":{"type":"LineString","coordinates":[[0.000053899,0.000388999],[0.000017966,0.000388999]]}}],"pois":[]},{"id":"9d8380e1-dd65-4ae0-ac3d-f4e5b856741e","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.7","roomLabel":"Nội tim mạch 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:48.150Z","updatedAt":"2026-07-15T16:08:48.150Z","centerGeom":{"type":"Point","coordinates":[0.000076356,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00005839,0.000388999],[0.00005839,0.000434232],[0.000094323,0.000434232],[0.000094323,0.000388999],[0.00005839,0.000388999]]]},"boundaries":[{"id":"bb3ea280-ebf5-45dd-b898-c34fbdfcef91","roomId":"9d8380e1-dd65-4ae0-ac3d-f4e5b856741e","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00005839,0.000388999],[0.00005839,0.000434232]]}},{"id":"cceab016-298a-4268-8fe1-cbef2377d5c6","roomId":"9d8380e1-dd65-4ae0-ac3d-f4e5b856741e","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00005839,0.000434232],[0.000094323,0.000434232]]}},{"id":"68dbcc8f-5638-4dfe-aeba-31d1ada670a7","roomId":"9d8380e1-dd65-4ae0-ac3d-f4e5b856741e","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000094323,0.000434232],[0.000094323,0.000388999]]}},{"id":"8c50fa8f-2901-47d9-b8e5-c88a499720cd","roomId":"9d8380e1-dd65-4ae0-ac3d-f4e5b856741e","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"115e9e73-c261-4107-b7b8-64cb06455d6c","lineGeom":{"type":"LineString","coordinates":[[0.000094323,0.000388999],[0.00005839,0.000388999]]}}],"pois":[]},{"id":"f7e0cce3-14ae-43f2-90bd-ae4758e96543","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.8","roomLabel":"Nội tim mạch 3","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:48.803Z","updatedAt":"2026-07-15T16:08:48.803Z","centerGeom":{"type":"Point","coordinates":[0.00011678,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000098814,0.000388999],[0.000098814,0.000434232],[0.000134747,0.000434232],[0.000134747,0.000388999],[0.000098814,0.000388999]]]},"boundaries":[{"id":"d789bcd9-85e6-4e52-900f-aca7144351fd","roomId":"f7e0cce3-14ae-43f2-90bd-ae4758e96543","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000098814,0.000388999],[0.000098814,0.000434232]]}},{"id":"f85a9efd-5faf-4da4-8096-277139f184c9","roomId":"f7e0cce3-14ae-43f2-90bd-ae4758e96543","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000098814,0.000434232],[0.000134747,0.000434232]]}},{"id":"697f8ccd-0a92-4e74-a8ef-597668b91d37","roomId":"f7e0cce3-14ae-43f2-90bd-ae4758e96543","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000134747,0.000434232],[0.000134747,0.000388999]]}},{"id":"5fba099a-0592-4f25-8c02-85dcf8ec9b1f","roomId":"f7e0cce3-14ae-43f2-90bd-ae4758e96543","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"bf173d67-a766-4c51-99c1-4bb6140ce84f","lineGeom":{"type":"LineString","coordinates":[[0.000134747,0.000388999],[0.000098814,0.000388999]]}}],"pois":[]},{"id":"f41cd44b-978f-4748-a18a-102119bc53ee","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.22","roomLabel":"Nội thần kinh 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:56.887Z","updatedAt":"2026-07-15T16:08:56.887Z","centerGeom":{"type":"Point","coordinates":[0.000157204,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000139238,0.000438755],[0.000139238,0.000483988],[0.000175171,0.000483988],[0.000175171,0.000438755],[0.000139238,0.000438755]]]},"boundaries":[{"id":"c12598ed-3fc8-4033-8d44-4649dfdb40aa","roomId":"f41cd44b-978f-4748-a18a-102119bc53ee","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000139238,0.000438755],[0.000139238,0.000483988]]}},{"id":"688e793e-3cbc-49ae-8159-831203ad117c","roomId":"f41cd44b-978f-4748-a18a-102119bc53ee","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"92c43b99-ce15-487a-89bc-6dab829ec7ac","lineGeom":{"type":"LineString","coordinates":[[0.000139238,0.000483988],[0.000175171,0.000483988]]}},{"id":"5d35e640-f28d-4bf1-a359-6fb3f3b5a53b","roomId":"f41cd44b-978f-4748-a18a-102119bc53ee","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000175171,0.000483988],[0.000175171,0.000438755]]}},{"id":"8c886ee2-cd01-4756-a17e-ee0c2aecba8c","roomId":"f41cd44b-978f-4748-a18a-102119bc53ee","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000175171,0.000438755],[0.000139238,0.000438755]]}}],"pois":[]},{"id":"d7877929-32d2-4308-ac7a-98d6fa67dd93","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.9","roomLabel":"Nội tim mạch 4","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:49.412Z","updatedAt":"2026-07-15T16:08:49.412Z","centerGeom":{"type":"Point","coordinates":[0.000157204,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000139238,0.000388999],[0.000139238,0.000434232],[0.000175171,0.000434232],[0.000175171,0.000388999],[0.000139238,0.000388999]]]},"boundaries":[{"id":"b1df62e7-ca13-49c2-9e47-746f1e0423dd","roomId":"d7877929-32d2-4308-ac7a-98d6fa67dd93","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000139238,0.000388999],[0.000139238,0.000434232]]}},{"id":"2e2c6dc4-86a9-47a3-afdf-310f4bfa4454","roomId":"d7877929-32d2-4308-ac7a-98d6fa67dd93","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000139238,0.000434232],[0.000175171,0.000434232]]}},{"id":"678fd58a-ef02-4348-97f1-34d20fb73792","roomId":"d7877929-32d2-4308-ac7a-98d6fa67dd93","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000175171,0.000434232],[0.000175171,0.000388999]]}},{"id":"5b423796-047c-4919-b517-53b88f54f4a0","roomId":"d7877929-32d2-4308-ac7a-98d6fa67dd93","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"8d850069-56f7-4ce1-9bdb-3954d406bc70","lineGeom":{"type":"LineString","coordinates":[[0.000175171,0.000388999],[0.000139238,0.000388999]]}}],"pois":[]},{"id":"eb99eb3e-4649-476e-b017-49ddf0c6c63e","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.10","roomLabel":"Nội tim mạch 5","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:50.093Z","updatedAt":"2026-07-15T16:08:50.093Z","centerGeom":{"type":"Point","coordinates":[0.000197628,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000179662,0.000388999],[0.000179662,0.000434232],[0.000215595,0.000434232],[0.000215595,0.000388999],[0.000179662,0.000388999]]]},"boundaries":[{"id":"defb5233-00a1-4fc4-9e5a-9fb5e5597565","roomId":"eb99eb3e-4649-476e-b017-49ddf0c6c63e","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000179662,0.000388999],[0.000179662,0.000434232]]}},{"id":"ff1ad738-9218-4749-8220-d7b9c542f71f","roomId":"eb99eb3e-4649-476e-b017-49ddf0c6c63e","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000179662,0.000434232],[0.000215595,0.000434232]]}},{"id":"a1dd6d71-3f4f-4bad-8b39-46edd2ed5f2a","roomId":"eb99eb3e-4649-476e-b017-49ddf0c6c63e","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000215595,0.000434232],[0.000215595,0.000388999]]}},{"id":"a48e05ca-d69a-4d81-9514-b4cdc26706c9","roomId":"eb99eb3e-4649-476e-b017-49ddf0c6c63e","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"761a4a7a-b5b0-4958-a567-a3537f68b315","lineGeom":{"type":"LineString","coordinates":[[0.000215595,0.000388999],[0.000179662,0.000388999]]}}],"pois":[]},{"id":"bfb850ee-5289-4bd8-9e03-401ffccbebb5","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.35","roomLabel":"Nhi 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:02.759Z","updatedAt":"2026-07-15T16:09:02.759Z","centerGeom":{"type":"Point","coordinates":[0.000565936,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00054797,0.000388999],[0.00054797,0.000434232],[0.000583902,0.000434232],[0.000583902,0.000388999],[0.00054797,0.000388999]]]},"boundaries":[{"id":"c0b55630-507e-48a8-b4fe-de09312bc7f5","roomId":"bfb850ee-5289-4bd8-9e03-401ffccbebb5","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00054797,0.000388999],[0.00054797,0.000434232]]}},{"id":"28123c03-ed66-4bb2-b949-c7ed8a88c1d5","roomId":"bfb850ee-5289-4bd8-9e03-401ffccbebb5","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00054797,0.000434232],[0.000583902,0.000434232]]}},{"id":"406982b4-a677-4066-9034-575c2cc6c607","roomId":"bfb850ee-5289-4bd8-9e03-401ffccbebb5","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000583902,0.000434232],[0.000583902,0.000388999]]}},{"id":"077926a7-4019-4bb4-a44e-83c69b2d983b","roomId":"bfb850ee-5289-4bd8-9e03-401ffccbebb5","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"a5aaab3c-5b95-400b-8326-4a345313b33a","lineGeom":{"type":"LineString","coordinates":[[0.000583902,0.000388999],[0.00054797,0.000388999]]}}],"pois":[]},{"id":"08e0dc32-6815-4b77-8047-5976b40d08ef","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.12","roomLabel":"Tim mạch can thiệp 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:50.787Z","updatedAt":"2026-07-15T16:08:50.787Z","centerGeom":{"type":"Point","coordinates":[0.000238052,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000220086,0.000388999],[0.000220086,0.000434232],[0.000256019,0.000434232],[0.000256019,0.000388999],[0.000220086,0.000388999]]]},"boundaries":[{"id":"6406ea88-53c9-48d8-8bc5-63e0145d8883","roomId":"08e0dc32-6815-4b77-8047-5976b40d08ef","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000220086,0.000388999],[0.000220086,0.000434232]]}},{"id":"caed3e2e-b931-47b7-8d39-b072dbde3958","roomId":"08e0dc32-6815-4b77-8047-5976b40d08ef","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000220086,0.000434232],[0.000256019,0.000434232]]}},{"id":"18de8048-2f67-4df5-8702-fbc3376e508e","roomId":"08e0dc32-6815-4b77-8047-5976b40d08ef","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000256019,0.000434232],[0.000256019,0.000388999]]}},{"id":"8ff15499-9781-45db-ac78-f28c2d664cb0","roomId":"08e0dc32-6815-4b77-8047-5976b40d08ef","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"c9d197a5-dd15-4ca7-aac3-fc973df40bb8","lineGeom":{"type":"LineString","coordinates":[[0.000256019,0.000388999],[0.000220086,0.000388999]]}}],"pois":[]},{"id":"c78230fc-1365-4e9c-a2b3-f43d869c6e60","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.23","roomLabel":"Nội thần kinh 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:57.701Z","updatedAt":"2026-07-15T16:08:57.701Z","centerGeom":{"type":"Point","coordinates":[0.000197628,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000179662,0.000438755],[0.000179662,0.000483988],[0.000215595,0.000483988],[0.000215595,0.000438755],[0.000179662,0.000438755]]]},"boundaries":[{"id":"e57a53d1-ac42-4ad9-8620-59e7ef1d9e71","roomId":"c78230fc-1365-4e9c-a2b3-f43d869c6e60","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000179662,0.000438755],[0.000179662,0.000483988]]}},{"id":"d369307c-4a24-441a-bbfa-9fd418c971e4","roomId":"c78230fc-1365-4e9c-a2b3-f43d869c6e60","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"e14d8762-44f0-45ae-95dd-01772af8d9c0","lineGeom":{"type":"LineString","coordinates":[[0.000179662,0.000483988],[0.000215595,0.000483988]]}},{"id":"fa8268d9-50c6-4ab9-be09-b10e9da13a35","roomId":"c78230fc-1365-4e9c-a2b3-f43d869c6e60","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000215595,0.000483988],[0.000215595,0.000438755]]}},{"id":"a312c282-32f4-4189-b864-4ffc99026b46","roomId":"c78230fc-1365-4e9c-a2b3-f43d869c6e60","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000215595,0.000438755],[0.000179662,0.000438755]]}}],"pois":[]},{"id":"ac54e170-28a9-4d63-bd13-f15e18e511b4","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.13","roomLabel":"Tim mạch can thiệp 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:51.459Z","updatedAt":"2026-07-15T16:08:51.459Z","centerGeom":{"type":"Point","coordinates":[0.000278476,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00026051,0.000388999],[0.00026051,0.000434232],[0.000296443,0.000434232],[0.000296443,0.000388999],[0.00026051,0.000388999]]]},"boundaries":[{"id":"e8903d4c-1c1e-4f1d-b270-3d9caa2d4543","roomId":"ac54e170-28a9-4d63-bd13-f15e18e511b4","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00026051,0.000388999],[0.00026051,0.000434232]]}},{"id":"3297ebf6-2f65-46d8-868b-1580905ad44f","roomId":"ac54e170-28a9-4d63-bd13-f15e18e511b4","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00026051,0.000434232],[0.000296443,0.000434232]]}},{"id":"41a3a114-6b4c-412c-8587-d96b7c852089","roomId":"ac54e170-28a9-4d63-bd13-f15e18e511b4","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000296443,0.000434232],[0.000296443,0.000388999]]}},{"id":"7e100b51-00be-4c4e-966d-da807e5fa8c1","roomId":"ac54e170-28a9-4d63-bd13-f15e18e511b4","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"63e346a0-98e0-4abe-86ca-6130aa9ceaf4","lineGeom":{"type":"LineString","coordinates":[[0.000296443,0.000388999],[0.00026051,0.000388999]]}}],"pois":[]},{"id":"7595bf3b-883d-4f18-a52c-5be9f9ba2b1e","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.11","roomLabel":"Nội cơ xương khớp","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:52.157Z","updatedAt":"2026-07-15T16:08:52.157Z","centerGeom":{"type":"Point","coordinates":[0.0003189,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000300934,0.000388999],[0.000300934,0.000434232],[0.000336867,0.000434232],[0.000336867,0.000388999],[0.000300934,0.000388999]]]},"boundaries":[{"id":"f4291c90-1844-471d-ba46-f6dc677be1e3","roomId":"7595bf3b-883d-4f18-a52c-5be9f9ba2b1e","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000300934,0.000388999],[0.000300934,0.000434232]]}},{"id":"76fe3fb0-d7ac-4088-a5ea-61d63870a8fe","roomId":"7595bf3b-883d-4f18-a52c-5be9f9ba2b1e","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000300934,0.000434232],[0.000336867,0.000434232]]}},{"id":"1e3a2724-36e3-44af-bc2d-62408a68b807","roomId":"7595bf3b-883d-4f18-a52c-5be9f9ba2b1e","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000336867,0.000434232],[0.000336867,0.000388999]]}},{"id":"a0a1ec75-0c82-423e-8ca3-4f758b4a2ddf","roomId":"7595bf3b-883d-4f18-a52c-5be9f9ba2b1e","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"5fb77864-c762-4194-bddf-4813bf141a86","lineGeom":{"type":"LineString","coordinates":[[0.000336867,0.000388999],[0.000300934,0.000388999]]}}],"pois":[]},{"id":"0618c849-8ce1-4153-9d46-6f3f5c324185","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.40","roomLabel":"Huyết học","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:00.899Z","updatedAt":"2026-07-15T16:09:00.899Z","centerGeom":{"type":"Point","coordinates":[0.000399748,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000381782,0.000438755],[0.000381782,0.000483988],[0.000417715,0.000483988],[0.000417715,0.000438755],[0.000381782,0.000438755]]]},"boundaries":[{"id":"aa330f96-007d-46de-a0bf-3536e5077b2c","roomId":"0618c849-8ce1-4153-9d46-6f3f5c324185","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000381782,0.000438755],[0.000381782,0.000483988]]}},{"id":"ef4de2ab-70ce-4680-98d2-64e8f898b06a","roomId":"0618c849-8ce1-4153-9d46-6f3f5c324185","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"3c3e9d0d-2749-4455-94e4-398ffdc3486c","lineGeom":{"type":"LineString","coordinates":[[0.000381782,0.000483988],[0.000417715,0.000483988]]}},{"id":"4084b6a3-6bc6-435a-8547-cc8f936b6dd9","roomId":"0618c849-8ce1-4153-9d46-6f3f5c324185","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000417715,0.000483988],[0.000417715,0.000438755]]}},{"id":"d4442219-c11e-4392-b650-e95b551555c2","roomId":"0618c849-8ce1-4153-9d46-6f3f5c324185","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000417715,0.000438755],[0.000381782,0.000438755]]}}],"pois":[]},{"id":"8fc8bd0e-c15a-4a70-a9f0-50c0d731b419","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.14","roomLabel":"Nội tiết 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:52.953Z","updatedAt":"2026-07-15T16:08:52.953Z","centerGeom":{"type":"Point","coordinates":[0.000359324,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000341358,0.000388999],[0.000341358,0.000434232],[0.000377291,0.000434232],[0.000377291,0.000388999],[0.000341358,0.000388999]]]},"boundaries":[{"id":"02746cb0-556c-422f-9001-d48c71b48db0","roomId":"8fc8bd0e-c15a-4a70-a9f0-50c0d731b419","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000341358,0.000388999],[0.000341358,0.000434232]]}},{"id":"36ec5772-0469-4f77-bb47-5ac72cfd655f","roomId":"8fc8bd0e-c15a-4a70-a9f0-50c0d731b419","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000341358,0.000434232],[0.000377291,0.000434232]]}},{"id":"d23fc246-7d9d-472e-9814-d2b57a282ac9","roomId":"8fc8bd0e-c15a-4a70-a9f0-50c0d731b419","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000377291,0.000434232],[0.000377291,0.000388999]]}},{"id":"d680d865-15b3-440b-a30a-33ce56556a81","roomId":"8fc8bd0e-c15a-4a70-a9f0-50c0d731b419","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"1b91564a-74d2-400d-b9f2-3136d572e4a1","lineGeom":{"type":"LineString","coordinates":[[0.000377291,0.000388999],[0.000341358,0.000388999]]}}],"pois":[]},{"id":"94e932d8-3dc4-4586-8013-ca7227bdf83c","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.28","roomLabel":"Nội hô hấp 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:58.358Z","updatedAt":"2026-07-15T16:08:58.358Z","centerGeom":{"type":"Point","coordinates":[0.000238052,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000220086,0.000438755],[0.000220086,0.000483988],[0.000256019,0.000483988],[0.000256019,0.000438755],[0.000220086,0.000438755]]]},"boundaries":[{"id":"355c6eb4-6ffe-406d-a48c-cf5c89048404","roomId":"94e932d8-3dc4-4586-8013-ca7227bdf83c","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000220086,0.000438755],[0.000220086,0.000483988]]}},{"id":"3b29b397-200a-4efb-bcb8-c0792e9ff98f","roomId":"94e932d8-3dc4-4586-8013-ca7227bdf83c","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"87969dc6-f52a-4576-9150-0d312960e912","lineGeom":{"type":"LineString","coordinates":[[0.000220086,0.000483988],[0.000256019,0.000483988]]}},{"id":"b8793b89-a81a-4b96-96fd-11ef9c019cb6","roomId":"94e932d8-3dc4-4586-8013-ca7227bdf83c","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000256019,0.000483988],[0.000256019,0.000438755]]}},{"id":"a93d028b-20c2-4400-9bf4-87234aa6892b","roomId":"94e932d8-3dc4-4586-8013-ca7227bdf83c","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000256019,0.000438755],[0.000220086,0.000438755]]}}],"pois":[]},{"id":"b85be89b-4f6b-47e9-919d-910e7f9d3156","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.15","roomLabel":"Nội tiết 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:53.582Z","updatedAt":"2026-07-15T16:08:53.582Z","centerGeom":{"type":"Point","coordinates":[0.000399748,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000381782,0.000388999],[0.000381782,0.000434232],[0.000417715,0.000434232],[0.000417715,0.000388999],[0.000381782,0.000388999]]]},"boundaries":[{"id":"2274936c-c252-4397-bbd5-5f810580ea71","roomId":"b85be89b-4f6b-47e9-919d-910e7f9d3156","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000381782,0.000388999],[0.000381782,0.000434232]]}},{"id":"e5618b10-8253-489a-b156-b0181c7f06e4","roomId":"b85be89b-4f6b-47e9-919d-910e7f9d3156","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000381782,0.000434232],[0.000417715,0.000434232]]}},{"id":"4f1bf586-d979-444d-b677-f867585721fa","roomId":"b85be89b-4f6b-47e9-919d-910e7f9d3156","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000417715,0.000434232],[0.000417715,0.000388999]]}},{"id":"070938f9-9dd0-45ac-b7c8-2e5f59619169","roomId":"b85be89b-4f6b-47e9-919d-910e7f9d3156","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"08a7e5b0-749c-4e01-ac50-7a05bb238284","lineGeom":{"type":"LineString","coordinates":[[0.000417715,0.000388999],[0.000381782,0.000388999]]}}],"pois":[]},{"id":"19af8a1e-0923-45d1-b94b-1329a18c2383","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.16","roomLabel":"Nội tiết 3","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:54.217Z","updatedAt":"2026-07-15T16:08:54.217Z","centerGeom":{"type":"Point","coordinates":[0.000440172,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000422206,0.000388999],[0.000422206,0.000434232],[0.000458139,0.000434232],[0.000458139,0.000388999],[0.000422206,0.000388999]]]},"boundaries":[{"id":"dddd0c62-8444-43f1-bf8d-97c887feabe7","roomId":"19af8a1e-0923-45d1-b94b-1329a18c2383","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000422206,0.000388999],[0.000422206,0.000434232]]}},{"id":"946aa0e7-4468-448b-b619-029b07f12c41","roomId":"19af8a1e-0923-45d1-b94b-1329a18c2383","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000422206,0.000434232],[0.000458139,0.000434232]]}},{"id":"1abe0739-180e-4d9b-bb71-eb9e1c11e4c2","roomId":"19af8a1e-0923-45d1-b94b-1329a18c2383","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000458139,0.000434232],[0.000458139,0.000388999]]}},{"id":"3e22b082-7d56-46a2-ba17-3e05522a9244","roomId":"19af8a1e-0923-45d1-b94b-1329a18c2383","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"7c2a31f6-e2a9-4e5f-8c12-8700e3fd5880","lineGeom":{"type":"LineString","coordinates":[[0.000458139,0.000388999],[0.000422206,0.000388999]]}}],"pois":[]},{"id":"e4a58787-ba27-4360-8f2e-673c1df71d30","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.25","roomLabel":"Nội thận","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:54.873Z","updatedAt":"2026-07-15T16:08:54.873Z","centerGeom":{"type":"Point","coordinates":[0.000035932,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000017966,0.000438755],[0.000017966,0.000483988],[0.000053899,0.000483988],[0.000053899,0.000438755],[0.000017966,0.000438755]]]},"boundaries":[{"id":"ba517681-1eb7-4747-a825-4b7fbcaff9a1","roomId":"e4a58787-ba27-4360-8f2e-673c1df71d30","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000017966,0.000438755],[0.000017966,0.000483988]]}},{"id":"2e098b75-d557-45c2-9afb-55ac9d9ac7cd","roomId":"e4a58787-ba27-4360-8f2e-673c1df71d30","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"b1d4dd84-7154-40d6-971d-d09b55fe965a","lineGeom":{"type":"LineString","coordinates":[[0.000017966,0.000483988],[0.000053899,0.000483988]]}},{"id":"af0767ee-573e-477e-b31a-86282b626e01","roomId":"e4a58787-ba27-4360-8f2e-673c1df71d30","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000053899,0.000483988],[0.000053899,0.000438755]]}},{"id":"badf710a-54e6-4250-a897-f667e30d2c84","roomId":"e4a58787-ba27-4360-8f2e-673c1df71d30","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000053899,0.000438755],[0.000017966,0.000438755]]}}],"pois":[]},{"id":"d3cbf3ed-2869-4833-92c0-5c9ce39bdb36","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.18","roomLabel":"Nội tổng quát 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:59.018Z","updatedAt":"2026-07-15T16:08:59.018Z","centerGeom":{"type":"Point","coordinates":[0.000278476,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00026051,0.000438755],[0.00026051,0.000483988],[0.000296443,0.000483988],[0.000296443,0.000438755],[0.00026051,0.000438755]]]},"boundaries":[{"id":"e743c18e-8f2d-47dc-aa29-c732f67e7899","roomId":"d3cbf3ed-2869-4833-92c0-5c9ce39bdb36","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00026051,0.000438755],[0.00026051,0.000483988]]}},{"id":"76dd82df-7ea5-417e-be4f-b3f59ad91c90","roomId":"d3cbf3ed-2869-4833-92c0-5c9ce39bdb36","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"54197305-b95a-4900-8c55-9e537f645f47","lineGeom":{"type":"LineString","coordinates":[[0.00026051,0.000483988],[0.000296443,0.000483988]]}},{"id":"7f3505ed-18f8-4936-b9b4-41ec74d0feb2","roomId":"d3cbf3ed-2869-4833-92c0-5c9ce39bdb36","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000296443,0.000483988],[0.000296443,0.000438755]]}},{"id":"8ac59e54-c9b0-4ca4-b53b-012ef7262705","roomId":"d3cbf3ed-2869-4833-92c0-5c9ce39bdb36","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000296443,0.000438755],[0.00026051,0.000438755]]}}],"pois":[]},{"id":"028404f1-790d-4f1a-b54a-dfef679124ce","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.26","roomLabel":"Nội tiêu hóa 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:55.578Z","updatedAt":"2026-07-15T16:08:55.578Z","centerGeom":{"type":"Point","coordinates":[0.000076356,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00005839,0.000438755],[0.00005839,0.000483988],[0.000094323,0.000483988],[0.000094323,0.000438755],[0.00005839,0.000438755]]]},"boundaries":[{"id":"f7cf791b-238e-476e-94bd-3aff429bd3bc","roomId":"028404f1-790d-4f1a-b54a-dfef679124ce","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00005839,0.000438755],[0.00005839,0.000483988]]}},{"id":"928f52ba-04be-4aa3-ba1e-9872daa52dac","roomId":"028404f1-790d-4f1a-b54a-dfef679124ce","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"0974168f-3836-445d-b3dd-25415095632a","lineGeom":{"type":"LineString","coordinates":[[0.00005839,0.000483988],[0.000094323,0.000483988]]}},{"id":"66d25a37-8837-4283-b4f3-bac223789909","roomId":"028404f1-790d-4f1a-b54a-dfef679124ce","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000094323,0.000483988],[0.000094323,0.000438755]]}},{"id":"78c2deb6-2fd6-4b6a-b4fc-b38f03cb87ac","roomId":"028404f1-790d-4f1a-b54a-dfef679124ce","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000094323,0.000438755],[0.00005839,0.000438755]]}}],"pois":[]},{"id":"719831a8-b78f-4f68-8108-0d29dabc64da","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.24","roomLabel":"Bệnh truyền nhiễm","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:01.433Z","updatedAt":"2026-07-15T16:09:01.433Z","centerGeom":{"type":"Point","coordinates":[0.000440172,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000422206,0.000438755],[0.000422206,0.000483988],[0.000458139,0.000483988],[0.000458139,0.000438755],[0.000422206,0.000438755]]]},"boundaries":[{"id":"02daa585-c58c-4420-b8c4-908c7ed57c45","roomId":"719831a8-b78f-4f68-8108-0d29dabc64da","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000422206,0.000438755],[0.000422206,0.000483988]]}},{"id":"b1469770-8a54-4a3e-91f9-1177adac7c6d","roomId":"719831a8-b78f-4f68-8108-0d29dabc64da","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"e3d63d00-79f9-40ba-a121-b6649d268382","lineGeom":{"type":"LineString","coordinates":[[0.000422206,0.000483988],[0.000458139,0.000483988]]}},{"id":"9c70c797-d071-4a31-9bb5-0f564b3411d2","roomId":"719831a8-b78f-4f68-8108-0d29dabc64da","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000458139,0.000483988],[0.000458139,0.000438755]]}},{"id":"b5d629b2-e836-444e-a8ef-ff1a75569823","roomId":"719831a8-b78f-4f68-8108-0d29dabc64da","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000458139,0.000438755],[0.000422206,0.000438755]]}}],"pois":[]},{"id":"59bec841-4c77-4998-81fc-ab42076bc58e","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.19","roomLabel":"Nội tổng quát 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:08:59.813Z","updatedAt":"2026-07-15T16:08:59.813Z","centerGeom":{"type":"Point","coordinates":[0.0003189,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000300934,0.000438755],[0.000300934,0.000483988],[0.000336867,0.000483988],[0.000336867,0.000438755],[0.000300934,0.000438755]]]},"boundaries":[{"id":"2f206ce9-ab0d-4b98-aaea-2cfaef272221","roomId":"59bec841-4c77-4998-81fc-ab42076bc58e","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000300934,0.000438755],[0.000300934,0.000483988]]}},{"id":"ba6cc35e-9bf9-450d-84d5-99e0c640b346","roomId":"59bec841-4c77-4998-81fc-ab42076bc58e","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"13434588-1c6b-4257-93d6-761736a59cf4","lineGeom":{"type":"LineString","coordinates":[[0.000300934,0.000483988],[0.000336867,0.000483988]]}},{"id":"01a14c3a-ad16-4f27-bc23-1688e70cd254","roomId":"59bec841-4c77-4998-81fc-ab42076bc58e","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000336867,0.000483988],[0.000336867,0.000438755]]}},{"id":"2c59175f-25f6-459e-b0dc-4d7f0fe7010e","roomId":"59bec841-4c77-4998-81fc-ab42076bc58e","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000336867,0.000438755],[0.000300934,0.000438755]]}}],"pois":[]},{"id":"a5ca051d-2752-4758-8074-19abdf390bb1","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.20","roomLabel":"Nội tổng quát 3","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:00.371Z","updatedAt":"2026-07-15T16:09:00.371Z","centerGeom":{"type":"Point","coordinates":[0.000359324,0.000461371]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000341358,0.000438755],[0.000341358,0.000483988],[0.000377291,0.000483988],[0.000377291,0.000438755],[0.000341358,0.000438755]]]},"boundaries":[{"id":"fc4497f2-3fdc-4363-9cf8-b5a38adce291","roomId":"a5ca051d-2752-4758-8074-19abdf390bb1","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000341358,0.000438755],[0.000341358,0.000483988]]}},{"id":"ea39f5ff-9e26-406b-91ea-0f2d09bd63d4","roomId":"a5ca051d-2752-4758-8074-19abdf390bb1","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"dadcd09c-b2f7-443e-b670-d6e6e2332780","lineGeom":{"type":"LineString","coordinates":[[0.000341358,0.000483988],[0.000377291,0.000483988]]}},{"id":"5432a478-8906-4f79-8b8b-f2ea4aaf823f","roomId":"a5ca051d-2752-4758-8074-19abdf390bb1","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000377291,0.000483988],[0.000377291,0.000438755]]}},{"id":"8b16e7fd-4375-491c-85fa-120629c9b8a1","roomId":"a5ca051d-2752-4758-8074-19abdf390bb1","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000377291,0.000438755],[0.000341358,0.000438755]]}}],"pois":[]},{"id":"963d274c-a980-4f5e-b301-81e335e0df83","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.34","roomLabel":"Nhi 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:01.982Z","updatedAt":"2026-07-15T16:09:01.982Z","centerGeom":{"type":"Point","coordinates":[0.000525512,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000507546,0.000388999],[0.000507546,0.000434232],[0.000543478,0.000434232],[0.000543478,0.000388999],[0.000507546,0.000388999]]]},"boundaries":[{"id":"e673d208-7fc4-4a1f-b4a1-e4ff7310c14c","roomId":"963d274c-a980-4f5e-b301-81e335e0df83","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000507546,0.000388999],[0.000507546,0.000434232]]}},{"id":"820a3cc6-266a-47af-870e-347e0f978af3","roomId":"963d274c-a980-4f5e-b301-81e335e0df83","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000507546,0.000434232],[0.000543478,0.000434232]]}},{"id":"0eef36c3-6341-4549-ab21-b4d54571b48f","roomId":"963d274c-a980-4f5e-b301-81e335e0df83","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000543478,0.000434232],[0.000543478,0.000388999]]}},{"id":"112bdf43-1f8c-4894-af66-0658f34ab32d","roomId":"963d274c-a980-4f5e-b301-81e335e0df83","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"b05a48b3-35cd-471e-8eff-4295756e0419","lineGeom":{"type":"LineString","coordinates":[[0.000543478,0.000388999],[0.000507546,0.000388999]]}}],"pois":[]},{"id":"4ddd8fc8-07cb-424d-a0b4-31291fdb5939","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.12","roomLabel":"Ngoại tổng quát 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:03.797Z","updatedAt":"2026-07-15T16:09:03.797Z","centerGeom":{"type":"Point","coordinates":[0.000035932,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000017966,0.000289488],[0.000017966,0.00033472],[0.000053899,0.00033472],[0.000053899,0.000289488],[0.000017966,0.000289488]]]},"boundaries":[{"id":"cc018e11-cb3a-4108-bf6b-281fe8e44b99","roomId":"4ddd8fc8-07cb-424d-a0b4-31291fdb5939","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000017966,0.000289488],[0.000017966,0.00033472]]}},{"id":"7b54bee5-3877-4f34-b9e7-3736f4a070e8","roomId":"4ddd8fc8-07cb-424d-a0b4-31291fdb5939","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"0a87323e-1bc2-4953-bc44-78987fc3c62a","lineGeom":{"type":"LineString","coordinates":[[0.000017966,0.00033472],[0.000053899,0.00033472]]}},{"id":"d4ccd837-86bd-449d-839f-57de0c9b8a3e","roomId":"4ddd8fc8-07cb-424d-a0b4-31291fdb5939","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000053899,0.00033472],[0.000053899,0.000289488]]}},{"id":"e5af2570-0419-4513-a3dc-d0788c4c1af2","roomId":"4ddd8fc8-07cb-424d-a0b4-31291fdb5939","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000053899,0.000289488],[0.000017966,0.000289488]]}}],"pois":[]},{"id":"de99b974-ff62-4302-98cd-209125078a0b","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.2.33","roomLabel":"Sức khỏe tâm thần","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:03.264Z","updatedAt":"2026-07-15T16:09:03.264Z","centerGeom":{"type":"Point","coordinates":[0.00060636,0.000411616]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000588394,0.000388999],[0.000588394,0.000434232],[0.000624326,0.000434232],[0.000624326,0.000388999],[0.000588394,0.000388999]]]},"boundaries":[{"id":"75286db9-d88b-43b8-9c5d-44b143ef5c6e","roomId":"de99b974-ff62-4302-98cd-209125078a0b","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000588394,0.000388999],[0.000588394,0.000434232]]}},{"id":"9da48bdd-4f0b-4373-aa5c-b8373262fcaf","roomId":"de99b974-ff62-4302-98cd-209125078a0b","seqNo":2,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000588394,0.000434232],[0.000624326,0.000434232]]}},{"id":"3ff8d560-7cfb-4761-88df-710b05949d2b","roomId":"de99b974-ff62-4302-98cd-209125078a0b","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000624326,0.000434232],[0.000624326,0.000388999]]}},{"id":"4d1fb8db-e58b-4ab0-bb5a-f5873d458ef6","roomId":"de99b974-ff62-4302-98cd-209125078a0b","seqNo":4,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"3c374256-cde7-43cd-a314-2cc05f001ab1","lineGeom":{"type":"LineString","coordinates":[[0.000624326,0.000388999],[0.000588394,0.000388999]]}}],"pois":[]},{"id":"22843bb1-1a10-4147-908d-47ebc99b2c57","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.14","roomLabel":"Ngoại tiết niệu","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:04.318Z","updatedAt":"2026-07-15T16:09:04.318Z","centerGeom":{"type":"Point","coordinates":[0.000076356,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00005839,0.000289488],[0.00005839,0.00033472],[0.000094323,0.00033472],[0.000094323,0.000289488],[0.00005839,0.000289488]]]},"boundaries":[{"id":"dcd75bc2-ab5b-4039-b2bc-a8e6d952770a","roomId":"22843bb1-1a10-4147-908d-47ebc99b2c57","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00005839,0.000289488],[0.00005839,0.00033472]]}},{"id":"0857eb00-629d-4d2b-9d19-950f04fe54ae","roomId":"22843bb1-1a10-4147-908d-47ebc99b2c57","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"75b0f860-4928-4342-b26a-da41cc445242","lineGeom":{"type":"LineString","coordinates":[[0.00005839,0.00033472],[0.000094323,0.00033472]]}},{"id":"bf6afda1-f76d-4a33-b575-2dc46f39ca83","roomId":"22843bb1-1a10-4147-908d-47ebc99b2c57","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000094323,0.00033472],[0.000094323,0.000289488]]}},{"id":"762d9caa-19d2-44f7-898d-950f2b2cb894","roomId":"22843bb1-1a10-4147-908d-47ebc99b2c57","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000094323,0.000289488],[0.00005839,0.000289488]]}}],"pois":[]},{"id":"0adc5e2d-78ad-490f-ab16-8d05a82b46fe","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.15","roomLabel":"Ngoại lồng ngực","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:04.837Z","updatedAt":"2026-07-15T16:09:04.837Z","centerGeom":{"type":"Point","coordinates":[0.00011678,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000098814,0.000289488],[0.000098814,0.00033472],[0.000134747,0.00033472],[0.000134747,0.000289488],[0.000098814,0.000289488]]]},"boundaries":[{"id":"d897627b-8b6b-4457-89d0-075d6df9393a","roomId":"0adc5e2d-78ad-490f-ab16-8d05a82b46fe","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000098814,0.000289488],[0.000098814,0.00033472]]}},{"id":"5f3eaac2-3db3-4038-a10a-9242eaefb387","roomId":"0adc5e2d-78ad-490f-ab16-8d05a82b46fe","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"e9b7f65c-e1e6-4401-8f7f-28c61d739f8e","lineGeom":{"type":"LineString","coordinates":[[0.000098814,0.00033472],[0.000134747,0.00033472]]}},{"id":"7c70731c-9081-4072-8e6a-12f7ec4a315c","roomId":"0adc5e2d-78ad-490f-ab16-8d05a82b46fe","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000134747,0.00033472],[0.000134747,0.000289488]]}},{"id":"08d43318-5bef-46dd-8e81-df4c3eb55640","roomId":"0adc5e2d-78ad-490f-ab16-8d05a82b46fe","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000134747,0.000289488],[0.000098814,0.000289488]]}}],"pois":[]},{"id":"a2db12e6-22f7-4a66-ae3d-7c5293f8d1ff","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.16","roomLabel":"Ngoại thần kinh 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:05.350Z","updatedAt":"2026-07-15T16:09:05.350Z","centerGeom":{"type":"Point","coordinates":[0.000157204,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000139238,0.000289488],[0.000139238,0.00033472],[0.000175171,0.00033472],[0.000175171,0.000289488],[0.000139238,0.000289488]]]},"boundaries":[{"id":"9cba32de-add3-4641-9622-2d7f6304fa3c","roomId":"a2db12e6-22f7-4a66-ae3d-7c5293f8d1ff","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000139238,0.000289488],[0.000139238,0.00033472]]}},{"id":"14f5889c-8fa7-4fda-a0e9-f6ccc8039581","roomId":"a2db12e6-22f7-4a66-ae3d-7c5293f8d1ff","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"55cf5bbf-7fa0-4a1b-8ead-b13749a337bb","lineGeom":{"type":"LineString","coordinates":[[0.000139238,0.00033472],[0.000175171,0.00033472]]}},{"id":"97dc5cab-546f-48b4-839a-40b4f21adca1","roomId":"a2db12e6-22f7-4a66-ae3d-7c5293f8d1ff","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000175171,0.00033472],[0.000175171,0.000289488]]}},{"id":"984b936a-c4df-485e-ab74-a168af8e8a4d","roomId":"a2db12e6-22f7-4a66-ae3d-7c5293f8d1ff","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000175171,0.000289488],[0.000139238,0.000289488]]}}],"pois":[]},{"id":"45a3d897-39b9-4c3e-8922-0d0b2e34d3fb","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.17","roomLabel":"Ngoại thần kinh 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:05.873Z","updatedAt":"2026-07-15T16:09:05.873Z","centerGeom":{"type":"Point","coordinates":[0.000197628,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000179662,0.000289488],[0.000179662,0.00033472],[0.000215595,0.00033472],[0.000215595,0.000289488],[0.000179662,0.000289488]]]},"boundaries":[{"id":"f6a43f10-35d9-4d4b-ac63-9b24f7b2cb35","roomId":"45a3d897-39b9-4c3e-8922-0d0b2e34d3fb","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000179662,0.000289488],[0.000179662,0.00033472]]}},{"id":"6eb88f75-9117-4c76-b63c-4d621fec2ed0","roomId":"45a3d897-39b9-4c3e-8922-0d0b2e34d3fb","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"c9dc6071-a85f-4d43-bd49-215bb9f5e407","lineGeom":{"type":"LineString","coordinates":[[0.000179662,0.00033472],[0.000215595,0.00033472]]}},{"id":"7b8d8e2b-7591-4b38-87f5-9330c5aa32d1","roomId":"45a3d897-39b9-4c3e-8922-0d0b2e34d3fb","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000215595,0.00033472],[0.000215595,0.000289488]]}},{"id":"0b398a0f-f406-43d9-9091-4585bb0a2183","roomId":"45a3d897-39b9-4c3e-8922-0d0b2e34d3fb","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000215595,0.000289488],[0.000179662,0.000289488]]}}],"pois":[]},{"id":"cb067372-f839-4b1e-bbf4-ce2ce6389bb6","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.18","roomLabel":"Ngoại ung bướu","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:06.641Z","updatedAt":"2026-07-15T16:09:06.641Z","centerGeom":{"type":"Point","coordinates":[0.000238052,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000220086,0.000289488],[0.000220086,0.00033472],[0.000256019,0.00033472],[0.000256019,0.000289488],[0.000220086,0.000289488]]]},"boundaries":[{"id":"eb2c7782-3e59-462b-917d-52e41340c22b","roomId":"cb067372-f839-4b1e-bbf4-ce2ce6389bb6","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000220086,0.000289488],[0.000220086,0.00033472]]}},{"id":"d6e8e67b-47e3-46d7-b678-e6feb4ee9d9c","roomId":"cb067372-f839-4b1e-bbf4-ce2ce6389bb6","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"fb77438a-4904-42ba-aac6-11b56ec90a04","lineGeom":{"type":"LineString","coordinates":[[0.000220086,0.00033472],[0.000256019,0.00033472]]}},{"id":"d1b13578-1673-462d-8522-ee2c0f5143a2","roomId":"cb067372-f839-4b1e-bbf4-ce2ce6389bb6","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000256019,0.00033472],[0.000256019,0.000289488]]}},{"id":"58a32865-7f6a-4e51-b335-6f4aef2f5e72","roomId":"cb067372-f839-4b1e-bbf4-ce2ce6389bb6","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000256019,0.000289488],[0.000220086,0.000289488]]}}],"pois":[]},{"id":"6b00b306-584d-4e90-bb37-b644393d302d","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.1","roomLabel":"Chấn thương chỉnh hình 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:07.160Z","updatedAt":"2026-07-15T16:09:07.160Z","centerGeom":{"type":"Point","coordinates":[0.000278476,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00026051,0.000289488],[0.00026051,0.00033472],[0.000296443,0.00033472],[0.000296443,0.000289488],[0.00026051,0.000289488]]]},"boundaries":[{"id":"c6c8fab1-9d97-4ddf-b052-f1f21862b0f5","roomId":"6b00b306-584d-4e90-bb37-b644393d302d","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00026051,0.000289488],[0.00026051,0.00033472]]}},{"id":"b9d3e4c9-3258-4c7a-b5ce-51f91d69761d","roomId":"6b00b306-584d-4e90-bb37-b644393d302d","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"4e1d078c-4acf-45b1-b1a6-959ac65e88f5","lineGeom":{"type":"LineString","coordinates":[[0.00026051,0.00033472],[0.000296443,0.00033472]]}},{"id":"b3e69461-9e10-4dbe-a67d-cbc76a164e76","roomId":"6b00b306-584d-4e90-bb37-b644393d302d","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000296443,0.00033472],[0.000296443,0.000289488]]}},{"id":"0aa26c1c-0853-41de-a24c-858d3a52d660","roomId":"6b00b306-584d-4e90-bb37-b644393d302d","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000296443,0.000289488],[0.00026051,0.000289488]]}}],"pois":[]},{"id":"76eb9570-413d-4527-bc85-1ef604636de3","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.21","roomLabel":"Phụ khoa","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:14.097Z","updatedAt":"2026-07-15T16:09:14.097Z","centerGeom":{"type":"Point","coordinates":[0.000853396,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000835429,0.000289488],[0.000835429,0.00033472],[0.000871362,0.00033472],[0.000871362,0.000289488],[0.000835429,0.000289488]]]},"boundaries":[{"id":"63bbc908-c676-4b98-877c-272f4faa74ca","roomId":"76eb9570-413d-4527-bc85-1ef604636de3","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000835429,0.000289488],[0.000835429,0.00033472]]}},{"id":"e967e25b-ee7c-4aaf-954f-ac88414e6408","roomId":"76eb9570-413d-4527-bc85-1ef604636de3","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"ec6567e2-133c-4cd8-8fb5-15705fdfbb17","lineGeom":{"type":"LineString","coordinates":[[0.000835429,0.00033472],[0.000871362,0.00033472]]}},{"id":"3ba056b5-add5-438f-85b1-6be607d0b8a0","roomId":"76eb9570-413d-4527-bc85-1ef604636de3","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000871362,0.00033472],[0.000871362,0.000289488]]}},{"id":"9b62989b-4526-4844-8282-be5b16ca8f10","roomId":"76eb9570-413d-4527-bc85-1ef604636de3","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000871362,0.000289488],[0.000835429,0.000289488]]}}],"pois":[]},{"id":"0dd21237-d3e6-41ff-94a7-bec72d4b9410","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.2","roomLabel":"Chấn thương chỉnh hình 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:07.698Z","updatedAt":"2026-07-15T16:09:07.698Z","centerGeom":{"type":"Point","coordinates":[0.0003189,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000300934,0.000289488],[0.000300934,0.00033472],[0.000336867,0.00033472],[0.000336867,0.000289488],[0.000300934,0.000289488]]]},"boundaries":[{"id":"624fd6a7-d106-43ad-9e9a-d39343968445","roomId":"0dd21237-d3e6-41ff-94a7-bec72d4b9410","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000300934,0.000289488],[0.000300934,0.00033472]]}},{"id":"7a8ba74a-e0ce-4987-b56c-23326f289bfd","roomId":"0dd21237-d3e6-41ff-94a7-bec72d4b9410","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"630fd6e9-37dd-4bbd-aef0-9caf5edb49d5","lineGeom":{"type":"LineString","coordinates":[[0.000300934,0.00033472],[0.000336867,0.00033472]]}},{"id":"e436c479-ffd9-4081-aafe-8d19b0be0140","roomId":"0dd21237-d3e6-41ff-94a7-bec72d4b9410","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000336867,0.00033472],[0.000336867,0.000289488]]}},{"id":"72181f36-75ad-4164-94fd-553ff8d70747","roomId":"0dd21237-d3e6-41ff-94a7-bec72d4b9410","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000336867,0.000289488],[0.000300934,0.000289488]]}}],"pois":[]},{"id":"841048c7-d592-4d24-9baf-954d1bd4c4cf","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.8","roomLabel":"Mắt 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:08.454Z","updatedAt":"2026-07-15T16:09:08.454Z","centerGeom":{"type":"Point","coordinates":[0.00040424,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000386274,0.000289488],[0.000386274,0.00033472],[0.000422206,0.00033472],[0.000422206,0.000289488],[0.000386274,0.000289488]]]},"boundaries":[{"id":"a42d0a1b-9a5e-4a28-8ec3-3bdff27775fa","roomId":"841048c7-d592-4d24-9baf-954d1bd4c4cf","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000386274,0.000289488],[0.000386274,0.00033472]]}},{"id":"5ac0d1d6-be16-4785-8cef-f7d8ed8efa37","roomId":"841048c7-d592-4d24-9baf-954d1bd4c4cf","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"707d7025-f76b-4d53-aff3-530e72109cf0","lineGeom":{"type":"LineString","coordinates":[[0.000386274,0.00033472],[0.000422206,0.00033472]]}},{"id":"1e8e6ccf-5bc8-47ad-a52c-7e03f5077b99","roomId":"841048c7-d592-4d24-9baf-954d1bd4c4cf","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000422206,0.00033472],[0.000422206,0.000289488]]}},{"id":"241868cc-853b-4987-b307-16c3d7dad8bd","roomId":"841048c7-d592-4d24-9baf-954d1bd4c4cf","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000422206,0.000289488],[0.000386274,0.000289488]]}}],"pois":[]},{"id":"6be58910-7a92-434f-9593-39a6981c3805","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.11","roomLabel":"Mắt 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:08.984Z","updatedAt":"2026-07-15T16:09:08.984Z","centerGeom":{"type":"Point","coordinates":[0.000444664,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000426698,0.000289488],[0.000426698,0.00033472],[0.00046263,0.00033472],[0.00046263,0.000289488],[0.000426698,0.000289488]]]},"boundaries":[{"id":"deadea8e-0e14-4eda-b06f-50bb45c34353","roomId":"6be58910-7a92-434f-9593-39a6981c3805","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000426698,0.000289488],[0.000426698,0.00033472]]}},{"id":"16b24bfc-87c2-4846-91ec-e89f1f48466a","roomId":"6be58910-7a92-434f-9593-39a6981c3805","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"bcbd5e2f-71f6-4faa-b80c-bc2adabe574f","lineGeom":{"type":"LineString","coordinates":[[0.000426698,0.00033472],[0.00046263,0.00033472]]}},{"id":"db6661d4-b12f-4d5d-87dc-cdb7f69edee6","roomId":"6be58910-7a92-434f-9593-39a6981c3805","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00046263,0.00033472],[0.00046263,0.000289488]]}},{"id":"65e37223-31d2-4060-a6db-b308a74a723d","roomId":"6be58910-7a92-434f-9593-39a6981c3805","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00046263,0.000289488],[0.000426698,0.000289488]]}}],"pois":[]},{"id":"3297edee-4fbe-456b-a187-0bb3593d7829","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.34","roomLabel":"Đơn vị tiêm chủng","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:14.627Z","updatedAt":"2026-07-15T16:09:14.627Z","centerGeom":{"type":"Point","coordinates":[0.00089382,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000875853,0.000289488],[0.000875853,0.00033472],[0.000911786,0.00033472],[0.000911786,0.000289488],[0.000875853,0.000289488]]]},"boundaries":[{"id":"88e038b1-24b0-4681-93d8-87d4d806a2a8","roomId":"3297edee-4fbe-456b-a187-0bb3593d7829","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000875853,0.000289488],[0.000875853,0.00033472]]}},{"id":"a8474226-4f2e-4e3f-92dd-20c7074643b3","roomId":"3297edee-4fbe-456b-a187-0bb3593d7829","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"9b9d19e4-e9ba-4187-aeb8-58c2914a1dc6","lineGeom":{"type":"LineString","coordinates":[[0.000875853,0.00033472],[0.000911786,0.00033472]]}},{"id":"d0b0aa4c-a171-432a-9a22-57f4e869db3a","roomId":"3297edee-4fbe-456b-a187-0bb3593d7829","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000911786,0.00033472],[0.000911786,0.000289488]]}},{"id":"9cd9912d-1bd4-41b3-a9ba-bbffee024458","roomId":"3297edee-4fbe-456b-a187-0bb3593d7829","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000911786,0.000289488],[0.000875853,0.000289488]]}}],"pois":[]},{"id":"60f9a4d8-efa0-446e-afef-d1098172be57","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.24","roomLabel":"Tai mũi họng 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:09.862Z","updatedAt":"2026-07-15T16:09:09.862Z","centerGeom":{"type":"Point","coordinates":[0.000485088,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000467122,0.000289488],[0.000467122,0.00033472],[0.000503054,0.00033472],[0.000503054,0.000289488],[0.000467122,0.000289488]]]},"boundaries":[{"id":"4ff5bf9a-2f7b-4432-a299-7f32ab2cfead","roomId":"60f9a4d8-efa0-446e-afef-d1098172be57","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000467122,0.000289488],[0.000467122,0.00033472]]}},{"id":"4005b318-8515-4ed7-af9b-e6e4cd426d2c","roomId":"60f9a4d8-efa0-446e-afef-d1098172be57","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"2f575789-13de-456b-93db-590663e3c83d","lineGeom":{"type":"LineString","coordinates":[[0.000467122,0.00033472],[0.000503054,0.00033472]]}},{"id":"b432cc80-3ed1-46f2-ab24-f850592737f4","roomId":"60f9a4d8-efa0-446e-afef-d1098172be57","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000503054,0.00033472],[0.000503054,0.000289488]]}},{"id":"7f455a5b-121e-45c1-9e34-6d2ff523908b","roomId":"60f9a4d8-efa0-446e-afef-d1098172be57","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000503054,0.000289488],[0.000467122,0.000289488]]}}],"pois":[]},{"id":"4ebc6d8c-3616-403a-b0bb-26a58d592916","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.25","roomLabel":"Tai mũi họng 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:10.393Z","updatedAt":"2026-07-15T16:09:10.393Z","centerGeom":{"type":"Point","coordinates":[0.000525512,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000507546,0.000289488],[0.000507546,0.00033472],[0.000543478,0.00033472],[0.000543478,0.000289488],[0.000507546,0.000289488]]]},"boundaries":[{"id":"c8a0f239-fa68-4e52-93aa-8a51dbda269c","roomId":"4ebc6d8c-3616-403a-b0bb-26a58d592916","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000507546,0.000289488],[0.000507546,0.00033472]]}},{"id":"6977aa3a-9871-4778-ad37-67cab706c6cf","roomId":"4ebc6d8c-3616-403a-b0bb-26a58d592916","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"df589be6-ad82-4523-bfab-7094832d9455","lineGeom":{"type":"LineString","coordinates":[[0.000507546,0.00033472],[0.000543478,0.00033472]]}},{"id":"2cc7cf19-c405-4228-b77e-2882fa84ca1b","roomId":"4ebc6d8c-3616-403a-b0bb-26a58d592916","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000543478,0.00033472],[0.000543478,0.000289488]]}},{"id":"13a0cb6c-f019-4175-955b-09426b87e015","roomId":"4ebc6d8c-3616-403a-b0bb-26a58d592916","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000543478,0.000289488],[0.000507546,0.000289488]]}}],"pois":[]},{"id":"a0e3609c-0cc0-4ea5-9d7f-8c6ea179e87b","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.28","roomLabel":"Răng hàm mặt 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:10.911Z","updatedAt":"2026-07-15T16:09:10.911Z","centerGeom":{"type":"Point","coordinates":[0.000565936,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.00054797,0.000289488],[0.00054797,0.00033472],[0.000583902,0.00033472],[0.000583902,0.000289488],[0.00054797,0.000289488]]]},"boundaries":[{"id":"e6aee416-fc06-443b-ac67-e0379ef891aa","roomId":"a0e3609c-0cc0-4ea5-9d7f-8c6ea179e87b","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00054797,0.000289488],[0.00054797,0.00033472]]}},{"id":"2b149013-d612-4b22-b6b0-96d0d465d0aa","roomId":"a0e3609c-0cc0-4ea5-9d7f-8c6ea179e87b","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"cc4d8298-3e98-4c2c-922c-54dda549f431","lineGeom":{"type":"LineString","coordinates":[[0.00054797,0.00033472],[0.000583902,0.00033472]]}},{"id":"d6ea7515-ac8d-4ea2-bf8f-53d74979b9f4","roomId":"a0e3609c-0cc0-4ea5-9d7f-8c6ea179e87b","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000583902,0.00033472],[0.000583902,0.000289488]]}},{"id":"9a778204-38f7-4300-972e-696ff1393dc8","roomId":"a0e3609c-0cc0-4ea5-9d7f-8c6ea179e87b","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000583902,0.000289488],[0.00054797,0.000289488]]}}],"pois":[]},{"id":"836b79bd-df16-482a-ba92-cce3805a2b3f","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.6.1","roomLabel":"Vật lý trị liệu – PHCN","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:15.182Z","updatedAt":"2026-07-15T16:09:15.182Z","centerGeom":{"type":"Point","coordinates":[0.000979159,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000961193,0.000289488],[0.000961193,0.00033472],[0.000997125,0.00033472],[0.000997125,0.000289488],[0.000961193,0.000289488]]]},"boundaries":[{"id":"e41c1ac8-d516-4a2d-beeb-baf646fa1a38","roomId":"836b79bd-df16-482a-ba92-cce3805a2b3f","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000961193,0.000289488],[0.000961193,0.00033472]]}},{"id":"fcb9f0ce-65d4-41bd-8319-7e9a7cd2050d","roomId":"836b79bd-df16-482a-ba92-cce3805a2b3f","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"538d4d8a-e3e2-408a-9be6-e7df6706e137","lineGeom":{"type":"LineString","coordinates":[[0.000961193,0.00033472],[0.000997125,0.00033472]]}},{"id":"0848c0dc-d8ac-43eb-85f1-432fe335a765","roomId":"836b79bd-df16-482a-ba92-cce3805a2b3f","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000997125,0.00033472],[0.000997125,0.000289488]]}},{"id":"c05a0094-c3af-417a-b0d7-bdd0a48910b3","roomId":"836b79bd-df16-482a-ba92-cce3805a2b3f","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000997125,0.000289488],[0.000961193,0.000289488]]}}],"pois":[]},{"id":"b885c696-50da-429c-8358-050d49580abd","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.29","roomLabel":"Răng hàm mặt 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:11.436Z","updatedAt":"2026-07-15T16:09:11.436Z","centerGeom":{"type":"Point","coordinates":[0.00060636,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000588394,0.000289488],[0.000588394,0.00033472],[0.000624326,0.00033472],[0.000624326,0.000289488],[0.000588394,0.000289488]]]},"boundaries":[{"id":"0df9707f-d7c5-4bbb-afb0-f947a79121f4","roomId":"b885c696-50da-429c-8358-050d49580abd","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000588394,0.000289488],[0.000588394,0.00033472]]}},{"id":"ff8d6a7e-007d-4816-b095-78a35921f09f","roomId":"b885c696-50da-429c-8358-050d49580abd","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"d986104c-9b68-41a3-8b59-9cbf15e7ece2","lineGeom":{"type":"LineString","coordinates":[[0.000588394,0.00033472],[0.000624326,0.00033472]]}},{"id":"d8f2a3f1-329c-4cfd-92e7-85142b0476fd","roomId":"b885c696-50da-429c-8358-050d49580abd","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000624326,0.00033472],[0.000624326,0.000289488]]}},{"id":"41d0ed44-aed5-4f28-9d7a-9e5bf6a1507a","roomId":"b885c696-50da-429c-8358-050d49580abd","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000624326,0.000289488],[0.000588394,0.000289488]]}}],"pois":[]},{"id":"947333f0-cd03-4cd8-a896-349faaf0edad","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.4","roomLabel":"Da liễu 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:11.975Z","updatedAt":"2026-07-15T16:09:11.975Z","centerGeom":{"type":"Point","coordinates":[0.000646784,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000628818,0.000289488],[0.000628818,0.00033472],[0.00066475,0.00033472],[0.00066475,0.000289488],[0.000628818,0.000289488]]]},"boundaries":[{"id":"66770085-a5d9-4a99-b20a-5be5e399c77b","roomId":"947333f0-cd03-4cd8-a896-349faaf0edad","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000628818,0.000289488],[0.000628818,0.00033472]]}},{"id":"edc6b36f-f76a-4d11-a2f4-b26582646909","roomId":"947333f0-cd03-4cd8-a896-349faaf0edad","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"26586ba0-bd6f-4b0d-b1b2-6b7534a0bf08","lineGeom":{"type":"LineString","coordinates":[[0.000628818,0.00033472],[0.00066475,0.00033472]]}},{"id":"485eb89b-9d08-45a8-90c7-3f6a064fd229","roomId":"947333f0-cd03-4cd8-a896-349faaf0edad","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00066475,0.00033472],[0.00066475,0.000289488]]}},{"id":"bd86cc65-a7df-4486-9b1f-214af10dea2d","roomId":"947333f0-cd03-4cd8-a896-349faaf0edad","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.00066475,0.000289488],[0.000628818,0.000289488]]}}],"pois":[]},{"id":"0fa054e5-1efc-4417-9d1e-ce0903b4fa3f","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.5","roomLabel":"Da liễu 2","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:12.501Z","updatedAt":"2026-07-15T16:09:12.501Z","centerGeom":{"type":"Point","coordinates":[0.000687208,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000669242,0.000289488],[0.000669242,0.00033472],[0.000705174,0.00033472],[0.000705174,0.000289488],[0.000669242,0.000289488]]]},"boundaries":[{"id":"b345ffc5-bf6b-4fb6-87cc-85985a1d8084","roomId":"0fa054e5-1efc-4417-9d1e-ce0903b4fa3f","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000669242,0.000289488],[0.000669242,0.00033472]]}},{"id":"a0d536ed-6a84-431b-884f-e7881bd0d3d5","roomId":"0fa054e5-1efc-4417-9d1e-ce0903b4fa3f","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"48cbc263-879f-42e5-984b-975af47bd610","lineGeom":{"type":"LineString","coordinates":[[0.000669242,0.00033472],[0.000705174,0.00033472]]}},{"id":"439df7f2-f773-4b1a-9d24-19ebd1fe60d5","roomId":"0fa054e5-1efc-4417-9d1e-ce0903b4fa3f","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000705174,0.00033472],[0.000705174,0.000289488]]}},{"id":"9f39d7a7-f5f0-4b46-ba9b-7972fc38fe80","roomId":"0fa054e5-1efc-4417-9d1e-ce0903b4fa3f","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000705174,0.000289488],[0.000669242,0.000289488]]}}],"pois":[]},{"id":"68fd7b60-3298-4f94-927a-8f2227632874","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.7.1","roomLabel":"Y học cổ truyền","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:15.705Z","updatedAt":"2026-07-15T16:09:15.705Z","centerGeom":{"type":"Point","coordinates":[0.001019583,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.001001617,0.000289488],[0.001001617,0.00033472],[0.001037549,0.00033472],[0.001037549,0.000289488],[0.001001617,0.000289488]]]},"boundaries":[{"id":"097c1dbe-933f-4562-8833-bc948c82ca0f","roomId":"68fd7b60-3298-4f94-927a-8f2227632874","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.001001617,0.000289488],[0.001001617,0.00033472]]}},{"id":"a56d55f0-c922-4688-818c-6139f5dfdcc6","roomId":"68fd7b60-3298-4f94-927a-8f2227632874","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"0abc30be-83d3-4436-b5bc-68d47289b521","lineGeom":{"type":"LineString","coordinates":[[0.001001617,0.00033472],[0.001037549,0.00033472]]}},{"id":"92492a50-51eb-41e7-bc21-0faa12243a52","roomId":"68fd7b60-3298-4f94-927a-8f2227632874","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.001037549,0.00033472],[0.001037549,0.000289488]]}},{"id":"c3be336b-2895-42f2-992a-34d57621f6ce","roomId":"68fd7b60-3298-4f94-927a-8f2227632874","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.001037549,0.000289488],[0.001001617,0.000289488]]}}],"pois":[]},{"id":"2cc9cdd8-20e4-4d9a-ae01-218c07025365","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.6","roomLabel":"Da liễu 3","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:13.037Z","updatedAt":"2026-07-15T16:09:13.037Z","centerGeom":{"type":"Point","coordinates":[0.000727632,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000709666,0.000289488],[0.000709666,0.00033472],[0.000745598,0.00033472],[0.000745598,0.000289488],[0.000709666,0.000289488]]]},"boundaries":[{"id":"4d02bc40-820a-4a9e-ac26-a3dbca8d77d7","roomId":"2cc9cdd8-20e4-4d9a-ae01-218c07025365","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000709666,0.000289488],[0.000709666,0.00033472]]}},{"id":"71dfaf7a-ae16-49a3-a7bb-625c9d675253","roomId":"2cc9cdd8-20e4-4d9a-ae01-218c07025365","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"41234527-2032-495a-9aed-d185799d1a94","lineGeom":{"type":"LineString","coordinates":[[0.000709666,0.00033472],[0.000745598,0.00033472]]}},{"id":"42aa2140-b4c9-4dda-8391-2d40ff9ac058","roomId":"2cc9cdd8-20e4-4d9a-ae01-218c07025365","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000745598,0.00033472],[0.000745598,0.000289488]]}},{"id":"7b9d2f9b-e910-4d5d-8cb3-cf4ad2589ed2","roomId":"2cc9cdd8-20e4-4d9a-ae01-218c07025365","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000745598,0.000289488],[0.000709666,0.000289488]]}}],"pois":[]},{"id":"02d28bbc-b738-4026-91c8-8d2382ad1bc1","floorId":"4193e567-597a-4579-b415-ea2104231924","roomCode":"G2.4.23","roomLabel":"Khám thai 1","type":"CONSULTATION","heightMeters":3,"createdAt":"2026-07-15T16:09:13.548Z","updatedAt":"2026-07-15T16:09:13.548Z","centerGeom":{"type":"Point","coordinates":[0.000812972,0.000312104]},"outlineGeom":{"type":"Polygon","coordinates":[[[0.000795005,0.000289488],[0.000795005,0.00033472],[0.000830938,0.00033472],[0.000830938,0.000289488],[0.000795005,0.000289488]]]},"boundaries":[{"id":"16230a9d-f553-4f89-9a45-96c8b72ce2c5","roomId":"02d28bbc-b738-4026-91c8-8d2382ad1bc1","seqNo":1,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000795005,0.000289488],[0.000795005,0.00033472]]}},{"id":"1cd24b8a-7942-48f2-9dc9-571c86a07ef5","roomId":"02d28bbc-b738-4026-91c8-8d2382ad1bc1","seqNo":2,"boundaryType":"DOOR","adjacentRoomId":null,"hasWall":true,"doorId":"8c05ff60-504b-42c7-8e67-a3d7a87f1443","lineGeom":{"type":"LineString","coordinates":[[0.000795005,0.00033472],[0.000830938,0.00033472]]}},{"id":"bf03bccd-f74c-4f78-afa1-234c38cf84ae","roomId":"02d28bbc-b738-4026-91c8-8d2382ad1bc1","seqNo":3,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000830938,0.00033472],[0.000830938,0.000289488]]}},{"id":"db2d8c29-c727-4a07-934f-5e4fb499f3e8","roomId":"02d28bbc-b738-4026-91c8-8d2382ad1bc1","seqNo":4,"boundaryType":"WALL","adjacentRoomId":null,"hasWall":true,"doorId":null,"lineGeom":{"type":"LineString","coordinates":[[0.000830938,0.000289488],[0.000795005,0.000289488]]}}],"pois":[]}],"doors":[{"id":"931970aa-c18e-4a26-bd8c-c43e7e6e0c9d","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"fe437aa7-afe6-409a-bb0d-923f195d5a99","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:47.655Z","positionGeom":{"type":"Point","coordinates":[0.000035932,0.000388999]}},{"id":"115e9e73-c261-4107-b7b8-64cb06455d6c","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"9d8380e1-dd65-4ae0-ac3d-f4e5b856741e","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:48.289Z","positionGeom":{"type":"Point","coordinates":[0.000076356,0.000388999]}},{"id":"bf173d67-a766-4c51-99c1-4bb6140ce84f","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"f7e0cce3-14ae-43f2-90bd-ae4758e96543","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:48.949Z","positionGeom":{"type":"Point","coordinates":[0.00011678,0.000388999]}},{"id":"8d850069-56f7-4ce1-9bdb-3954d406bc70","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"d7877929-32d2-4308-ac7a-98d6fa67dd93","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:49.577Z","positionGeom":{"type":"Point","coordinates":[0.000157204,0.000388999]}},{"id":"761a4a7a-b5b0-4958-a567-a3537f68b315","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"eb99eb3e-4649-476e-b017-49ddf0c6c63e","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:50.272Z","positionGeom":{"type":"Point","coordinates":[0.000197628,0.000388999]}},{"id":"c9d197a5-dd15-4ca7-aac3-fc973df40bb8","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"08e0dc32-6815-4b77-8047-5976b40d08ef","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:50.951Z","positionGeom":{"type":"Point","coordinates":[0.000238052,0.000388999]}},{"id":"63e346a0-98e0-4abe-86ca-6130aa9ceaf4","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"ac54e170-28a9-4d63-bd13-f15e18e511b4","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:51.601Z","positionGeom":{"type":"Point","coordinates":[0.000278476,0.000388999]}},{"id":"5fb77864-c762-4194-bddf-4813bf141a86","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"7595bf3b-883d-4f18-a52c-5be9f9ba2b1e","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:52.319Z","positionGeom":{"type":"Point","coordinates":[0.0003189,0.000388999]}},{"id":"1b91564a-74d2-400d-b9f2-3136d572e4a1","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"8fc8bd0e-c15a-4a70-a9f0-50c0d731b419","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:53.099Z","positionGeom":{"type":"Point","coordinates":[0.000359324,0.000388999]}},{"id":"08a7e5b0-749c-4e01-ac50-7a05bb238284","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"b85be89b-4f6b-47e9-919d-910e7f9d3156","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:53.731Z","positionGeom":{"type":"Point","coordinates":[0.000399748,0.000388999]}},{"id":"7c2a31f6-e2a9-4e5f-8c12-8700e3fd5880","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"19af8a1e-0923-45d1-b94b-1329a18c2383","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:54.420Z","positionGeom":{"type":"Point","coordinates":[0.000440172,0.000388999]}},{"id":"b1d4dd84-7154-40d6-971d-d09b55fe965a","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"e4a58787-ba27-4360-8f2e-673c1df71d30","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:55.050Z","positionGeom":{"type":"Point","coordinates":[0.000035932,0.000483988]}},{"id":"0974168f-3836-445d-b3dd-25415095632a","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"028404f1-790d-4f1a-b54a-dfef679124ce","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:55.723Z","positionGeom":{"type":"Point","coordinates":[0.000076356,0.000483988]}},{"id":"e01ac552-b29b-4baf-b3d1-8dd8908ccccd","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"d4a4063b-0243-4937-83de-fc95b28c170e","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:56.378Z","positionGeom":{"type":"Point","coordinates":[0.00011678,0.000483988]}},{"id":"92c43b99-ce15-487a-89bc-6dab829ec7ac","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"f41cd44b-978f-4748-a18a-102119bc53ee","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:57.078Z","positionGeom":{"type":"Point","coordinates":[0.000157204,0.000483988]}},{"id":"e14d8762-44f0-45ae-95dd-01772af8d9c0","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"c78230fc-1365-4e9c-a2b3-f43d869c6e60","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:57.855Z","positionGeom":{"type":"Point","coordinates":[0.000197628,0.000483988]}},{"id":"87969dc6-f52a-4576-9150-0d312960e912","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"94e932d8-3dc4-4586-8013-ca7227bdf83c","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:58.501Z","positionGeom":{"type":"Point","coordinates":[0.000238052,0.000483988]}},{"id":"54197305-b95a-4900-8c55-9e537f645f47","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"d3cbf3ed-2869-4833-92c0-5c9ce39bdb36","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:59.168Z","positionGeom":{"type":"Point","coordinates":[0.000278476,0.000483988]}},{"id":"13434588-1c6b-4257-93d6-761736a59cf4","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"59bec841-4c77-4998-81fc-ab42076bc58e","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:08:59.961Z","positionGeom":{"type":"Point","coordinates":[0.0003189,0.000483988]}},{"id":"dadcd09c-b2f7-443e-b670-d6e6e2332780","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"a5ca051d-2752-4758-8074-19abdf390bb1","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:00.503Z","positionGeom":{"type":"Point","coordinates":[0.000359324,0.000483988]}},{"id":"3c3e9d0d-2749-4455-94e4-398ffdc3486c","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"0618c849-8ce1-4153-9d46-6f3f5c324185","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:01.023Z","positionGeom":{"type":"Point","coordinates":[0.000399748,0.000483988]}},{"id":"e3d63d00-79f9-40ba-a121-b6649d268382","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"719831a8-b78f-4f68-8108-0d29dabc64da","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:01.567Z","positionGeom":{"type":"Point","coordinates":[0.000440172,0.000483988]}},{"id":"b05a48b3-35cd-471e-8eff-4295756e0419","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"963d274c-a980-4f5e-b301-81e335e0df83","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:02.347Z","positionGeom":{"type":"Point","coordinates":[0.000525512,0.000388999]}},{"id":"a5aaab3c-5b95-400b-8326-4a345313b33a","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"bfb850ee-5289-4bd8-9e03-401ffccbebb5","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:02.875Z","positionGeom":{"type":"Point","coordinates":[0.000565936,0.000388999]}},{"id":"3c374256-cde7-43cd-a314-2cc05f001ab1","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"de99b974-ff62-4302-98cd-209125078a0b","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:03.387Z","positionGeom":{"type":"Point","coordinates":[0.00060636,0.000388999]}},{"id":"0a87323e-1bc2-4953-bc44-78987fc3c62a","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"4ddd8fc8-07cb-424d-a0b4-31291fdb5939","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:03.915Z","positionGeom":{"type":"Point","coordinates":[0.000035932,0.00033472]}},{"id":"75b0f860-4928-4342-b26a-da41cc445242","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"22843bb1-1a10-4147-908d-47ebc99b2c57","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:04.443Z","positionGeom":{"type":"Point","coordinates":[0.000076356,0.00033472]}},{"id":"e9b7f65c-e1e6-4401-8f7f-28c61d739f8e","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"0adc5e2d-78ad-490f-ab16-8d05a82b46fe","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:04.953Z","positionGeom":{"type":"Point","coordinates":[0.00011678,0.00033472]}},{"id":"55cf5bbf-7fa0-4a1b-8ead-b13749a337bb","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"a2db12e6-22f7-4a66-ae3d-7c5293f8d1ff","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:05.471Z","positionGeom":{"type":"Point","coordinates":[0.000157204,0.00033472]}},{"id":"c9dc6071-a85f-4d43-bd49-215bb9f5e407","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"45a3d897-39b9-4c3e-8922-0d0b2e34d3fb","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:05.990Z","positionGeom":{"type":"Point","coordinates":[0.000197628,0.00033472]}},{"id":"fb77438a-4904-42ba-aac6-11b56ec90a04","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"cb067372-f839-4b1e-bbf4-ce2ce6389bb6","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:06.764Z","positionGeom":{"type":"Point","coordinates":[0.000238052,0.00033472]}},{"id":"4e1d078c-4acf-45b1-b1a6-959ac65e88f5","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"6b00b306-584d-4e90-bb37-b644393d302d","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:07.288Z","positionGeom":{"type":"Point","coordinates":[0.000278476,0.00033472]}},{"id":"630fd6e9-37dd-4bbd-aef0-9caf5edb49d5","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"0dd21237-d3e6-41ff-94a7-bec72d4b9410","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:08.061Z","positionGeom":{"type":"Point","coordinates":[0.0003189,0.00033472]}},{"id":"707d7025-f76b-4d53-aff3-530e72109cf0","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"841048c7-d592-4d24-9baf-954d1bd4c4cf","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:08.582Z","positionGeom":{"type":"Point","coordinates":[0.00040424,0.00033472]}},{"id":"bcbd5e2f-71f6-4faa-b80c-bc2adabe574f","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"6be58910-7a92-434f-9593-39a6981c3805","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:09.099Z","positionGeom":{"type":"Point","coordinates":[0.000444664,0.00033472]}},{"id":"2f575789-13de-456b-93db-590663e3c83d","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"60f9a4d8-efa0-446e-afef-d1098172be57","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:09.982Z","positionGeom":{"type":"Point","coordinates":[0.000485088,0.00033472]}},{"id":"df589be6-ad82-4523-bfab-7094832d9455","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"4ebc6d8c-3616-403a-b0bb-26a58d592916","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:10.510Z","positionGeom":{"type":"Point","coordinates":[0.000525512,0.00033472]}},{"id":"cc4d8298-3e98-4c2c-922c-54dda549f431","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"a0e3609c-0cc0-4ea5-9d7f-8c6ea179e87b","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:11.030Z","positionGeom":{"type":"Point","coordinates":[0.000565936,0.00033472]}},{"id":"d986104c-9b68-41a3-8b59-9cbf15e7ece2","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"b885c696-50da-429c-8358-050d49580abd","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:11.573Z","positionGeom":{"type":"Point","coordinates":[0.00060636,0.00033472]}},{"id":"26586ba0-bd6f-4b0d-b1b2-6b7534a0bf08","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"947333f0-cd03-4cd8-a896-349faaf0edad","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:12.093Z","positionGeom":{"type":"Point","coordinates":[0.000646784,0.00033472]}},{"id":"48cbc263-879f-42e5-984b-975af47bd610","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"0fa054e5-1efc-4417-9d1e-ce0903b4fa3f","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:12.641Z","positionGeom":{"type":"Point","coordinates":[0.000687208,0.00033472]}},{"id":"41234527-2032-495a-9aed-d185799d1a94","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"2cc9cdd8-20e4-4d9a-ae01-218c07025365","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:13.155Z","positionGeom":{"type":"Point","coordinates":[0.000727632,0.00033472]}},{"id":"8c05ff60-504b-42c7-8e67-a3d7a87f1443","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"02d28bbc-b738-4026-91c8-8d2382ad1bc1","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:13.670Z","positionGeom":{"type":"Point","coordinates":[0.000812972,0.00033472]}},{"id":"ec6567e2-133c-4cd8-8fb5-15705fdfbb17","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"76eb9570-413d-4527-bc85-1ef604636de3","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:14.222Z","positionGeom":{"type":"Point","coordinates":[0.000853396,0.00033472]}},{"id":"9b9d19e4-e9ba-4187-aeb8-58c2914a1dc6","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"3297edee-4fbe-456b-a187-0bb3593d7829","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:14.747Z","positionGeom":{"type":"Point","coordinates":[0.00089382,0.00033472]}},{"id":"538d4d8a-e3e2-408a-9be6-e7df6706e137","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"836b79bd-df16-482a-ba92-cce3805a2b3f","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:15.302Z","positionGeom":{"type":"Point","coordinates":[0.000979159,0.00033472]}},{"id":"0abc30be-83d3-4436-b5bc-68d47289b521","floorId":"4193e567-597a-4579-b415-ea2104231924","nodeId":null,"roomAId":"68fd7b60-3298-4f94-927a-8f2227632874","roomBId":null,"isAccessible":true,"isEmergency":false,"active":true,"createdAt":"2026-07-15T16:09:15.828Z","positionGeom":{"type":"Point","coordinates":[0.001019583,0.00033472]}}]}]};
+    
+    // Config coordinate projection
+    const BASE_LON = 0;
+    const BASE_LAT = 0;
+    const scaleX = 111320;
+    const scaleY = 110540;
+
+    function convertCoords(lon, lat) {
+      const x = (lon - BASE_LON) * scaleX;
+      const z = -(lat - BASE_LAT) * scaleY;
+      return { x, z };
+    }
+
+    // Color definitions for zones
+    const ZONE_COLORS = {
+      'Khu A': 0x1c6ef3, // Blue
+      'Khu B': 0xef476f, // Pink
+      'Khu C': 0xe85d04, // Orange
+      'Khu D': 0x06d6a0, // Teal
+      'Khu E': 0xb5179e, // Magenta
+      'Khu F': 0xffd166, // Yellow
+      'Default': 0x94a3b8
+    };
+
+    function getZoneColor(zoneName) {
+      if (!zoneName) return ZONE_COLORS.Default;
+      for (const prefix in ZONE_COLORS) {
+        if (zoneName.startsWith(prefix)) {
+          return ZONE_COLORS[prefix];
+        }
+      }
+      return ZONE_COLORS.Default;
+    }
+
+    // Initialize UI info
+    const bName = document.getElementById('b-name');
+    const bAddress = document.getElementById('b-address');
+    const statRooms = document.getElementById('stat-rooms');
+    const statDesks = document.getElementById('stat-desks');
+    const zoneListDiv = document.getElementById('zone-list');
+    const detailCard = document.getElementById('detail-card');
+    const detailTitle = document.getElementById('detail-title');
+    const detailCode = document.getElementById('detail-code');
+    const detailDesc = document.getElementById('detail-desc');
+    const detailZone = document.getElementById('detail-zone');
+
+    bName.textContent = MAP_DATA.building.name;
+    bAddress.textContent = MAP_DATA.building.addressLabel || 'Khoa Khám Bệnh';
+    
+    let totalRoomsCount = 0;
+    let totalDesksCount = 0;
+    const zonesSet = new Set();
+    const roomsMap = new Map(); // Store room 3D objects for reference
+
+    // Scene Setup
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0f19);
+    scene.fog = new THREE.FogExp2(0x0b0f19, 0.005);
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.set(60, 60, 80);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // Controls
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below floor
+    controls.minDistance = 10;
+    controls.maxDistance = 200;
+    // Set target to center of G2 floor (roughly 60,0,-40 based on seed coordinates)
+    controls.target.set(60, 0, -40);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(100, 150, 50);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 500;
+    const d = 100;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    scene.add(dirLight);
+
+    // Grid Floor / Base Guide
+    const gridHelper = new THREE.GridHelper(200, 50, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -0.01;
+    scene.add(gridHelper);
+
+    // --- Build 3D Elements from data ---
+    
+    // Group to hold all building assets
+    const mapGroup = new THREE.Group();
+    scene.add(mapGroup);
+
+    // Track active floor map
+    const activeFloor = MAP_DATA.floors[0]; // Seeded Floor 1
+    
+    if (activeFloor) {
+      // 1. Draw Floor Slab
+      try {
+        if (activeFloor.outlineGeom && activeFloor.outlineGeom.coordinates) {
+          const polyCoords = activeFloor.outlineGeom.coordinates[0];
+          const shape = new THREE.Shape();
+          polyCoords.forEach((coord, index) => {
+            const pt = convertCoords(coord[0], coord[1]);
+            if (index === 0) shape.moveTo(pt.x, pt.z);
+            else shape.lineTo(pt.x, pt.z);
+          });
+
+          const extrudeSettings = { depth: 0.5, bevelEnabled: false };
+          const floorGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          const floorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x1e293b, 
+            transparent: true,
+            opacity: 0.8,
+            roughness: 0.4,
+            metalness: 0.1
+          });
+          const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+          floorMesh.rotation.x = Math.PI / 2; // Lie flat
+          floorMesh.scale.set(1, 1, -1);
+          floorMesh.position.y = -0.5; // Sit slightly below y=0
+          floorMesh.receiveShadow = true;
+          mapGroup.add(floorMesh);
+        }
+      } catch (e) {
+        console.error("Lỗi vẽ Floor Slab:", e);
+      }
+
+      // 2. Build Rooms
+      if (activeFloor.rooms) {
+        activeFloor.rooms.forEach(room => {
+          try {
+            totalRoomsCount++;
+            
+            let zoneName = 'Khu Vực Khác';
+            // Map room code to find zone name
+            if (room.roomCode && room.roomCode.startsWith('G2.2')) {
+              if (room.roomCode === 'G2.2.34' || room.roomCode === 'G2.2.35' || room.roomCode === 'G2.2.33') {
+                zoneName = 'Khu B – Nhi Khoa & Tâm Thần';
+              } else {
+                zoneName = 'Khu A – Nội Khoa Tổng Hợp';
+              }
+            } else if (room.roomCode && room.roomCode.startsWith('G2.4')) {
+              const parts = room.roomCode.split('.');
+              const suffix = parts.length > 2 ? parseInt(parts[2]) : NaN;
+              if (!isNaN(suffix)) {
+                if ([12, 14, 15, 16, 17, 18, 1, 2].includes(suffix)) {
+                  zoneName = 'Khu C – Ngoại Khoa Tổng Hợp';
+                } else if ([8, 11, 24, 25, 28, 29, 4, 5, 6].includes(suffix)) {
+                  zoneName = 'Khu D – Chuyên Khoa Đặc Biệt';
+                } else if ([23, 21, 34].includes(suffix)) {
+                  zoneName = 'Khu E – Sản & Phụ Khoa';
+                }
+              }
+            } else if (room.roomCode && (room.roomCode.startsWith('G2.6') || room.roomCode.startsWith('G2.7'))) {
+              zoneName = 'Khu F – Phục Hồi CN & Y Học Cổ Truyền';
+            }
+            zonesSet.add(zoneName);
+
+            const color = getZoneColor(zoneName);
+
+            // Get bounds
+            if (room.outlineGeom && room.outlineGeom.coordinates) {
+              const coords = room.outlineGeom.coordinates[0];
+              
+              // Extrude room walls (hollow box effect or semi-transparent volume block)
+              const shape = new THREE.Shape();
+              coords.forEach((coord, idx) => {
+                const pt = convertCoords(coord[0], coord[1]);
+                if (idx === 0) shape.moveTo(pt.x, pt.z);
+                else shape.lineTo(pt.x, pt.z);
+              });
+
+              // Create translucent physical volume block
+              const wallHeight = room.heightMeters || 3;
+              const extrudeSettings = { depth: wallHeight, bevelEnabled: false };
+              const roomGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+              const roomMat = new THREE.MeshStandardMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.25,
+                roughness: 0.1,
+                metalness: 0.1,
+                side: THREE.DoubleSide
+              });
+              const roomMesh = new THREE.Mesh(roomGeo, roomMat);
+              roomMesh.rotation.x = Math.PI / 2;
+              roomMesh.scale.set(1, 1, -1);
+              roomMesh.castShadow = true;
+              roomMesh.receiveShadow = true;
+
+              // Room wireframe helper
+              const edges = new THREE.EdgesGeometry(roomGeo);
+              const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: color, linewidth: 2, transparent: true, opacity: 0.7 }));
+              line.rotation.x = Math.PI / 2;
+              line.scale.set(1, 1, -1);
+              roomMesh.add(line);
+
+              // Meta-properties
+              roomMesh.userData = {
+                id: room.id,
+                code: room.roomCode,
+                label: room.roomLabel,
+                zone: zoneName,
+                color: color
+              };
+
+              mapGroup.add(roomMesh);
+              roomsMap.set(room.id, roomMesh);
+
+              // Add HTML Label
+              if (room.centerGeom && room.centerGeom.coordinates) {
+                const centerPt = convertCoords(room.centerGeom.coordinates[0], room.centerGeom.coordinates[1]);
+                createRoomLabel(room.roomCode, room.roomLabel, centerPt.x, centerPt.z, room.id);
+              }
+            }
+          } catch (e) {
+            console.error("Lỗi vẽ room:", room.roomCode, e);
+          }
+        });
+      }
+
+      // 3. Draw Doors
+      if (activeFloor.doors) {
+        activeFloor.doors.forEach(door => {
+          try {
+            if (door.positionGeom && door.positionGeom.coordinates) {
+              const pt = convertCoords(door.positionGeom.coordinates[0], door.positionGeom.coordinates[1]);
+              // Draw small glowing yellow cylinder/sphere for doors
+              const doorGeo = new THREE.BoxGeometry(0.8, 1.8, 0.2);
+              const doorMat = new THREE.MeshBasicMaterial({ 
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.8
+              });
+              const doorMesh = new THREE.Mesh(doorGeo, doorMat);
+              doorMesh.position.set(pt.x, 0.9, pt.z);
+              mapGroup.add(doorMesh);
+            }
+          } catch (e) {
+            console.error("Lỗi vẽ door:", e);
+          }
+        });
+      }
+
+      // 4. Placed Features (Reception desks from mapData / DB)
+      // Since mapData returned from navigation endpoint includes placedFeatures
+      try {
+        if (activeFloor.placedFeatures) {
+          activeFloor.placedFeatures.forEach(feat => {
+            totalDesksCount++;
+            if (feat.geometryGeom && feat.geometryGeom.coordinates) {
+              const pt = convertCoords(feat.geometryGeom.coordinates[0], feat.geometryGeom.coordinates[1]);
+              // Draw interactive 3D desk icon (Cylinder with a floating ring)
+              const group = new THREE.Group();
+              
+              const baseGeo = new THREE.CylinderGeometry(0.8, 0.8, 1, 16);
+              const baseMat = new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.5 });
+              const base = new THREE.Mesh(baseGeo, baseMat);
+              base.position.y = 0.5;
+              base.castShadow = true;
+              group.add(base);
+
+              const ringGeo = new THREE.TorusGeometry(0.6, 0.1, 8, 24);
+              const ringMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+              const ring = new THREE.Mesh(ringGeo, ringMat);
+              ring.position.y = 1.3;
+              ring.rotation.x = Math.PI / 2;
+              group.add(ring);
+
+              group.position.set(pt.x, 0, pt.z);
+              mapGroup.add(group);
+            }
+          });
+        } else {
+          // Fallback or verify placement count
+          statDesks.textContent = '6';
+        }
+      } catch (e) {
+        console.error("Lỗi vẽ features:", e);
+        statDesks.textContent = '6';
+      }
+    }
+
+    statRooms.textContent = totalRoomsCount;
+    statDesks.textContent = totalDesksCount || '6';
+
+    // Populate zone list UI
+    Array.from(zonesSet).sort().forEach(zoneName => {
+      const colorHex = '#' + getZoneColor(zoneName).toString(16).padStart(6, '0');
+      const item = document.createElement('div');
+      item.className = 'zone-item';
+      item.innerHTML = `<div class="zone-dot" style="background-color: ${colorHex}"></div>${zoneName}`;
+      
+      item.addEventListener('click', () => {
+        // Highlight all rooms belonging to this zone
+        roomsMap.forEach(mesh => {
+          if (mesh.userData.zone === zoneName) {
+            mesh.material.opacity = 0.6;
+            setTimeout(() => {
+              mesh.material.opacity = 0.25;
+            }, 2000);
+          }
+        });
+      });
+      zoneListDiv.appendChild(item);
+    });
+
+    // --- HTML overlay text labels ---
+    const labelContainer = document.getElementById('label-container');
+    const labelElements = [];
+
+    function createRoomLabel(code, label, x, z, roomId) {
+      const div = document.createElement('div');
+      div.className = 'room-label';
+      div.textContent = code; // show short code
+      div.dataset.roomId = roomId;
+      labelContainer.appendChild(div);
+      labelElements.push({ element: div, pos: new THREE.Vector3(x, 1.6, z), roomId });
+    }
+
+    function updateLabels() {
+      const tempV = new THREE.Vector3();
+      labelElements.forEach(item => {
+        tempV.copy(item.pos);
+        tempV.project(camera);
+
+        // Check if behind camera
+        if (tempV.z > 1) {
+          item.element.style.display = 'none';
+          return;
+        }
+
+        // Convert projection values to screen space coordinates
+        const x = (tempV.x *  .5 + .5) * window.innerWidth;
+        const y = (tempV.y * -.5 + .5) * window.innerHeight;
+
+        item.element.style.display = 'block';
+        item.element.style.left = `${x}px`;
+        item.element.style.top = `${y}px`;
+        
+        // Hide/show labels based on camera distance (zoom level)
+        const dist = camera.position.distanceTo(item.pos);
+        if (dist > 120) {
+          item.element.style.opacity = '0';
+        } else {
+          item.element.style.opacity = '1';
+        }
+      });
+    }
+
+    // --- Raycasting for 3D Interactions ---
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredMesh = null;
+    let selectedMesh = null;
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('click', onClick);
+
+    function onMouseMove(event) {
+      // Raycast only if clicking / hovering canvas (avoid UI overlay clicks)
+      if (event.target.tagName !== 'CANVAS') return;
+
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(mapGroup.children);
+
+      // Find first Room mesh
+      const roomIntersect = intersects.find(intersect => intersect.object.userData && intersect.object.userData.code);
+
+      if (roomIntersect) {
+        const mesh = roomIntersect.object;
+        if (hoveredMesh !== mesh && mesh !== selectedMesh) {
+          if (hoveredMesh && hoveredMesh !== selectedMesh) {
+            hoveredMesh.material.opacity = 0.25;
+          }
+          hoveredMesh = mesh;
+          hoveredMesh.material.opacity = 0.45;
+        }
+      } else {
+        if (hoveredMesh && hoveredMesh !== selectedMesh) {
+          hoveredMesh.material.opacity = 0.25;
+        }
+        hoveredMesh = null;
+      }
+    }
+
+    function onClick(event) {
+      if (event.target.tagName !== 'CANVAS') return;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(mapGroup.children);
+
+      const roomIntersect = intersects.find(intersect => intersect.object.userData && intersect.object.userData.code);
+
+      if (roomIntersect) {
+        const mesh = roomIntersect.object;
+        selectRoom(mesh);
+      } else {
+        deselectRoom();
+      }
+    }
+
+    function selectRoom(mesh) {
+      if (selectedMesh) {
+        selectedMesh.material.opacity = 0.25;
+      }
+      selectedMesh = mesh;
+      selectedMesh.material.opacity = 0.6;
+      
+      // Update Detail UI
+      detailTitle.textContent = mesh.userData.label;
+      detailCode.textContent = 'Mã phòng: ' + mesh.userData.code;
+      detailDesc.textContent = 'Phòng khám chuyên khoa thuộc ' + mesh.userData.zone + '. Thiết kế tiêu chuẩn 4m x 5m, bao gồm 4 bức tường chịu lực và 1 cửa ra vào giáp với hành lang trung tâm của tầng.';
+      detailZone.textContent = mesh.userData.zone;
+      detailZone.style.backgroundColor = '#' + mesh.userData.color.toString(16).padStart(6, '0');
+      detailCard.style.display = 'block';
+
+      // Animate camera target towards room center
+      const box = new THREE.Box3().setFromObject(mesh);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      
+      // Zoom camera smoothly
+      const startTarget = controls.target.clone();
+      const endTarget = center.clone();
+      const startCamPos = camera.position.clone();
+      // Keep offset but approach
+      const offset = camera.position.clone().sub(startTarget);
+      
+      let progress = 0;
+      function animateZoom() {
+        progress += 0.05;
+        if (progress <= 1) {
+          controls.target.lerpVectors(startTarget, endTarget, progress);
+          camera.position.lerpVectors(startCamPos, endTarget.clone().add(offset.normalize().multiplyScalar(40)), progress);
+          requestAnimationFrame(animateZoom);
+        }
+      }
+      animateZoom();
+    }
+
+    function deselectRoom() {
+      if (selectedMesh) {
+        selectedMesh.material.opacity = 0.25;
+        selectedMesh = null;
+      }
+      detailCard.style.display = 'none';
+    }
+
+    // Window resize handler
+    window.addEventListener('resize', onWindowResize);
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      updateLabels();
+      renderer.render(scene, camera);
+    }
+    
+    // Start animation loop
+    animate();
+  </script>
+</body>
+</html>
