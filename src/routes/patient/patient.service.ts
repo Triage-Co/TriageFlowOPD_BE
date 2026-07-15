@@ -1,6 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CreatePatientReqDto, UpdatePatientReqDto } from './dto/request-patient.dto';
+import {
+  CreatePatientReqDto,
+  UpdatePatientReqDto,
+} from './dto/request-patient.dto';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PatientService {
@@ -22,10 +26,10 @@ export class PatientService {
     };
   }
 
-  async findAll(account_id: string) {
-    const getPatientData = await this.patientRepository.findAll(account_id);
+  async getAll() {
+    const getPatientData = await this.patientRepository.findAll();
 
-    if (!getPatientData) {
+    if (getPatientData.length <= 0) {
       throw new NotFoundException({
         message: 'Danh sách rỗng',
         detail: 'Không có bệnh nhân nào trong danh sách',
@@ -40,9 +44,26 @@ export class PatientService {
     };
   }
 
-  async findOne(account_id: string, patient_id: string) {
+  async getMyPatients(account_id?: string) {
+    const getPatientData = await this.patientRepository.findAll(account_id);
+
+    if (getPatientData.length <= 0) {
+      throw new NotFoundException({
+        message: 'Danh sách rỗng',
+        detail: 'Không có bệnh nhân nào trong danh sách',
+      });
+    }
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy danh sách bệnh nhân thành công',
+      data: getPatientData,
+    };
+  }
+
+  async getOne(patient_id: string) {
     const getPatientData = await this.patientRepository.findOne(
-      account_id,
       patient_id,
     );
 
@@ -60,8 +81,32 @@ export class PatientService {
       data: getPatientData,
     };
   }
+  async getMyPatient(patient_id: string, account_id?: string) {
+    const getPatientData = await this.patientRepository.findOne(
+      patient_id,
+      account_id,
+    );
 
-  async update(account_id: string, patient_id: string, updatePatientReqDto: UpdatePatientReqDto) {
+    if (!getPatientData) {
+      throw new NotFoundException({
+        message: 'Danh sách rỗng',
+        detail: `Không có bệnh nhân với id ${patient_id} trong hệ thống`,
+      });
+    }
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy danh sách bệnh nhân thành công',
+      data: getPatientData,
+    };
+  }
+
+  async update(
+    account_id: string,
+    patient_id: string,
+    updatePatientReqDto: UpdatePatientReqDto,
+  ) {
     const updatePatientData = await this.patientRepository.update(
       account_id,
       patient_id,

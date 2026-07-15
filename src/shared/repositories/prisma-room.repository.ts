@@ -33,13 +33,20 @@ export class PrismaRoomRepository implements IRoomRepository {
   }
 
   findAll(): Promise<any> {
-    return this.prismaService.room.findMany();
+    return this.prismaService.room.findMany({
+      include: {
+        specialty: true,
+      },
+    });
   }
 
   findById(id: string): Promise<any> {
     return this.prismaService.room.findUnique({
       where: {
         room_id: id,
+      },
+      include: {
+        specialty: true,
       },
     });
   }

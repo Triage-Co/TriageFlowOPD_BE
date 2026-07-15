@@ -93,6 +93,7 @@ enum StepStatusEnum {
 
 model Account {
   account_id String         @id @default(uuid()) @db.Uuid
+  avatar     String        @default("https://img.magnific.com/premium-vector/3d-simple-user-icon-isolated_169241-6922.jpg?semt=ais_hybrid&w=740&q=80")
   user_name  String
   email      String         @unique
   role       RoleTypeEnum   @default(USER)
@@ -134,7 +135,7 @@ model Staff {
   full_name        String
   license_number   String   @default("N/A")
   experience_years Int      @default(0)
-  specialty_id     String?  @db.Uuid 
+  specialty_id     String?  @db.Uuid
   createdAt        DateTime @default(now()) @db.Timestamptz()
   updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz()
 

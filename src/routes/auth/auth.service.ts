@@ -35,7 +35,7 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   async signUp(signUpRequestDto: SignUpReqDto) {
-    const { user_name, gender, email, password } = signUpRequestDto;
+    const { user_name, gender, email, password, phone } = signUpRequestDto;
 
     if (await this.accountRepository.findByEmail(email)) {
       throw AuthErrors.EmailExists;
@@ -45,6 +45,7 @@ export class AuthService {
       user_name,
       gender,
       role: 'USER',
+      phone
     });
 
     if (error) {
@@ -80,6 +81,7 @@ export class AuthService {
         email: email,
         user_name: user_name,
         gender: gender,
+        phone: phone,
         role: 'USER',
       });
 
