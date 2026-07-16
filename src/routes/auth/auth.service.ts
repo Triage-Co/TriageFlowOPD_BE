@@ -104,7 +104,7 @@ export class AuthService {
           await this.accountRepository.delete(account_id);
         } catch (error) {
           this.logger.error(
-            `Không thể xóa account với id: ${account_id}`,
+            `Không thể xóa người dùng với id: ${account_id}`,
             error,
           );
         }

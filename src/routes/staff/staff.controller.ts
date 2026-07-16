@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { StaffService } from './staff.service';
 import { CreateStaffReqDto } from './dto/req-staff.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 
 @Controller('staff')
 export class StaffController {
@@ -27,8 +28,4 @@ export class StaffController {
     return this.staffService.update(id, updateStaffDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.staffService.remove(id);
-  }
 }

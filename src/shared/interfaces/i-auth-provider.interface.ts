@@ -23,12 +23,16 @@ export interface IAuthProvider {
   signInWithOtp(email: string): Promise<any>;
   resetPasswordForEmail(email: string): Promise<any>;
   verifyOtp(email: string, token: string, type: OtpType): Promise<any>;
-  updateUserById(account_id: string, data: any): Promise<any>;
+  updateUserById(
+    account_id: string,
+    metadata?: any,
+    email?: string,
+    password?: string,
+  ): Promise<any>;
   refreshSession(refresh_token: string): Promise<any>;
   signOut(token: string, type: SignOutType): Promise<any>;
   deleteAccount(accountId: string): Promise<any>;
   adminCreateAccount(data: any): Promise<any>;
   ban(account_id: string, banReqDto: BanReqDto): Promise<any>;
   unBan(account_id: string): Promise<any>;
-
 }

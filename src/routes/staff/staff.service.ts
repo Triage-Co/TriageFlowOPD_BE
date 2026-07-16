@@ -1,10 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
 import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.interface';
 import { CreateStaffReqDto } from './dto/req-staff.dto';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
+import { Staff } from '@prisma/client';
 
 @Injectable()
 export class StaffService {
@@ -15,6 +16,8 @@ export class StaffService {
     private readonly accountRepository: IAccountRepository,
     @Inject('IAuthProvider') private readonly authProvider: IAuthProvider,
   ) {}
+
+  private readonly logger = new Logger(StaffService.name);
 
   async create(createStaffReqDto: CreateStaffReqDto) {
     const {
@@ -86,26 +89,53 @@ export class StaffService {
     }
 
     const account_id = supabaseData.user.id;
+    let isLocalAccountCreated = false;
 
-    const accountData = await this.accountRepository.create({
-      account_id,
-      ...accountDto,
-    });
+    try {
+      const accountData = await this.accountRepository.create({
+        account_id,
+        ...accountDto,
+      });
 
-    const staffData = await this.staffRepository.create({
-      staff_id: account_id,
-      ...staffDto,
-    });
+      isLocalAccountCreated = true;
 
-    return {
-      code: 200,
-      stauts: 'success',
-      message: 'Thành công',
-      data: {
-        staffData,
-        accountData,
-      },
-    };
+      const staffData = await this.staffRepository.create({
+        staff_id: account_id,
+        ...staffDto,
+      });
+
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Thành công',
+        data: {
+          staffData,
+          accountData,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Đã xảy ra lỗi đang tiến hành rollback');
+      if (isLocalAccountCreated) {
+        try {
+          await this.accountRepository.delete(account_id);
+        } catch (error) {
+          this.logger.error(
+            `Không thể xóa người dùng với id: ${account_id}`,
+            error,
+          );
+        }
+      }
+
+      try {
+        await this.authProvider.deleteAccount(account_id);
+      } catch (error) {
+        this.logger.error(
+          `Không thể xóa tài khoản supabase với id: ${account_id}`,
+          error,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAll() {
@@ -113,7 +143,7 @@ export class StaffService {
 
     return {
       code: 200,
-      stauts: 'success',
+      status: 'success',
       message: 'Tìm tất cả nhân viên thành công',
       data: data,
     };
@@ -124,30 +154,39 @@ export class StaffService {
 
     return {
       code: 200,
-      stauts: 'success',
+      status: 'success',
       message: `Tìm nhân viên vơi id ${id} thành công`,
       data: data,
     };
   }
 
   async update(id: string, updateStaffDto: UpdateStaffDto) {
-    const data = await this.staffRepository.update(id, updateStaffDto);
+    const { email, role, password, gender, user_name, ...staffDto } =
+      updateStaffDto;
+
+    const data: Staff = await this.staffRepository.update(id, staffDto);
+
+    if (user_name || gender || role) {
+      await this.accountRepository.update(data.staff_id, {
+        user_name,
+        gender,
+        role,
+      });
+    }
+    const metadata = { user_name, gender, role };
+
+    await this.authProvider.updateUserById(
+      data.staff_id,
+      metadata,
+      email,
+      password,
+    );
 
     return {
       code: 200,
-      stauts: 'success',
+      status: 'success',
       message: `Cập nhật nhân viên với id ${id} thành công`,
       data: data,
-    };
-  }
-
-  async remove(id: string) {
-    await this.staffRepository.delete(id);
-
-    return {
-      code: 200,
-      stauts: 'success',
-      message: 'Xóa nhân viên thành công',
     };
   }
 }
