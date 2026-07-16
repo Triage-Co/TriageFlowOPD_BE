@@ -79,19 +79,10 @@ export class SupabaseAuthProvider implements IAuthProvider {
       type: type,
     });
   }
-  updateUserById(
-    account_id: string,
-    metadata?: any,
-    email?: string,
-    password?: string,
-  ): Promise<any> {
+  updateUserById(account_id: string, metadata: any): Promise<any> {
     return this.supabaseService
       .getClient()
       .auth.admin.updateUserById(account_id, {
-        ...(email && { email: email }),
-        ...(password && {
-          password: password,
-        }),
         ...(metadata &&
           Object.keys(metadata).length > 0 && { user_metadata: metadata }),
       });

@@ -93,12 +93,12 @@ enum StepStatusEnum {
 
 model Account {
   account_id String         @id @default(uuid()) @db.Uuid
-  avatar     String        @default("https://img.magnific.com/premium-vector/3d-simple-user-icon-isolated_169241-6922.jpg?semt=ais_hybrid&w=740&q=80")
+  avatar     String         @default("https://img.magnific.com/premium-vector/3d-simple-user-icon-isolated_169241-6922.jpg?semt=ais_hybrid&w=740&q=80")
   user_name  String
   email      String         @unique
   role       RoleTypeEnum   @default(USER)
   gender     GenderTypeEnum @default(MALE)
-  phone      String?
+  phone      String?        @unique
   is_banned  Boolean        @default(false)
   createdAt  DateTime       @default(now()) @db.Timestamptz()
   updatedAt  DateTime       @default(now()) @updatedAt @db.Timestamptz()

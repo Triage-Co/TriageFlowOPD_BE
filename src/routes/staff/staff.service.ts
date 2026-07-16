@@ -6,6 +6,9 @@ import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.inte
 import { CreateStaffReqDto } from './dto/req-staff.dto';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { Staff } from '@prisma/client';
+import { resend } from '../../shared/config/resend.config';
+import { getWelcomeEmailHtml } from '../../shared/template/email.template';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class StaffService {
@@ -15,6 +18,7 @@ export class StaffService {
     @Inject('IAccountRepository')
     private readonly accountRepository: IAccountRepository,
     @Inject('IAuthProvider') private readonly authProvider: IAuthProvider,
+    private readonly prismaService: PrismaService,
   ) {}
 
   private readonly logger = new Logger(StaffService.name);
@@ -54,15 +58,14 @@ export class StaffService {
       throw AuthErrors.EmailExists;
     }
 
-    const { data: supabaseData, error } = await this.authProvider.signUp(
-      email,
-      password,
-      {
+    const { data: supabaseData, error } =
+      await this.authProvider.adminCreateAccount({
+        email,
+        password,
         user_name,
         gender,
         role,
-      },
-    );
+      });
 
     if (error) {
       switch (error.code) {
@@ -102,6 +105,14 @@ export class StaffService {
       const staffData = await this.staffRepository.create({
         staff_id: account_id,
         ...staffDto,
+      });
+
+      const htmlContext = getWelcomeEmailHtml(email, password);
+      await resend.emails.send({
+        from: 'noreply@triageflow.me',
+        to: email,
+        subject: 'Chào mừng bạn gia nhập hệ thống',
+        html: htmlContext,
       });
 
       return {
@@ -161,32 +172,39 @@ export class StaffService {
   }
 
   async update(id: string, updateStaffDto: UpdateStaffDto) {
-    const { email, role, password, gender, user_name, ...staffDto } =
-      updateStaffDto;
+    const { role, gender, user_name, ...staffDto } = updateStaffDto;
 
-    const data: Staff = await this.staffRepository.update(id, staffDto);
+    try {
+      const rs = await this.prismaService.$transaction(async (tx) => {
+        const data: Staff = await this.staffRepository.update(id, staffDto, tx);
 
-    if (user_name || gender || role) {
-      await this.accountRepository.update(data.staff_id, {
-        user_name,
-        gender,
-        role,
+        if (user_name || gender || role) {
+          await this.accountRepository.update(
+            data.staff_id,
+            {
+              user_name,
+              gender,
+              role,
+            },
+            tx,
+          );
+        }
+        const metadata = { user_name, gender, role };
+
+        await this.authProvider.updateUserById(data.staff_id, metadata);
+
+        return data;
       });
+
+      return {
+        code: 200,
+        status: 'success',
+        message: `Cập nhật nhân viên với id ${id} thành công`,
+        data: rs,
+      };
+    } catch (error) {
+      this.logger.error('đã xảy ra lỗi đang roleback', error);
+      throw error;
     }
-    const metadata = { user_name, gender, role };
-
-    await this.authProvider.updateUserById(
-      data.staff_id,
-      metadata,
-      email,
-      password,
-    );
-
-    return {
-      code: 200,
-      status: 'success',
-      message: `Cập nhật nhân viên với id ${id} thành công`,
-      data: data,
-    };
   }
 }

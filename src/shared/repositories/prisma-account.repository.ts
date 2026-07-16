@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IAccountRepository } from '../interfaces/i-account.repository';
 import { PrismaService } from '../config/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaAccountRepository implements IAccountRepository {
@@ -32,8 +33,13 @@ export class PrismaAccountRepository implements IAccountRepository {
       },
     });
   }
-  update(account_id: string, data: any): Promise<any> {
-    return this.prismaService.account.update({
+  update(
+    account_id: string,
+    data: any,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any> {
+    const db = tx || this.prismaService;
+    return db.account.update({
       where: {
         account_id: account_id,
       },

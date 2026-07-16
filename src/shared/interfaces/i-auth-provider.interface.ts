@@ -25,9 +25,7 @@ export interface IAuthProvider {
   verifyOtp(email: string, token: string, type: OtpType): Promise<any>;
   updateUserById(
     account_id: string,
-    metadata?: any,
-    email?: string,
-    password?: string,
+    metadata: any,
   ): Promise<any>;
   refreshSession(refresh_token: string): Promise<any>;
   signOut(token: string, type: SignOutType): Promise<any>;

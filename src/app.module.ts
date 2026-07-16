@@ -88,4 +88,4 @@ import { NavigationModule } from './routes/navigation/navigation.module';
     SpecialtyModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}
