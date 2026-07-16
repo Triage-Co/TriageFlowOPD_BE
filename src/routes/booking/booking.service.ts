@@ -130,9 +130,9 @@ export class BookingService {
       const createPaymentData = await this.transactionService.create({
         amount: 2000,
         cancelUrl:
-          'https://www.youtube.com/watch?v=d2icAj6DPZI&list=RDd2icAj6DPZI&start_radio=1',
+          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
         returnUrl:
-          'https://www.youtube.com/watch?v=d2icAj6DPZI&list=RDd2icAj6DPZI&start_radio=1',
+          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
         clientId: exitedPatient.account_id,
         transType: 'APPOINTMENT_PAYMENT',
       });
