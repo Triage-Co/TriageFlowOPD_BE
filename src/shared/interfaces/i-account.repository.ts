@@ -5,10 +5,13 @@ export interface IAccountRepository {
   findById(account_id: string): Promise<any>;
   update(
     account_id: string,
-    data: any,
+    data: Prisma.AccountUncheckedUpdateInput,
     tx?: Prisma.TransactionClient,
   ): Promise<any>;
-  create(data: any): Promise<any>;
+  create(
+    data: Prisma.AccountUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any>;
   delete(id: string): Promise<any>;
   findAll(): Promise<any>;
 }

@@ -51,7 +51,6 @@ export class StaffService {
       full_name,
       specialty_id,
     };
-
     const existedEmail = await this.accountRepository.findByEmail(email);
 
     if (existedEmail) {
@@ -92,21 +91,29 @@ export class StaffService {
     }
 
     const account_id = supabaseData.user.id;
-    let isLocalAccountCreated = false;
-
     try {
-      const accountData = await this.accountRepository.create({
-        account_id,
-        ...accountDto,
+      const rs = await this.prismaService.$transaction(async (tx) => {
+        const accountData = await this.accountRepository.create(
+          {
+            account_id,
+            ...accountDto,
+          },
+          tx,
+        );
+
+        const staffData = await this.staffRepository.create(
+          {
+            staff_id: account_id,
+            ...staffDto,
+          },
+          tx,
+        );
+
+        return {
+          staffData,
+          accountData,
+        };
       });
-
-      isLocalAccountCreated = true;
-
-      const staffData = await this.staffRepository.create({
-        staff_id: account_id,
-        ...staffDto,
-      });
-
       const htmlContext = getWelcomeEmailHtml(email, password);
       await resend.emails.send({
         from: 'noreply@triageflow.me',
@@ -119,30 +126,16 @@ export class StaffService {
         code: 200,
         status: 'success',
         message: 'Thành công',
-        data: {
-          staffData,
-          accountData,
-        },
+        data: rs,
       };
     } catch (error) {
-      this.logger.error('Đã xảy ra lỗi đang tiến hành rollback');
-      if (isLocalAccountCreated) {
-        try {
-          await this.accountRepository.delete(account_id);
-        } catch (error) {
-          this.logger.error(
-            `Không thể xóa người dùng với id: ${account_id}`,
-            error,
-          );
-        }
-      }
-
+      this.logger.error('Đã xảy ra lỗi đang tiến hành rollback', error);
       try {
         await this.authProvider.deleteAccount(account_id);
-      } catch (error) {
+      } catch (authErr) {
         this.logger.error(
-          `Không thể xóa tài khoản supabase với id: ${account_id}`,
-          error,
+          `Cảnh báo: Không thể xóa Supabase account ${account_id}`,
+          authErr,
         );
       }
       throw error;
@@ -172,29 +165,63 @@ export class StaffService {
   }
 
   async update(id: string, updateStaffDto: UpdateStaffDto) {
-    const { role, gender, user_name, ...staffDto } = updateStaffDto;
+    const { role, gender, user_name, phone, ...staffDto } = updateStaffDto;
 
     try {
+      const oldAccountData = await this.accountRepository.findById(id);
+      const oldStaffData = await this.staffRepository.findById(id);
       const rs = await this.prismaService.$transaction(async (tx) => {
         const data: Staff = await this.staffRepository.update(id, staffDto, tx);
 
-        if (user_name || gender || role) {
+        if (user_name || gender || role || phone) {
           await this.accountRepository.update(
             data.staff_id,
             {
               user_name,
               gender,
               role,
+              phone,
             },
             tx,
           );
         }
-        const metadata = { user_name, gender, role };
-
-        await this.authProvider.updateUserById(data.staff_id, metadata);
 
         return data;
       });
+
+      if (user_name || gender || role || phone) {
+        const metadata = { user_name, gender, role };
+
+        const { error } = await this.authProvider.updateUserById(
+          rs.staff_id,
+          metadata,
+        );
+
+        if (error) {
+          this.logger.error(
+            `Supabase update lỗi cho user ${rs.staff_id}`,
+            error,
+          );
+
+          await this.accountRepository.update(rs.staff_id, {
+            user_name: oldAccountData.user_name,
+            gender: oldAccountData.gender,
+            role: oldAccountData.role,
+          });
+
+          await this.staffRepository.update(rs.staff_id, {
+            license_number: oldStaffData.license_number,
+            experience_years: oldStaffData.experience_years,
+            full_name: oldStaffData.full_name,
+            specialty_id: oldStaffData.specialty_id,
+          });
+
+          throw AuthErrors.ProviderError(
+            'Không thể đồng bộ hệ thống, đã hoàn tác thay đổi',
+            error.message,
+          );
+        }
+      }
 
       return {
         code: 200,

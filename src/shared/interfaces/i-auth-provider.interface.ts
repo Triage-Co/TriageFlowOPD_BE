@@ -1,3 +1,9 @@
+import {
+  AuthOtpResponse,
+  AuthResponse,
+  AuthTokenResponse,
+  AuthTokenResponsePassword,
+} from '@supabase/supabase-js';
 import { BanReqDto } from '../../routes/account/dto/req-account.dto';
 
 export enum OtpType {
@@ -18,15 +24,15 @@ export enum SignOutType {
 }
 
 export interface IAuthProvider {
-  signUp(email: string, password: string, metadata: any): Promise<any>;
-  signInWithPassword(email: string, password: string): Promise<any>;
-  signInWithOtp(email: string): Promise<any>;
+  signUp(email: string, password: string, metadata: any): Promise<AuthResponse>;
+  signInWithPassword(
+    email: string,
+    password: string,
+  ): Promise<AuthTokenResponsePassword>;
+  signInWithOtp(email: string): Promise<AuthOtpResponse>;
   resetPasswordForEmail(email: string): Promise<any>;
-  verifyOtp(email: string, token: string, type: OtpType): Promise<any>;
-  updateUserById(
-    account_id: string,
-    metadata: any,
-  ): Promise<any>;
+  verifyOtp(email: string, token: string, type: OtpType): Promise<AuthResponse>;
+  updateUserById(account_id: string, metadata: any): Promise<any>;
   refreshSession(refresh_token: string): Promise<any>;
   signOut(token: string, type: SignOutType): Promise<any>;
   deleteAccount(accountId: string): Promise<any>;

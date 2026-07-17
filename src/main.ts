@@ -3,7 +3,8 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import './shared/config/env.config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { GlobalExceptionFilter } from './shared/filter/global-exception.filter';
+import { GlobalExceptionFilter } from './shared/globals/global-exception.filter';
+import { ExcludeTimestampInterceptor } from './shared/globals/exclude-timestamps.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,6 +23,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalInterceptors(new ExcludeTimestampInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle('Triage Flow OPD BACKEND SYSTEM')
