@@ -1,8 +1,15 @@
-import { Prisma, RoleTypeEnum } from "@prisma/client";
+import { Prisma, Staff } from '@prisma/client';
 
 export interface IStaffRepository {
-  create(data: any): Promise<any>;
-  update(id: string, data: any, tx?: Prisma.TransactionClient): Promise<any>;
+  create(
+    data: Prisma.StaffUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any>;
+  update(
+    id: string,
+    data: Prisma.StaffUncheckedUpdateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any>;
   findAll(): Promise<any>;
   findById(id: string): Promise<any>;
 }

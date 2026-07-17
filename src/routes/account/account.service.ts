@@ -1,19 +1,19 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { BanReqDto, CreateAccountDto } from './dto/req-account.dto';
-import { PrismaService } from '../../shared/config/prisma.service';
-import { SupabaseService } from '../../shared/config/supabase.service';
-import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
-import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.interface';
-import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
+import { BanReqDto, CreateAccountDto } from "./dto/req-account.dto";
+import { PrismaService } from "../../shared/config/prisma.service";
+import { SupabaseService } from "../../shared/config/supabase.service";
+import type { IAccountRepository } from "../../shared/interfaces/i-account.repository";
+import type { IAuthProvider } from "../../shared/interfaces/i-auth-provider.interface";
+import { AuthErrors } from "../../shared/exceptions/auth.exceptions";
 
 @Injectable()
 export class AccountService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly supabaseService: SupabaseService,
-    @Inject('IAccountRepository')
+    @Inject("IAccountRepository")
     private readonly accountRepository: IAccountRepository,
-    @Inject('IAuthProvider') private readonly authProvider: IAuthProvider,
+    @Inject("IAuthProvider") private readonly authProvider: IAuthProvider,
   ) {}
 
   async findAll() {
@@ -21,8 +21,8 @@ export class AccountService {
 
     return {
       code: 200,
-      status: 'success',
-      message: 'Lấy danh sách tài khoản hành công',
+      status: "success",
+      message: "Lấy danh sách tài khoản hành công",
       data: data,
     };
   }
@@ -34,7 +34,7 @@ export class AccountService {
     }
     return {
       code: 200,
-      status: 'success',
+      status: "success",
       message: `Lấy tài khoản theo id: ${id} thành công`,
       data: data,
     };
@@ -54,7 +54,7 @@ export class AccountService {
 
     return {
       code: 200,
-      status: 'success',
+      status: "success",
       message: `Đã khóa tài khoản`,
       data: data.user.user_metadata,
     };
@@ -74,8 +74,8 @@ export class AccountService {
 
     return {
       code: 200,
-      status: 'success',
-      message: 'Mở khóa tài khoản thành công',
+      status: "success",
+      message: "Mở khóa tài khoản thành công",
       data: data.user.user_metadata,
     };
   }

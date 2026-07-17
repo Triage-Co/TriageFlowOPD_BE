@@ -35,7 +35,7 @@ export class PrismaAccountRepository implements IAccountRepository {
   }
   update(
     account_id: string,
-    data: any,
+    data: Prisma.AccountUncheckedUpdateInput,
     tx?: Prisma.TransactionClient,
   ): Promise<any> {
     const db = tx || this.prismaService;
@@ -53,8 +53,12 @@ export class PrismaAccountRepository implements IAccountRepository {
     });
   }
 
-  create(data: any): Promise<any> {
-    return this.prismaService.account.create({
+  create(
+    data: Prisma.AccountUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any> {
+    const db = tx || this.prismaService;
+    return db.account.create({
       data: {
         ...data,
       },
