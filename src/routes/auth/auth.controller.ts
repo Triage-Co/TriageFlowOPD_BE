@@ -39,6 +39,12 @@ export class AuthController {
     return this.authService.signInWithEmail(signInWithEmailRequestDto);
   }
 
+  @Post('/login/citizen-id')
+  signInWithCitizenId(
+    @Body() signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
+  ) {
+    return this.authService.SignInWithCitizenId(signInWithCitizenIdRequestDto);
+  }
 
   @Post('/otp/send')
   signInWithOtp(@Body() signInWithOtpRequestDto: SignInWithOtpRequestDto) {

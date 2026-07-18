@@ -6,6 +6,21 @@ import { Prisma } from '@prisma/client';
 @Injectable()
 export class PrismaPatientRepository implements IPatientRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findByCitizenId(citizenId: string): Promise<any> {
+    return this.prismaService.patient.findFirst({
+      where: {
+        citizen_id: citizenId,
+      },
+      include: {
+        account: {
+          omit: {
+            account_id: true,
+            is_banned: true,
+          },
+        },
+      },
+    });
+  }
   findOneWithPatientId(patient_id: string): Promise<any> {
     return this.prismaService.patient.findUnique({
       where: {

@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   ForgotPasswordRequestDto,
   RefreshTokenRequestDto,
+  SignInWithCitizenIdRequestDto,
   SignInWithEmailRequestDto,
   SignInWithOtpRequestDto,
   SignOutReqRequestDto,
@@ -19,7 +20,8 @@ import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.inte
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
 import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
-
+import { JwtService } from '@nestjs/jwt';
+import { Patient } from '@prisma/client';
 @Injectable()
 export class AuthService {
   constructor(
@@ -30,6 +32,7 @@ export class AuthService {
     private readonly patientRepository: IPatientRepository,
     @Inject('IStaffRepository')
     private readonly staffRepository: IStaffRepository,
+    private readonly jwtService: JwtService,
   ) {}
 
   private readonly logger = new Logger(AuthService.name);
@@ -45,7 +48,7 @@ export class AuthService {
       user_name,
       gender,
       role: 'USER',
-      phone
+      phone,
     });
 
     if (error) {
@@ -145,7 +148,7 @@ export class AuthService {
 
         case 'user_banned':
           throw AuthErrors.UserBanned;
-        
+
         default:
           throw AuthErrors.ProviderError(
             'Đăng nhập không thành công',
@@ -190,6 +193,38 @@ export class AuthService {
       code: 200,
       status: 'success',
       message: 'gửi OTP thành công',
+    };
+  }
+
+  async SignInWithCitizenId(
+    signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
+  ) {
+    const existedPatient: Patient =
+      await this.patientRepository.findByCitizenId(
+        signInWithCitizenIdRequestDto.citizen_id,
+      );
+    if (!existedPatient) {
+      throw AuthErrors.PatientNotFoundByCitizenId(
+        signInWithCitizenIdRequestDto.citizen_id,
+      );
+    }
+
+    const payload = {
+      sub: existedPatient.patient_id,
+      id: existedPatient.patient_id,
+      patient: existedPatient,
+    };
+    const token = await this.jwtService.signAsync(payload);
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đăng nhập thành công',
+      data: {
+        token: token,
+        patient_id: existedPatient.patient_id,
+        citizen_id: existedPatient.citizen_id,
+      },
     };
   }
 

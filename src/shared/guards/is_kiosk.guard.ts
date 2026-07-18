@@ -4,17 +4,16 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { SupabaseService } from '../config/supabase.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
-export class IsAuthGuard implements CanActivate {
-  constructor(private readonly supabaseService: SupabaseService) {}
-
+export class IsKioskGuard implements CanActivate {
+  constructor(private readonly jwtService: JwtService) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const ctx = context.switchToHttp();
     const request = ctx.getRequest();
     const authorization = request.headers.authorization;
-
+    console.log(authorization);
     if (!authorization) {
       throw new UnauthorizedException({
         detail: 'Chưa có token trong header',
@@ -29,19 +28,16 @@ export class IsAuthGuard implements CanActivate {
         detail: 'Định dạng token phải là Bearer token',
       });
     }
-    const {
-      data: { user },
-      error,
-    } = await this.supabaseService.getClient().auth.getUser(token);
 
-    if (error || !user) {
+    try {
+      const payload = await this.jwtService.verifyAsync(token);
+      request['user'] = payload;
+    } catch (error) {
       throw new UnauthorizedException({
-        message: 'Token không hợp lệ hoặc đã hết hạn.',
-        detail: error?.message,
+        message: 'Xác thực thất bại',
+        detail: 'Token không hợp lệ hoặc đã hết hạn',
       });
     }
-
-    request['user'] = user;
 
     return true;
   }
