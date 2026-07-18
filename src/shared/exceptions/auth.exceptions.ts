@@ -24,16 +24,16 @@ export const AuthErrors = {
       'Không tìm thấy người dùng',
       `Không tìm thấy người dùng với email: ${email} trong hệ thống.`,
     ),
-  UserNotFoundByCitizenId: (citizen_id: string) =>
+  PatientNotFoundByCitizenId: (citizen_id: string) =>
     new AuthException(
       HttpStatus.NOT_FOUND,
-      'Không tìm thấy người dùng',
-      `Không tìm thấy người dùng với CCCD/CMND: ${citizen_id} trong hệ thống.`,
+      `Không tìm thấy Bệnh nhân với CCCD/CMND: ${citizen_id} trong hệ thống, vui lòng liên hệ lễ tân để được hỗ trợ`,
+      `Không tìm thấy Bệnh nhân với CCCD/CMND: ${citizen_id} trong hệ thống.`,
     ),
   UserNotFoundById: (account_id: string) =>
     new AuthException(
       HttpStatus.NOT_FOUND,
-      'Không tìm thấy người dùng',
+      `Không tìm thấy người dùng với account id: ${account_id} trong hệ thống.`,
       `Không tìm thấy người dùng với account id: ${account_id} trong hệ thống`,
     ),
   EmailNotConfirmed: new AuthException(

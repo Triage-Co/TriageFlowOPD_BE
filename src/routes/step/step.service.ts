@@ -144,6 +144,6 @@ export class StepService {
           step_status: StepStatusEnum.IN_PROGRESS,
         });
       }
-    }
+    } 
   }
 }

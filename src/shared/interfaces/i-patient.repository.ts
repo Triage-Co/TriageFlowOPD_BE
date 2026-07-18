@@ -20,4 +20,5 @@ export interface IPatientRepository {
     account_id?: string,
     tx?: Prisma.TransactionClient,
   ): Promise<any>;
+  findByCitizenId(citizenId: string): Promise<any>;
 }

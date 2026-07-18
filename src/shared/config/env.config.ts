@@ -34,6 +34,8 @@ class EnvClass {
   REDIS_URL: string;
   @IsString({ message: 'Thiếu RESEND_KEY TRONG FILE .ENV' })
   RESEND_KEY: string;
+  @IsString({ message: 'Thiếu KIOSK_KEY TRONG FILE .ENV' })
+  KIOSK_KEY: string;
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

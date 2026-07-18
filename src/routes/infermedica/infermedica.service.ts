@@ -6,13 +6,15 @@ import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { AuthError } from '@supabase/supabase-js';
+import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 
 @Injectable()
 export class InfermedicaService {
-  PATIENT_ANWSER: PrismaClient['patient_Anwser'];
+  PATIENT_ANSWER: PrismaClient['patient_Answer'];
   ACCOUNT: PrismaClient['account'];
   PATIENT: PrismaClient['patient'];
-  TRIAGE_INFOR: PrismaClient['triage_Information'];
+  TRIAGE_INFO: PrismaClient['triage_Information'];
   SPECIALTY: PrismaClient['specialty'];
 
   constructor(
@@ -20,10 +22,10 @@ export class InfermedicaService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prismaService: PrismaService,
   ) {
-    this.PATIENT_ANWSER = prismaService.patient_Anwser;
+    this.PATIENT_ANSWER = prismaService.patient_Answer;
     this.ACCOUNT = prismaService.account;
     this.PATIENT = prismaService.patient;
-    this.TRIAGE_INFOR = prismaService.triage_Information;
+    this.TRIAGE_INFO = prismaService.triage_Information;
     this.SPECIALTY = prismaService.specialty;
   }
 
@@ -54,11 +56,20 @@ export class InfermedicaService {
     }
   }
 
-  async diagnoise(
+  async diagnosis(
     triageDto: TriageDto,
     citizen_id: string,
     interview_token?: string,
   ) {
+    const existedPatient = await this.PATIENT.findFirst({
+      where: {
+        citizen_id: citizen_id,
+      },
+    });
+    if (!existedPatient) {
+      throw AuthErrors.PatientNotFoundByCitizenId(citizen_id);
+    }
+
     try {
       const configRecord = await this.prismaService.triage_Config.findFirst({
         where: {
@@ -66,26 +77,23 @@ export class InfermedicaService {
         },
       });
 
-      let numberOfDiagnoise = 5;
+      let numberOfDiagnoses = 5;
 
       if (configRecord && configRecord.rule_value) {
         const ruleValue = configRecord.rule_value as any;
-        if (ruleValue.number_of_diagnoise) {
-          numberOfDiagnoise = ruleValue.number_of_diagnoise;
+        if (ruleValue.number_of_diagnosis) {
+          numberOfDiagnoses = ruleValue.number_of_diagnosis;
         }
       }
 
-      let interviewId = `new_session_${Date.now()}`;
+      let currentToken = interview_token || `new_session_${Date.now()}`;
 
-      if (interview_token) {
-        interviewId = interview_token;
-      }
+      const cacheKey = `interview_${currentToken}`;
 
-      const cacheKey = `interview_turn_${interviewId}`;
-      let currentTurn = (await this.cacheManager.get<number>(cacheKey)) || 0;
+      let currentTurn = await this.cacheManager.get<number>(cacheKey);
 
-      if (interview_token) {
-        currentTurn = (await this.cacheManager.get<number>(cacheKey)) || 1;
+      if (!currentTurn) {
+        currentTurn = interview_token ? 1 : 0;
       }
 
       const { data } = await firstValueFrom(
@@ -101,89 +109,24 @@ export class InfermedicaService {
       currentTurn += 1;
       await this.cacheManager.set(cacheKey, currentTurn, 3600000);
 
-      const isOverLimit = currentTurn >= numberOfDiagnoise;
+      const isOverLimit = currentTurn >= numberOfDiagnoses;
 
-      if (citizen_id) {
-        const exitedUser = await this.PATIENT.findUnique({
-          where: {
-            citizen_id: citizen_id,
-          }
-        });
+      const finalToken = interview_token || currentToken;
 
-        if (!interview_token) {
-          if (!exitedUser) {
-            await this.PATIENT_ANWSER.create({
-              data: {
-                citizen_id: citizen_id,
-                questionnaire_data:
-                  triageDto as unknown as Prisma.InputJsonValue,
-                interview_token: data.interview_token || null,
-              },
-            });
-          } else {
-            await this.PATIENT_ANWSER.create({
-              data: {
-                citizen_id: citizen_id,
-                patient_id: exitedUser.patient_id,
-                questionnaire_data:
-                  triageDto as unknown as Prisma.InputJsonObject,
-                interview_token: data.interview_token || null,
-              },
-            });
-          }
-        } else {
-          const exitedInterviewToken = await this.PATIENT_ANWSER.findFirst({
-            where: {
-              interview_token: interview_token,
-            },
-          });
-
-          if (!exitedInterviewToken) {
-            if (!exitedUser) {
-              await this.PATIENT_ANWSER.create({
-                data: {
-                  citizen_id: citizen_id,
-                  questionnaire_data:
-                    triageDto as unknown as Prisma.InputJsonValue,
-                  interview_token: data.interview_token || null,
-                },
-              });
-            } else {
-              await this.PATIENT_ANWSER.create({
-                data: {
-                  citizen_id: citizen_id,
-                  patient_id: exitedUser.patient_id,
-                  questionnaire_data:
-                    triageDto as unknown as Prisma.InputJsonObject,
-                  interview_token: data.interview_token || null,
-                },
-              });
-            }
-          } else {
-            if (!exitedUser) {
-              await this.PATIENT_ANWSER.update({
-                where: {
-                  interview_token: interview_token,
-                },
-                data: {
-                  questionnaire_data:
-                    triageDto as unknown as Prisma.InputJsonValue,
-                },
-              });
-            } else {
-              await this.PATIENT_ANWSER.update({
-                where: {
-                  interview_token: interview_token,
-                },
-                data: {
-                  questionnaire_data:
-                    triageDto as unknown as Prisma.InputJsonObject,
-                },
-              });
-            }
-          }
-        }
-      }
+      await this.PATIENT_ANSWER.upsert({
+        where: {
+          interview_token: finalToken,
+        },
+        update: {
+          questionnaire_data: triageDto as unknown as Prisma.InputJsonObject,
+        },
+        create: {
+          citizen_id: citizen_id,
+          patient_id: existedPatient.patient_id,
+          questionnaire_data: triageDto as unknown as Prisma.InputJsonObject,
+          interview_token: finalToken,
+        },
+      });
       return {
         code: 200,
         message: 'Thành công',
@@ -191,6 +134,7 @@ export class InfermedicaService {
         data: {
           ...data,
           question: data.question,
+          ...(interview_token && { interview_token: interview_token }),
           should_stop: isOverLimit || !data.question,
         },
       };
@@ -234,13 +178,13 @@ export class InfermedicaService {
 
   async recommendSpecialist(triageDto: TriageDto, interview_token: string) {
     try {
-      const exitedPatientAwser = await this.PATIENT_ANWSER.findUnique({
+      const exitedPatientAnswer = await this.PATIENT_ANSWER.findUnique({
         where: {
           interview_token: interview_token,
         },
       });
 
-      if (!exitedPatientAwser) {
+      if (!exitedPatientAnswer) {
         throw new NotAcceptableException({
           message: 'Không tìm thấy interview token',
           detail: `Không tìm thấy interview token trong hệ thống`,
@@ -268,25 +212,25 @@ export class InfermedicaService {
         },
       });
 
-      const exitedPatientInfor = await this.TRIAGE_INFOR.findFirst({
+      const exitedPatientInfo = await this.TRIAGE_INFO.findFirst({
         where: {
-          answer_id: exitedPatientAwser.patient_anwser_id,
+          answer_id: exitedPatientAnswer.patient_answer_id,
         },
       });
 
       if (exitedSpecialty) {
-        if (!exitedPatientInfor) {
-          await this.TRIAGE_INFOR.create({
+        if (!exitedPatientInfo) {
+          await this.TRIAGE_INFO.create({
             data: {
-              answer_id: exitedPatientAwser.patient_anwser_id,
+              answer_id: exitedPatientAnswer.patient_answer_id,
               specialty_id: exitedSpecialty.specialty_id,
               interview_token: interview_token,
             },
           });
         } else {
-          await this.TRIAGE_INFOR.update({
+          await this.TRIAGE_INFO.update({
             where: {
-              triage_information_id: exitedPatientInfor.triage_information_id,
+              triage_information_id: exitedPatientInfo.triage_information_id,
             },
             data: {
               specialty_id: exitedSpecialty.specialty_id,
@@ -324,7 +268,7 @@ export class InfermedicaService {
           params: {
             'age.value': Number(searchDto.age),
             phrase: searchDto.phrase,
-            max_results: 999
+            max_results: 999,
           },
         }),
       );

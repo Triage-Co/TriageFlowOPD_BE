@@ -187,7 +187,11 @@ export class InfermedicaController {
     type: "string"
   })
   diagnoise(@Body() triageDto: TriageDto, @Query("citizen_id") citizen_id: string, @Query("interview_token") interview_token?: string) {
-    return this.infermedicaService.diagnoise(triageDto, citizen_id, interview_token);
+    return this.infermedicaService.diagnosis(
+      triageDto,
+      citizen_id,
+      interview_token,
+    );
   }
 
   @ApiOperation({

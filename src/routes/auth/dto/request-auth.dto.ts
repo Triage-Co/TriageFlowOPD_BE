@@ -80,12 +80,6 @@ export class SignInWithCitizenIdRequestDto {
   })
   citizen_id: string;
 
-  @IsString()
-  @ApiProperty({
-    name: 'password',
-    example: 'TriageFlowOpd',
-  })
-  password: string;
 }
 
 export class SignInWithOtpRequestDto {

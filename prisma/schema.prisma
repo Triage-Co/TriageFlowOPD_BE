@@ -65,10 +65,11 @@ enum BookingStatusEnum {
 }
 
 enum FlowStatusEnum {
-  SUCCESSED
   PENDING
-  MISSING
-  FINISHED
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  CANCELLED
 }
 
 enum PaymentStatusEnum {
@@ -89,6 +90,18 @@ enum StepStatusEnum {
   COMPLETED
   DECLINED
   CANCELLED
+}
+
+enum ClinicalRoomType {
+  RECEPTION
+  TRIAGE
+  CONSULTATION
+  TREATMENT
+  LAB
+  IMAGING
+  PHARMACY
+  CASHIER
+  ADMIN
 }
 
 model Account {
@@ -123,7 +136,7 @@ model Patient {
 
   account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
   bookings       Booking[]
-  patientAnwsers Patient_Anwser[]
+  patientAnswers Patient_Answer[]
   medicalRecords Medical_Record[]
 
   @@index([full_name, account_id, dob])
@@ -236,10 +249,11 @@ model Flow {
 }
 
 model Room {
-  room_id          String  @id @default(uuid()) @db.Uuid
+  room_id          String           @id @default(uuid()) @db.Uuid
   room_name        String
-  physical_room_id String? @db.Uuid
-  specialty_id     String? @db.Uuid
+  room_type        ClinicalRoomType @default(CONSULTATION)
+  physical_room_id String?          @db.Uuid
+  specialty_id     String?          @db.Uuid
   shifts           Shift[]
 
   specialty     Specialty?    @relation(fields: [specialty_id], references: [specialty_id])
@@ -269,8 +283,8 @@ model Step {
 
   physicalRoom   PhysicalRoom?     @relation(fields: [physicalRoomId], references: [id])
   physicalRoomId String?           @db.Uuid
-  dependencies   Step_Dependency[] @relation("StepNeedsToWait")
-  dependedBy     Step_Dependency[] @relation("StepIsDependedOn")
+  dependencies   Step_Dependency[] @relation("StepNeedsToWait") //step con (phải đước hoàn thành -> step cha mới hoàn thành)
+  dependedBy     Step_Dependency[] @relation("StepIsDependedOn") //step mình hoàn thành -> step tiếp theo được làm tiếp
 
   @@map("step")
 }
@@ -288,6 +302,12 @@ model Step_Dependency {
 
   @@unique([step_id, depends_on_step_id])
   @@map("step_dependency")
+}
+
+model Flow_Template {
+  template_id   String @id @default(uuid()) @db.Uuid
+  template_name String
+  steps         Json[] @db.JsonB
 }
 
 model Queue {
@@ -380,17 +400,17 @@ model Service_Order {
   @@map("service_order")
 }
 
-model Patient_Anwser {
-  patient_anwser_id  String  @id @default(uuid()) @db.Uuid
+model Patient_Answer {
+  patient_answer_id  String  @id @default(uuid()) @db.Uuid
   patient_id         String? @db.Uuid
   citizen_id         String?
   questionnaire_data Json?   @db.JsonB
   interview_token    String? @unique
 
-  patient            Patient?             @relation(fields: [patient_id], references: [patient_id])
-  triageInformations Triage_Information[]
+  patient           Patient?             @relation(fields: [patient_id], references: [patient_id])
+  triageInformation Triage_Information[]
 
-  @@map("patient_anwser")
+  @@map("patient_answer")
 }
 
 model Triage_Information {
@@ -400,7 +420,7 @@ model Triage_Information {
   interview_token       String? @unique
   suggested_priority    Int?
 
-  answer    Patient_Anwser? @relation(fields: [answer_id], references: [patient_anwser_id])
+  answer    Patient_Answer? @relation(fields: [answer_id], references: [patient_answer_id])
   specialty Specialty?      @relation(fields: [specialty_id], references: [specialty_id])
 
   @@map("triage_information")

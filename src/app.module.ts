@@ -36,6 +36,8 @@ import { SpecialtyModule } from './routes/specialty/specialty.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { NavigationModule } from './routes/navigation/navigation.module';
+import { TemplateModule } from './routes/template/template.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -53,9 +55,17 @@ import { NavigationModule } from './routes/navigation/navigation.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    JwtModule.register({
+      global: true,
+      secret: process.env.KIOSK_KEY,
+      signOptions: {
+        expiresIn: '12h',
+      },
+    }),
     ScheduleModule.forRoot(),
     SharedModule,
     AuthModule,
+    JwtModule,
     StaffModule,
     ShiftModule,
     RoomModule,
@@ -86,6 +96,7 @@ import { NavigationModule } from './routes/navigation/navigation.module';
     NavigationModule,
     FlowModule,
     SpecialtyModule,
+    TemplateModule,
   ],
 })
 export class AppModule {}

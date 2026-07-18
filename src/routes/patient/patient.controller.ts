@@ -16,18 +16,30 @@ import {
   UpdatePatientByStaffReqDto,
   UpdatePatientReqDto,
 } from './dto/request-patient.dto';
-import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiSecurity } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
+import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @Controller('patient')
-@ApiBearerAuth()
-@UseGuards(IsAuthGuard)
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
 
+  @Get('kiosk')
+  @ApiBearerAuth()
+  @UseGuards(IsKioskGuard)
+  @ApiOperation({
+    summary: '[KIOSK] lấy thông tin bệnh nhân (cần đăng nhập)',
+  })
+  findByKiosk(@Req() req: any) {
+    const { id } = req.user;
+    return this.patientService.getOne(id);
+  }
+
   @Post('me')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
   @ApiOperation({
     summary: '[USER] tạo bệnh nhân',
   })
@@ -40,6 +52,8 @@ export class PatientController {
   }
 
   @Get('/me')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
   @ApiOperation({
     summary: '[USER] lấy tất bệnh nhân',
   })
@@ -49,6 +63,8 @@ export class PatientController {
   }
 
   @Delete('me/:patient_id')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
   @ApiOperation({
     summary: '[USER] xóa bệnh nhân theo patient id',
   })
@@ -58,6 +74,8 @@ export class PatientController {
   }
 
   @Get('me/:patient_id')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
   @ApiOperation({
     summary: '[USER] lấy bệnh nhân theo patient id',
   })
@@ -67,6 +85,8 @@ export class PatientController {
   }
 
   @Patch('me/:patient_id')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
   @ApiOperation({
     summary: '[USER] cập nhật bệnh nhân theo patient id',
   })
@@ -81,7 +101,7 @@ export class PatientController {
 
   @Post()
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF] tạo bệnh nhân',
   })
@@ -92,7 +112,7 @@ export class PatientController {
 
   @Get()
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF] lấy tất cả bệnh nhân',
   })
@@ -102,7 +122,7 @@ export class PatientController {
 
   @Get(':patient_id')
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF] lấy bệnh nhân theo patient id',
   })
@@ -112,7 +132,7 @@ export class PatientController {
 
   @Patch('/:patient_id')
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF] cập nhật bệnh nhân theo patient id',
   })
@@ -126,7 +146,7 @@ export class PatientController {
 
   @Delete(':patient_id')
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF] xóa bệnh nhân theo patient id',
   })

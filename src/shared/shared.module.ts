@@ -12,6 +12,7 @@ import { PrismaRoomRepository } from './repositories/prisma-room.repository';
 import { PrismaNotificationRepository } from './repositories/prisma-notification.repository';
 import { PrismaStepRepository } from './repositories/prisma-step.repository';
 import { PrismaFlowRepository } from './repositories/prisma-flow.repository';
+import { PrismaTemplateRepository } from './repositories/prisma-template.repository';
 
 @Global()
 @Module({
@@ -57,6 +58,10 @@ import { PrismaFlowRepository } from './repositories/prisma-flow.repository';
       provide: 'IFlowRepository',
       useClass: PrismaFlowRepository,
     },
+    {
+      provide: 'ITemplateRepository',
+      useClass: PrismaTemplateRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -72,6 +77,7 @@ import { PrismaFlowRepository } from './repositories/prisma-flow.repository';
     'INotificationRepository',
     'IStepRepository',
     'IFlowRepository',
+    'ITemplateRepository',
   ],
 })
 export class SharedModule {}

@@ -5,6 +5,8 @@ import {
 } from './dto/request-patient.dto';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
 import { Prisma } from '@prisma/client';
+import { AuthError } from '@supabase/supabase-js';
+import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 
 @Injectable()
 export class PatientService {
@@ -126,6 +128,20 @@ export class PatientService {
       code: 200,
       status: 'success',
       message: `xóa bệnh nhân với id ${patient_id} thành công`,
+    };
+  }
+
+  
+  async findByCitizenId(citizenId: string) {
+    const data = await this.patientRepository.findByCitizenId(citizenId);
+    if (!data) {
+      throw AuthErrors.PatientNotFoundByCitizenId(citizenId);
+    }
+    return {
+      code: 200,
+      message: 'Lấy bệnh nhân với CCCD/CMNN thành công',
+      status: 'success',
+      data: data,
     };
   }
 }
