@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IPatientRepository } from '../interfaces/i-patient.repository';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaPatientRepository implements IPatientRepository {
@@ -12,14 +13,22 @@ export class PrismaPatientRepository implements IPatientRepository {
       },
     });
   }
-  update(account_id: string, patient_id: string, data: any): Promise<any> {
-    return this.prismaService.patient.update({
+  update(
+    patient_id: string,
+    data: any,
+    account_id?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any> {
+    const db = tx || this.prismaService;
+    return db.patient.update({
       data: {
         ...data,
       },
       where: {
         patient_id: patient_id,
-        account_id: account_id,
+        ...(account_id && {
+          account_id: account_id,
+        }),
       },
     });
   }
@@ -42,18 +51,26 @@ export class PrismaPatientRepository implements IPatientRepository {
       },
     });
   }
-  
-  delete(account_id: string, patient_id: string): Promise<any> {
+
+  delete(patient_id: string, account_id?: string): Promise<any> {
     return this.prismaService.patient.delete({
       where: {
         patient_id: patient_id,
-        account_id: account_id,
+        ...(account_id && {
+          account_id: account_id,
+        }),
       },
     });
   }
 
-  create(account_id: string, data: any): Promise<any> {
-    return this.prismaService.patient.create({
+  create(
+    account_id: string,
+    data: any,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any> {
+    const db = tx || this.prismaService;
+
+    return db.patient.create({
       data: {
         ...data,
         account_id: account_id,

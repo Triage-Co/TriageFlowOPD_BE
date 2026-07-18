@@ -56,3 +56,27 @@ export class CreatePatientReqDto {
 export class UpdatePatientReqDto extends PartialType(
   OmitType(CreatePatientReqDto, ['citizen_id', 'medical_coverage_id']),
 ) {}
+
+
+
+export class CreatePatientByStaffReqDto extends CreatePatientReqDto {
+  @IsString()
+  @ApiProperty({
+    name: 'account_id',
+    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
+    description: 'ID của tài khoản user mà staff muốn gán bệnh nhân vào',
+  })
+  account_id: string;
+}
+
+export class UpdatePatientByStaffReqDto extends PartialType(CreatePatientReqDto) {
+  @IsString()
+  @IsOptional()
+  @ApiProperty({
+    name: 'account_id',
+    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
+    description: 'ID của tài khoản user mới',
+    required: false,
+  })
+  account_id?: string;
+}

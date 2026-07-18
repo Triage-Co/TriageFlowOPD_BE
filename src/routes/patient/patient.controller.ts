@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 import { PatientService } from './patient.service';
 import {
+  CreatePatientByStaffReqDto,
   CreatePatientReqDto,
+  UpdatePatientByStaffReqDto,
   UpdatePatientReqDto,
 } from './dto/request-patient.dto';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -27,20 +29,65 @@ export class PatientController {
 
   @Post('me')
   @ApiOperation({
-    summary: '[USER] tạo bệnh nhân của chính user',
+    summary: '[USER] tạo bệnh nhân',
   })
-  create(@Req() req: any, @Body() createPatientDto: CreatePatientReqDto) {
+  createMyPatient(
+    @Req() req: any,
+    @Body() createPatientDto: CreatePatientReqDto,
+  ) {
     const { id } = req.user;
     return this.patientService.create(id, createPatientDto);
   }
 
   @Get('/me')
   @ApiOperation({
-    summary: '[USER] lấy tất bệnh nhân theo của chính user',
+    summary: '[USER] lấy tất bệnh nhân',
   })
   getMyPatients(@Req() req: any) {
     const { id } = req['user'];
     return this.patientService.getMyPatients(id);
+  }
+
+  @Delete('me/:patient_id')
+  @ApiOperation({
+    summary: '[USER] xóa bệnh nhân theo patient id',
+  })
+  removeMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
+    const { id } = req['user'];
+    return this.patientService.remove(id, patient_id);
+  }
+
+  @Get('me/:patient_id')
+  @ApiOperation({
+    summary: '[USER] lấy bệnh nhân theo patient id',
+  })
+  findMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
+    const { id } = req['user'];
+    return this.patientService.getMyPatient(patient_id, id);
+  }
+
+  @Patch('me/:patient_id')
+  @ApiOperation({
+    summary: '[USER] cập nhật bệnh nhân theo patient id',
+  })
+  updateMyPatient(
+    @Req() req: any,
+    @Param('patient_id') patient_id: string,
+    @Body() updatePatientReqDto: UpdatePatientReqDto,
+  ) {
+    const { id } = req.user;
+    return this.patientService.update(patient_id, updatePatientReqDto, id);
+  }
+
+  @Post()
+  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: '[STAFF] tạo bệnh nhân',
+  })
+  create(@Body() createPatientDto: CreatePatientByStaffReqDto) {
+    const { account_id, ...createDto } = createPatientDto;
+    return this.patientService.create(account_id, createDto);
   }
 
   @Get()
@@ -53,15 +100,6 @@ export class PatientController {
     return this.patientService.getAll();
   }
 
-  @Get('me/:patient_id')
-  @ApiOperation({
-    summary: '[USER] lấy bệnh nhân theo patient id của chính user',
-  })
-  findMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
-    const { id } = req['user'];
-    return this.patientService.getMyPatient(patient_id, id);
-  }
-
   @Get(':patient_id')
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
   @UseGuards(IsRoleGuard)
@@ -72,25 +110,27 @@ export class PatientController {
     return this.patientService.getOne(patient_id);
   }
 
-  @Patch('me/:patient_id')
+  @Patch('/:patient_id')
+  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary: '[USER] cập nhật bệnh nhân theo patient id của chính user',
+    summary: '[STAFF] cập nhật bệnh nhân theo patient id',
   })
   update(
-    @Req() req: any,
     @Param('patient_id') patient_id: string,
-    @Body() updatePatientReqDto: UpdatePatientReqDto,
+    @Body() updatePatientReqDto: UpdatePatientByStaffReqDto,
   ) {
-    const { id } = req.user;
-    return this.patientService.update(id, patient_id, updatePatientReqDto);
+    const { account_id, ...patientDto } = updatePatientReqDto;
+    return this.patientService.update(patient_id, patientDto, account_id);
   }
 
-  @Delete('me/:patient_id')
+  @Delete(':patient_id')
+  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary: '[USER] xóa bệnh nhân theo patient id của chính user',
+    summary: '[STAFF] xóa bệnh nhân theo patient id',
   })
-  remove(@Req() req: any, @Param('patient_id') patient_id: string) {
-    const { id } = req['user'];
-    return this.patientService.remove(id, patient_id);
+  remove(@Param('patient_id') patient_id: string) {
+    return this.patientService.remove(patient_id);
   }
 }

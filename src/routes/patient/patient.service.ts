@@ -63,9 +63,7 @@ export class PatientService {
   }
 
   async getOne(patient_id: string) {
-    const getPatientData = await this.patientRepository.findOne(
-      patient_id,
-    );
+    const getPatientData = await this.patientRepository.findOne(patient_id);
 
     if (!getPatientData) {
       throw new NotFoundException({
@@ -103,14 +101,14 @@ export class PatientService {
   }
 
   async update(
-    account_id: string,
     patient_id: string,
     updatePatientReqDto: UpdatePatientReqDto,
+    account_id?: string,
   ) {
     const updatePatientData = await this.patientRepository.update(
-      account_id,
       patient_id,
       updatePatientReqDto,
+      account_id,
     );
 
     return {
@@ -121,8 +119,8 @@ export class PatientService {
     };
   }
 
-  async remove(account_id: string, patient_id: string) {
-    await this.patientRepository.delete(account_id, patient_id);
+  async remove(patient_id: string, account_id?: string) {
+    await this.patientRepository.delete(patient_id, account_id);
 
     return {
       code: 200,
