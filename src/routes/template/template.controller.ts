@@ -11,7 +11,7 @@ import {
 import { TemplateService } from './template.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { roles } from '../../shared/decorator/role.decorator';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
@@ -25,6 +25,9 @@ export class TemplateController {
   @Post()
   @roles('ADMIN')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: '[ADMIN] tạo template',
+  })
   create(@Body() createTemplateDto: CreateTemplateDto) {
     return this.templateService.create(createTemplateDto);
   }
@@ -32,6 +35,9 @@ export class TemplateController {
   @Get()
   @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: '[ADMIN-DOCTOR-ANCILLARY_STAFFS- NURSE] Tìm template theo id',
+  })
   findAll() {
     return this.templateService.findAll();
   }
@@ -39,6 +45,10 @@ export class TemplateController {
   @Get('name/:name')
   @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary:
+      '[ADMIN - DOCTOR - ANCILLARY_STAFFS - NURSE] Tìm template theo tên',
+  })
   findByName(@Param('name') name: string) {
     return this.templateService.findByName(name);
   }
@@ -46,6 +56,9 @@ export class TemplateController {
   @Get(':id')
   @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: '[ADMIN - DOCTOR - ANCILLARY_STAFFS - NURSE] Tìm template theo id',
+  })
   findOne(@Param('id') id: string) {
     return this.templateService.findOne(id);
   }
@@ -53,6 +66,9 @@ export class TemplateController {
   @Patch(':id')
   @roles('ADMIN')
   @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: '[ADMIN] cập nhật template',
+  })
   update(
     @Param('id') id: string,
     @Body() updateTemplateDto: UpdateTemplateDto,
@@ -62,6 +78,9 @@ export class TemplateController {
 
   @Delete(':id')
   @roles('ADMIN')
+  @ApiOperation({
+    summary: '[ADMIN] xóa template',
+  })
   @UseGuards(IsRoleGuard)
   remove(@Param('id') id: string) {
     return this.templateService.remove(id);

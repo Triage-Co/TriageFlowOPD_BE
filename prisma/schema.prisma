@@ -233,6 +233,7 @@ model Booking {
   prescriptions Prescription[]
   serviceOrders Service_Order[]
 
+  @@index([patient_id, slot_id, status])
   @@map("booking")
 }
 
@@ -260,6 +261,9 @@ model Room {
   physical_room PhysicalRoom? @relation(fields: [physical_room_id], references: [id], onDelete: SetNull)
   steps         Step[]
 
+  @@index([room_name, room_type])
+  @@index([physical_room_id])
+  @@index([specialty_id])
   @@map("room")
 }
 

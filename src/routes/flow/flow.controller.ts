@@ -46,7 +46,7 @@ export class FlowController {
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard)
   @ApiOperation({
-    summary: 'Tìm tất cả lịch sử flow theo Patient ID',
+    summary: '[AUTH] Tìm tất cả lịch sử flow theo Patient ID',
   })
   async findAllByPatientId(@Param('patient_id') patientId: string) {
     return this.flowService.findAllByPatientId(patientId);
@@ -56,7 +56,7 @@ export class FlowController {
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard)
   @ApiOperation({
-    summary: 'Tìm flow đang chạy (PENDING/IN_PROGRESS) theo Patient ID',
+    summary: '[AUTH] Tìm flow đang chạy (PENDING/IN_PROGRESS) theo Patient ID',
   })
   async findIsActiveByPatientId(@Param('patient_id') patientId: string) {
     return this.flowService.findIsActiveByPatientId(patientId);
@@ -67,7 +67,7 @@ export class FlowController {
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: 'Tìm tất cả flow theo của staff và admin',
+    summary: '[STAFF - ADMIN] Tìm tất cả flow',
   })
   async findAll() {
     return this.flowService.findAll();
@@ -78,7 +78,7 @@ export class FlowController {
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: 'Tìm flow theo step id của staff và admin',
+    summary: '[STAFF - ADMIN]Tìm flow theo step id',
   })
   findOne(@Param('id') id: string) {
     return this.flowService.findOne(id);
@@ -88,6 +88,9 @@ export class FlowController {
   @ApiBearerAuth()
   @roles('ADMIN', 'DOCTOR')
   @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiOperation({
+    summary: '[DOCTOR - ADMIN] thêm template vào flow',
+  })
   @ApiBody({
     schema: {
       type: 'object',

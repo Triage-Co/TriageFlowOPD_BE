@@ -103,7 +103,7 @@ export class PatientController {
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: '[STAFF] tạo bệnh nhân',
+    summary: '[STAFF - ADMIN] tạo bệnh nhân',
   })
   create(@Body() createPatientDto: CreatePatientByStaffReqDto) {
     const { account_id, ...createDto } = createPatientDto;
@@ -114,7 +114,7 @@ export class PatientController {
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: '[STAFF] lấy tất cả bệnh nhân',
+    summary: '[STAFF - ADMIN] lấy tất cả bệnh nhân',
   })
   getAll() {
     return this.patientService.getAll();
@@ -124,7 +124,7 @@ export class PatientController {
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: '[STAFF] lấy bệnh nhân theo patient id',
+    summary: '[STAFF - ADMIN] lấy bệnh nhân theo patient id',
   })
   findOne(@Param('patient_id') patient_id: string) {
     return this.patientService.getOne(patient_id);
@@ -134,7 +134,7 @@ export class PatientController {
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: '[STAFF] cập nhật bệnh nhân theo patient id',
+    summary: '[STAFF - ADMIN] cập nhật bệnh nhân theo patient id',
   })
   update(
     @Param('patient_id') patient_id: string,
@@ -148,7 +148,7 @@ export class PatientController {
   @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
-    summary: '[STAFF] xóa bệnh nhân theo patient id',
+    summary: '[STAFF - ADMIN] xóa bệnh nhân theo patient id',
   })
   remove(@Param('patient_id') patient_id: string) {
     return this.patientService.remove(patient_id);
