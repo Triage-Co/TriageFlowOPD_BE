@@ -85,156 +85,165 @@ export class FlowService {
     const idMapping = new Map<string, string>();
     const createdStepIds: string[] = [];
 
-    return this.prismaService.$transaction(async (tx) => {
-      const saveStepsRecursively = async (
-        steps: TemplateStepDto[],
-        parentStepId: string | null = null,
-      ) => {
-        for (const step of steps) {
-          const availableRooms = await tx.room.findMany({
-            where: {
-              room_type: step.room_type,
-              shifts: {
-                some: {
-                  slots: {
-                    some: {
-                      capacity: {
-                        gt: 0,
+    return this.prismaService.$transaction(
+      async (tx) => {
+        const saveStepsRecursively = async (
+          steps: TemplateStepDto[],
+          parentStepId: string | null = null,
+        ) => {
+          for (const step of steps) {
+            const availableRooms = await tx.room.findMany({
+              where: {
+                room_type: step.room_type,
+                shifts: {
+                  some: {
+                    slots: {
+                      some: {
+                        capacity: {
+                          gt: 0,
+                        },
                       },
                     },
                   },
                 },
               },
-            },
-            include: {
-              shifts: {
-                where: {
-                  slots: {
-                    some: {
-                      capacity: {
-                        gt: 0,
+              include: {
+                shifts: {
+                  where: {
+                    slots: {
+                      some: {
+                        capacity: {
+                          gt: 0,
+                        },
                       },
                     },
                   },
-                },
-                include: {
-                  slots: {
-                    where: {
-                      capacity: {
-                        gt: 0,
+                  include: {
+                    slots: {
+                      where: {
+                        capacity: {
+                          gt: 0,
+                        },
                       },
+                      orderBy: [{ capacity: 'desc' }, { start_time: 'asc' }],
                     },
-                    orderBy: [{ capacity: 'desc' }, { start_time: 'asc' }],
                   },
                 },
               },
-            },
+            });
+
+            console.log(availableRooms);
+
+            if (availableRooms.length === 0) {
+              throw new Error(
+                `Không có phòng hoặc nhân sự nào trống cho dịch vụ: ${step.room_type}`,
+              );
+            }
+
+            const currentIndex =
+              this.roundRobinTracker.get(step.room_type) || 0;
+
+            const selectedRoom =
+              availableRooms[currentIndex % availableRooms.length];
+
+            this.roundRobinTracker.set(step.room_type, currentIndex + 1);
+            const createdStep = await tx.step.create({
+              data: {
+                flow_id: flowId,
+                step_status: 'PENDING',
+                room_id: selectedRoom.room_id,
+                staff_id: selectedRoom.shifts[0].staff_id,
+                parent_step_id: parentStepId,
+                payment_status: step.requires_payment ? 'PENDING' : null,
+              },
+            });
+
+            idMapping.set(step.template_step_id, createdStep.step_id);
+            createdStepIds.push(createdStep.step_id);
+
+            if (step.sub_steps && step.sub_steps.length > 0) {
+              await saveStepsRecursively(step.sub_steps, createdStep.step_id);
+            }
+          }
+        };
+        await saveStepsRecursively(templateSteps);
+
+        const saveDependenciesRecursively = async (
+          steps: TemplateStepDto[],
+        ) => {
+          for (const step of steps) {
+            if (step.depends_on && step.depends_on.length > 0) {
+              const stepId = idMapping.get(step.template_step_id);
+              for (const requiredStep of step.depends_on) {
+                const dependsOnStepId = idMapping.get(requiredStep);
+
+                if (stepId && dependsOnStepId) {
+                  await tx.step_Dependency.create({
+                    data: {
+                      step_id: stepId,
+                      depends_on_step_id: dependsOnStepId,
+                    },
+                  });
+                }
+              }
+            }
+            if (step.sub_steps && step.sub_steps.length > 0) {
+              await saveDependenciesRecursively(step.sub_steps);
+            }
+          }
+        };
+
+        await saveDependenciesRecursively(templateSteps);
+
+        for (const stepId of createdStepIds) {
+          const currentStep = await tx.step.findUnique({
+            where: { step_id: stepId },
+            select: { parent_step_id: true },
           });
 
-          console.log(availableRooms);
-
-          if (availableRooms.length === 0) {
-            throw new Error(
-              `Không có phòng hoặc nhân sự nào trống cho dịch vụ: ${step.room_type}`,
-            );
-          }
-
-          const currentIndex = this.roundRobinTracker.get(step.room_type) || 0;
-
-          const selectedRoom =
-            availableRooms[currentIndex % availableRooms.length];
-
-          this.roundRobinTracker.set(step.room_type, currentIndex + 1);
-          const createdStep = await tx.step.create({
-            data: {
-              flow_id: flowId,
-              step_status: 'PENDING',
-              room_id: selectedRoom.room_id,
-              staff_id: selectedRoom.shifts[0].staff_id,
-              parent_step_id: parentStepId,
-              payment_status: step.requires_payment ? 'PENDING' : null,
-            },
+          const dependencyCount = await tx.step_Dependency.count({
+            where: { step_id: stepId },
           });
 
-          idMapping.set(step.template_step_id, createdStep.step_id);
-          createdStepIds.push(createdStep.step_id);
+          let isReadyToProgress = false;
 
-          if (step.sub_steps && step.sub_steps.length > 0) {
-            await saveStepsRecursively(step.sub_steps, createdStep.step_id);
-          }
-        }
-      };
-      await saveStepsRecursively(templateSteps);
+          if (dependencyCount == 0) {
+            if (!currentStep?.parent_step_id) {
+              isReadyToProgress = true;
+            } else {
+              const parentStep = await tx.step.findUnique({
+                where: { step_id: currentStep.parent_step_id },
+                select: { step_status: true },
+              });
 
-      const saveDependenciesRecursively = async (steps: TemplateStepDto[]) => {
-        for (const step of steps) {
-          if (step.depends_on && step.depends_on.length > 0) {
-            const stepId = idMapping.get(step.template_step_id);
-            for (const requiredStep of step.depends_on) {
-              const dependsOnStepId = idMapping.get(requiredStep);
-
-              if (stepId && dependsOnStepId) {
-                await tx.step_Dependency.create({
-                  data: {
-                    step_id: stepId,
-                    depends_on_step_id: dependsOnStepId,
-                  },
-                });
+              if (parentStep?.step_status === 'IN_PROGRESS') {
+                isReadyToProgress = true;
               }
             }
           }
-          if (step.sub_steps && step.sub_steps.length > 0) {
-            await saveDependenciesRecursively(step.sub_steps);
-          }
-        }
-      };
-
-      await saveDependenciesRecursively(templateSteps);
-
-      for (const stepId of createdStepIds) {
-        const currentStep = await tx.step.findUnique({
-          where: { step_id: stepId },
-          select: { parent_step_id: true },
-        });
-
-        const dependencyCount = await tx.step_Dependency.count({
-          where: { step_id: stepId },
-        });
-
-        let isReadyToProgress = false;
-
-        if (dependencyCount == 0) {
-          if (!currentStep?.parent_step_id) {
-            isReadyToProgress = true;
-          } else {
-            const parentStep = await tx.step.findUnique({
-              where: { step_id: currentStep.parent_step_id },
-              select: { step_status: true },
+          if (isReadyToProgress) {
+            await tx.step.update({
+              where: { step_id: stepId },
+              data: { step_status: 'IN_PROGRESS' },
             });
-
-            if (parentStep?.step_status === 'IN_PROGRESS') {
-              isReadyToProgress = true;
-            }
           }
         }
-        if (isReadyToProgress) {
-          await tx.step.update({
-            where: { step_id: stepId },
-            data: { step_status: 'IN_PROGRESS' },
-          });
-        }
-      }
 
-      return {
-        code: 200,
-        status: 'success',
-        message: 'Tạo template thành công',
-        flow_id: flowId,
-      };
-    });
+        return {
+          code: 200,
+          status: 'success',
+          message: 'Tạo template thành công',
+          flow_id: flowId,
+        };
+      },
+      {
+        maxWait: 10000,
+        timeout: 30000,
+      },
+    );
   }
 
-  @Cron('0 3 05 * * *', {
+  @Cron('59 59 23 * * *', {
     timeZone: 'Asia/Ho_Chi_Minh',
   })
   async changeFlowStatus() {
