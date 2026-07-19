@@ -249,6 +249,7 @@ model Flow {
   @@map("flow")
 }
 
+
 model Room {
   room_id          String           @id @default(uuid()) @db.Uuid
   room_name        String

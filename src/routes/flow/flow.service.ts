@@ -65,12 +65,35 @@ export class FlowService {
   async addTemplateToFlow(flowId: string, templateId: string) {
     const existingFlow = await this.prismaService.flow.findUnique({
       where: { flow_id: flowId },
+      include: {
+        steps: {
+          include: {
+            room: true,
+          },
+        },
+        booking: {
+          include: {
+            slot: {
+              include: {
+                shift: {
+                  include: {
+                    room: true,
+                    staff: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!existingFlow) {
       throw new NotFoundException(
         'Không tìm thấy Flow hiện tại của bệnh nhân.',
       );
     }
+
+    const specialtyId = existingFlow.booking.slot.shift.room.specialty_id;
 
     const template = await this.prismaService.flow_Template.findUnique({
       where: { template_id: templateId },
@@ -92,9 +115,15 @@ export class FlowService {
           parentStepId: string | null = null,
         ) => {
           for (const step of steps) {
+            const neededSpecialFilter = [
+              'CONSULTATION',
+              'TREATMENT',
+              'TRIAGE',
+            ].includes(step.room_type);
             const availableRooms = await tx.room.findMany({
               where: {
                 room_type: step.room_type,
+                ...(neededSpecialFilter && { specialty_id: specialtyId }),
                 shifts: {
                   some: {
                     slots: {
@@ -131,8 +160,6 @@ export class FlowService {
                 },
               },
             });
-
-            console.log(availableRooms);
 
             if (availableRooms.length === 0) {
               throw new Error(
@@ -252,6 +279,7 @@ export class FlowService {
         status: {
           in: ['IN_PROGRESS', 'PENDING'],
         },
+        //thêm createAt và check
       },
       data: {
         status: 'ABANDONED',

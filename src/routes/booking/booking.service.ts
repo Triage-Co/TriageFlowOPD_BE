@@ -116,6 +116,9 @@ export class BookingService {
         where: {
           shift_id: createFlowData.booking.slot.shift_id,
         },
+        include: {
+          room: true,
+        },
       });
 
       // const slotIndex = exitedSlot.shift.slots.findIndex(
