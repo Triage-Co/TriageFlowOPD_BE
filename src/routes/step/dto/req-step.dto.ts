@@ -1,80 +1,137 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { StepStatusEnum } from '@prisma/client';
-import { IsEnum, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateParentStepReqDto {
-  @IsUUID()
   @ApiProperty({
-    name: 'flow_id',
-    example: '',
+    description: 'ID của flow (Luồng khám)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
   })
+  @IsUUID('4', { message: 'flow_id phải là định dạng UUID v4' })
+  @IsNotEmpty({ message: 'flow_id không được để trống' })
   flow_id: string;
 
-  @IsUUID()
-  @ApiProperty({
-    name: 'room_id',
-    example: '',
+  @ApiPropertyOptional({
+    description: 'ID của phòng (nếu có)',
+    example: '123e4567-e89b-12d3-a456-426614174011',
   })
-  room_id: string;
+  @IsUUID('4')
+  @IsOptional()
+  room_id?: string;
 
-  @IsEnum(StepStatusEnum)
-  @ApiProperty({
-    name: 'step_status',
-    example: '',
+  @ApiPropertyOptional({
+    description: 'ID của nhân viên phụ trách (nếu có)',
+    example: '123e4567-e89b-12d3-a456-426614174022',
   })
-  step_status: string;
+  @IsUUID('4')
+  @IsOptional()
+  staff_id?: string;
 
-  @IsUUID()
-  @ApiProperty({
-    name: 'staff_id',
-    example: '',
+  @ApiPropertyOptional({
+    enum: StepStatusEnum,
+    description: 'Trạng thái của bước (Mặc định: PENDING)',
+    example: StepStatusEnum.PENDING,
   })
-  staff_id: string;
+  @IsEnum(StepStatusEnum, { message: 'Trạng thái không hợp lệ' })
+  @IsOptional()
+  step_status?: StepStatusEnum;
 }
+
 export class CreateSubStepReqDto {
-  @IsUUID()
   @ApiProperty({
-    name: 'parent_step_id',
-    example: '',
+    description: 'ID của bước cha',
+    example: '123e4567-e89b-12d3-a456-426614174033',
   })
+  @IsUUID('4', { message: 'parent_step_id phải là định dạng UUID v4' })
+  @IsNotEmpty({ message: 'parent_step_id không được để trống' })
   parent_step_id: string;
 
-  @IsUUID()
-  @ApiProperty({
-    name: 'room_id',
-    example: '',
+  @ApiPropertyOptional({
+    description: 'ID của phòng (nếu có)',
+    example: '123e4567-e89b-12d3-a456-426614174011',
   })
-  room_id: string;
+  @IsUUID('4')
+  @IsOptional()
+  room_id?: string;
 
-  @IsEnum(StepStatusEnum)
-  @ApiProperty({
-    name: 'step_status',
-    example: '',
+  @ApiPropertyOptional({
+    description: 'ID của nhân viên phụ trách (nếu có)',
+    example: '123e4567-e89b-12d3-a456-426614174022',
   })
-  step_status: string;
+  @IsUUID('4')
+  @IsOptional()
+  staff_id?: string;
 
-  @IsUUID()
-  @ApiProperty({
-    name: 'staff_id',
-    example: '',
+  @ApiPropertyOptional({
+    enum: StepStatusEnum,
+    description: 'Trạng thái của bước (Mặc định: PENDING)',
+    example: StepStatusEnum.PENDING,
   })
-  staff_id: string;
+  @IsEnum(StepStatusEnum, { message: 'Trạng thái không hợp lệ' })
+  @IsOptional()
+  step_status?: StepStatusEnum;
 }
 
 export class CreateDependencyReqDto {
-  @IsUUID()
   @ApiProperty({
-    name: 'waiting_step_id',
     description: 'ID của bước đang phải chờ (bước theo sau)',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
+  @IsUUID('4')
+  @IsNotEmpty()
   waiting_step_id: string;
 
-  @IsUUID()
   @ApiProperty({
-    name: 'required_step_id',
     description: 'ID của bước điều kiện (bước phải hoàn thành trước)',
     example: '123e4567-e89b-12d3-a456-426614174001',
   })
+  @IsUUID('4')
+  @IsNotEmpty()
   required_step_id: string;
+}
+
+export class UpdateStepReqDto {
+  @ApiPropertyOptional({
+    description: 'ID của phòng',
+    example: '123e4567-e89b-12d3-a456-426614174011',
+  })
+  @IsUUID('4')
+  @IsOptional()
+  room_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID của nhân viên phụ trách',
+    example: '123e4567-e89b-12d3-a456-426614174022',
+  })
+  @IsUUID('4')
+  @IsOptional()
+  staff_id?: string;
+
+  @ApiPropertyOptional({
+    description: 'Số thứ tự/Số chứng từ (nếu có)',
+    example: 1,
+  })
+  @IsInt()
+  @IsOptional()
+  docNo?: number;
+
+  @ApiPropertyOptional({
+    enum: PaymentStatusEnum,
+    description: 'Trạng thái thanh toán',
+    example: PaymentStatusEnum.SUCCESSED,
+  })
+  @IsEnum(PaymentStatusEnum)
+  @IsOptional()
+  payment_status?: PaymentStatusEnum;
+}
+
+export class UpdateStepStatusReqDto {
+  @ApiProperty({
+    enum: StepStatusEnum,
+    description: 'Trạng thái mới của Step',
+    example: StepStatusEnum.IN_PROGRESS,
+  })
+  @IsEnum(StepStatusEnum, { message: 'Trạng thái không hợp lệ' })
+  @IsNotEmpty({ message: 'Trạng thái không được để trống' })
+  step_status: StepStatusEnum;
 }

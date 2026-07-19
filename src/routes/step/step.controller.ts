@@ -14,6 +14,8 @@ import {
   CreateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
+  UpdateStepReqDto,
+  UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
@@ -84,5 +86,32 @@ export class StepController {
   })
   completeStep(@Param('step_id') stepId: string) {
     return this.stepService.completeStep(stepId);
+  }
+
+  @Patch(':step_id')
+  @roles('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE', 'ANCILLARY_STAFFS')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Cập nhật thông tin chung của step (nhân viên, phòng, trạng thái thanh toán...)',
+  })
+  updateStep(
+    @Param('step_id') stepId: string,
+    @Body() updateStepReqDto: UpdateStepReqDto,
+  ) {
+    return this.stepService.updateStep(stepId, updateStepReqDto);
+  }
+
+  @Patch(':step_id/status')
+  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE', 'RECEPTIONIST')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái của step (IN_PROGRESS, CANCELLED...)',
+  })
+  updateStepStatus(
+    @Param('step_id') stepId: string,
+    @Body() updateStepStatusReqDto: UpdateStepStatusReqDto,
+  ) {
+    return this.stepService.updateStepStatus(stepId, updateStepStatusReqDto);
   }
 }

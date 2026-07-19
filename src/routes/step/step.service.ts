@@ -8,6 +8,8 @@ import {
   CreateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
+  UpdateStepReqDto,
+  UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import { StepStatusEnum } from '@prisma/client';
@@ -46,7 +48,7 @@ export class StepService {
   async createDependency(createDependencyReqDto: CreateDependencyReqDto) {
     const data = await this.stepRepository.createDependency(
       createDependencyReqDto.waiting_step_id,
-      createDependencyReqDto.waiting_step_id,
+      createDependencyReqDto.required_step_id,
     );
 
     return {
@@ -57,12 +59,11 @@ export class StepService {
     };
   }
 
-
   async findByIdAndAccountId(account_id: string, id: string) {
     const data = await this.stepRepository.findByIdAndAccountId(account_id, id);
 
     if (!data) {
-      throw StepErrors.StepNotFoundByIdAndAccountId(account_id,id);
+      throw StepErrors.StepNotFoundByIdAndAccountId(account_id, id);
     }
     return {
       code: 200,
@@ -144,6 +145,52 @@ export class StepService {
           step_status: StepStatusEnum.IN_PROGRESS,
         });
       }
-    } 
+    }
+  }
+
+  async updateStep(stepId: string, updateData: UpdateStepReqDto) {
+    const currentStep = await this.stepRepository.findById(stepId);
+    if (!currentStep) {
+      throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+
+    const updatedStep = await this.stepRepository.update(stepId, updateData);
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Cập nhật thông tin bước thành công',
+      data: updatedStep,
+    };
+  }
+
+  async updateStepStatus(
+    stepId: string,
+    updateStatusDto: UpdateStepStatusReqDto,
+  ) {
+    const currentStep = await this.stepRepository.findById(stepId);
+    if (!currentStep) {
+      throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+
+    if (updateStatusDto.step_status === StepStatusEnum.COMPLETED) {
+      await this.completeStep(stepId);
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Đã hoàn thành bước và cập nhật tiến trình.',
+      };
+    }
+
+    const updatedStep = await this.stepRepository.update(stepId, {
+      step_status: updateStatusDto.step_status,
+    });
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Cập nhật trạng thái bước thành công',
+      data: updatedStep,
+    };
   }
 }
