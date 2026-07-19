@@ -22,7 +22,7 @@ import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 export class FlowController {
   constructor(private readonly flowService: FlowService) {}
 
-  @Get('kiosk/patient/:patient_id')
+  @Get('patient/:patient_id/kiosk')
   @ApiBearerAuth()
   @UseGuards(IsKioskGuard)
   @ApiOperation({
@@ -32,7 +32,7 @@ export class FlowController {
     return this.flowService.findAllByPatientId(patientId);
   }
 
-  @Get('kiosk/patient/:patient_id/active')
+  @Get('patient/:patient_id/active/kiosk')
   @ApiBearerAuth()
   @UseGuards(IsKioskGuard)
   @ApiOperation({
