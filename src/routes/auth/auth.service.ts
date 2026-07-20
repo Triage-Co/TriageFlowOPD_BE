@@ -41,7 +41,7 @@ export class AuthService {
     const { user_name, gender, email, password, phone } = signUpRequestDto;
 
     if (await this.accountRepository.findByEmail(email)) {
-      throw AuthErrors.EmailExists;
+      throw AuthErrors.EmailExists(email);
     }
 
     const { data, error } = await this.authProvider.signUp(email, password, {

@@ -3,8 +3,10 @@ import {
   AuthResponse,
   AuthTokenResponse,
   AuthTokenResponsePassword,
+  UserResponse,
 } from '@supabase/supabase-js';
 import { BanReqDto } from '../../routes/account/dto/req-account.dto';
+import { SupabaseMetadata } from '../types/supabase-auth.type';
 
 export enum OtpType {
   EMAIL = 'email',
@@ -36,7 +38,11 @@ export interface IAuthProvider {
   refreshSession(refresh_token: string): Promise<any>;
   signOut(token: string, type: SignOutType): Promise<any>;
   deleteAccount(accountId: string): Promise<any>;
-  adminCreateAccount(data: any): Promise<any>;
+  adminCreateAccount(
+    email: string,
+    password: string,
+    data: SupabaseMetadata,
+  ): Promise<UserResponse>;
   ban(account_id: string, banReqDto: BanReqDto): Promise<any>;
   unBan(account_id: string): Promise<any>;
 }

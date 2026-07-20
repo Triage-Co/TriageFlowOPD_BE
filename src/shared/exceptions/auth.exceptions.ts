@@ -8,11 +8,22 @@ export class AuthException extends HttpException {
 }
 
 export const AuthErrors = {
-  EmailExists: new AuthException(
-    HttpStatus.CONFLICT,
-    'Lỗi trùng lặp dữ liệu',
-    'Email này đã được sử dụng trong hệ thống.',
-  ),
+  EmailExists: (email?: string) =>
+    new AuthException(
+      HttpStatus.CONFLICT,
+      'Email đã tồn tại',
+      email
+        ? `Email: ${email} đã được sử dụng trong hệ thống.`
+        : `Email này đã được sử dụng trong hệ thống`,
+    ),
+  PhoneExists: (phone?: string) =>
+    new AuthException(
+      HttpStatus.CONFLICT,
+      'Số điện thoại đã tồn tại',
+      phone
+        ? `Số điện thoại: ${phone} đã được sử dụng trong hệ thống`
+        : `Số điện thoại này đã được sử dụng trong hệ thống`,
+    ),
   CitizenIdExists: new AuthException(
     HttpStatus.CONFLICT,
     'Lỗi trùng lặp dữ liệu',
@@ -23,6 +34,12 @@ export const AuthErrors = {
       HttpStatus.NOT_FOUND,
       'Không tìm thấy người dùng',
       `Không tìm thấy người dùng với email: ${email} trong hệ thống.`,
+    ),
+  UserNotFoundByPhone: (phone: string) =>
+    new AuthException(
+      HttpStatus.NOT_FOUND,
+      'Không tìm thấy người dùng',
+      `Không tìm thấy người dùng với số điện thoại: ${phone} trong hệ thống.`,
     ),
   PatientNotFoundByCitizenId: (citizen_id: string) =>
     new AuthException(

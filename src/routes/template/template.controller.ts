@@ -33,31 +33,31 @@ export class TemplateController {
   }
 
   @Get()
-  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
+  @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary: '[ADMIN-DOCTOR-ANCILLARY_STAFFS- NURSE] Tìm template theo id',
+    summary: '[ADMIN - STAFF] Tìm template theo id',
   })
   findAll() {
     return this.templateService.findAll();
   }
 
   @Get('name/:name')
-  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
+  @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
     summary:
-      '[ADMIN - DOCTOR - ANCILLARY_STAFFS - NURSE] Tìm template theo tên',
+      '[ADMIN - STAFF] Tìm template theo tên',
   })
   findByName(@Param('name') name: string) {
     return this.templateService.findByName(name);
   }
 
   @Get(':id')
-  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
+  @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary: '[ADMIN - DOCTOR - ANCILLARY_STAFFS - NURSE] Tìm template theo id',
+    summary: '[ADMIN - STAFF] Tìm template theo id',
   })
   findOne(@Param('id') id: string) {
     return this.templateService.findOne(id);
