@@ -178,6 +178,7 @@ export class FlowService {
               data: {
                 flow_id: flowId,
                 step_status: 'PENDING',
+                step_name: template.template_name,
                 room_id: selectedRoom.room_id,
                 staff_id: selectedRoom.shifts[0].staff_id,
                 parent_step_id: parentStepId,

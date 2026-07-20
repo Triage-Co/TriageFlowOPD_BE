@@ -62,7 +62,6 @@ export class StepService {
 
   async findByIdAndAccountId(account_id: string, id: string) {
     const data = await this.stepRepository.findByIdAndAccountId(account_id, id);
-
     if (!data) {
       throw StepErrors.StepNotFoundByIdAndAccountId(account_id, id);
     }
@@ -74,13 +73,10 @@ export class StepService {
     };
   }
 
-  async findByIdAndPatientId(
-    findByIdAndPatientIdReqDto: FindByIdAndPatientIdReqDto,
-  ) {
-    const { patient_id, step_id } = findByIdAndPatientIdReqDto;
+  async findByIdAndPatientId(step_id: string, patient_id: string) {
     const data = await this.stepRepository.findStepByIdAndPatientId(
-      patient_id,
       step_id,
+      patient_id,
     );
 
     if (!data) {

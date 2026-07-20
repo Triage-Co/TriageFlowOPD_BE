@@ -36,7 +36,7 @@ export class FlowController {
   @ApiBearerAuth()
   @UseGuards(IsKioskGuard)
   @ApiOperation({
-    summary: '[KIOSK] Tìm flow đang chạy (PENDING/IN_PROGRESS) theo Patient ID',
+    summary: '[KIOSK] Tìm flow đang chạy (IN_PROGRESS) theo Patient ID',
   })
   async findIsActiveByPatientIdInKiosk(@Param('patient_id') patientId: string) {
     return this.flowService.findIsActiveByPatientId(patientId);

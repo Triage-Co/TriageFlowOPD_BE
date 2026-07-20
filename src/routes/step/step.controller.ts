@@ -8,6 +8,7 @@ import {
   Delete,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { StepService } from './step.service';
 import {
@@ -22,30 +23,33 @@ import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
+import { orGuard } from '../../shared/guards/orGuards';
+import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @Controller('step')
 @ApiBearerAuth()
-@UseGuards(IsAuthGuard)
+@UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
 export class StepController {
   constructor(private readonly stepService: StepService) {}
 
   @Get(':step_id/me')
   @ApiOperation({
-    summary: 'Tìm step theo step id của user',
+    summary: 'Tìm step theo step id của account (đăng nhập với account)',
   })
   findByIdAndAccountId(@Req() req: any, @Param('step_id') step_id: string) {
     const { id } = req.user;
     return this.stepService.findByIdAndAccountId(id, step_id);
   }
 
-  @Get(':step_id/patient')
+  @Get(':step_id/patient/:patient_id')
   @ApiOperation({
-    summary: 'Tìm step theo step id và id của patient',
+    summary: 'Tìm step theo step id và id của patient [dùng patient id]',
   })
   findByIdAndPatientId(
-    @Body() findByIdAndPatientIdReqDto: FindByIdAndPatientIdReqDto,
+    @Param('step_id') step_id: string,
+    @Param('patient_id') patient_id: string,
   ) {
-    return this.stepService.findByIdAndPatientId(findByIdAndPatientIdReqDto);
+    return this.stepService.findByIdAndPatientId(step_id, patient_id);
   }
 
   @Get(':step_id')
