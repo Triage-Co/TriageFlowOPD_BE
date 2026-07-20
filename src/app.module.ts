@@ -38,6 +38,7 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { NavigationModule } from './routes/navigation/navigation.module';
 import { TemplateModule } from './routes/template/template.module';
 import { JwtModule } from '@nestjs/jwt';
+import { QueueModule } from './routes/queue/queue.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { JwtModule } from '@nestjs/jwt';
     FlowModule,
     SpecialtyModule,
     TemplateModule,
+    QueueModule,
   ],
 })
 export class AppModule {}
