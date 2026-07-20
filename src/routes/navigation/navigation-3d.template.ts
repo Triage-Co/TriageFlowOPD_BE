@@ -16,8 +16,8 @@ export function get3DMapHtml(buildingData: any): string {
     }
     body {
       font-family: 'Be Vietnam Pro', sans-serif;
-      background-color: #0b0f19;
-      color: #f3f4f6;
+      background-color: #cbd5e1;
+      color: #0f172a;
       overflow: hidden;
       height: 100vh;
       display: flex;
@@ -54,9 +54,9 @@ export function get3DMapHtml(buildingData: any): string {
     /* Sidebar */
     .sidebar {
       width: 360px;
-      background: rgba(15, 22, 42, 0.8);
+      background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(15, 23, 42, 0.08);
       border-radius: 16px;
       padding: 24px;
       display: flex;
@@ -64,14 +64,15 @@ export function get3DMapHtml(buildingData: any): string {
       gap: 20px;
       max-height: calc(100vh - 48px);
       overflow-y: auto;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      color: #0f172a;
     }
 
     .sidebar::-webkit-scrollbar {
       width: 6px;
     }
     .sidebar::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.1);
       border-radius: 10px;
     }
 
@@ -89,30 +90,22 @@ export function get3DMapHtml(buildingData: any): string {
       align-items: center;
       justify-content: center;
       border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
     }
     .brand-title h1 {
       font-size: 16px;
       font-weight: 800;
       letter-spacing: 0.5px;
+      color: #0f172a;
     }
     .brand-title p {
       font-size: 11px;
-      color: #9ca3af;
-    }
-
-    .section-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      color: #6b7280;
-      font-weight: 700;
-      margin-bottom: 8px;
+      color: #64748b;
     }
 
     .building-info {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.02);
+      border: 1px solid rgba(0, 0, 0, 0.04);
       padding: 14px;
       border-radius: 10px;
     }
@@ -123,64 +116,13 @@ export function get3DMapHtml(buildingData: any): string {
     }
     .building-info p {
       font-size: 12px;
-      color: #9ca3af;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-    .stat-card {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      padding: 12px;
-      border-radius: 8px;
-      text-align: center;
-    }
-    .stat-val {
-      font-size: 20px;
-      font-weight: 800;
-      color: #3b82f6;
-    }
-    .stat-label {
-      font-size: 10px;
-      color: #6b7280;
-      margin-top: 2px;
-    }
-
-    .zone-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .zone-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-    .zone-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.1);
-    }
-    .zone-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
+      color: #64748b;
     }
 
     /* Selected Details Box */
     .detail-card {
-      background: rgba(59, 130, 246, 0.08);
-      border: 1px solid rgba(59, 130, 246, 0.2);
+      background: rgba(59, 130, 246, 0.05);
+      border: 1px solid rgba(59, 130, 246, 0.15);
       padding: 16px;
       border-radius: 12px;
       display: none;
@@ -188,12 +130,12 @@ export function get3DMapHtml(buildingData: any): string {
     .detail-card h3 {
       font-size: 14px;
       font-weight: 700;
-      color: #60a5fa;
+      color: #1d4ed8;
       margin-bottom: 4px;
     }
     .detail-card p {
       font-size: 12px;
-      color: #9ca3af;
+      color: #475569;
       margin-bottom: 8px;
     }
     .detail-badge {
@@ -202,8 +144,8 @@ export function get3DMapHtml(buildingData: any): string {
       font-size: 10px;
       font-weight: 600;
       border-radius: 4px;
-      background: rgba(59, 130, 246, 0.2);
-      color: #60a5fa;
+      background: rgba(59, 130, 246, 0.1);
+      color: #1d4ed8;
     }
 
     /* Help overlay */
@@ -211,15 +153,16 @@ export function get3DMapHtml(buildingData: any): string {
       position: absolute;
       bottom: 24px;
       right: 24px;
-      background: rgba(15, 22, 42, 0.7);
+      background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(8px);
       padding: 12px 18px;
       border-radius: 30px;
       font-size: 11px;
-      color: #9ca3af;
+      color: #475569;
       display: flex;
       gap: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     }
     .help-item {
       display: flex;
@@ -234,15 +177,15 @@ export function get3DMapHtml(buildingData: any): string {
       z-index: 5;
     }
     .room-label {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(15, 23, 42, 0.12);
       padding: 3px 8px;
       border-radius: 4px;
       font-size: 9px;
       font-weight: 600;
-      color: #f3f4f6;
+      color: #0f172a;
       white-space: nowrap;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
       transform: translate(-50%, -50%);
       pointer-events: none;
       transition: opacity 0.2s;
@@ -268,22 +211,6 @@ export function get3DMapHtml(buildingData: any): string {
       <div class="building-info">
         <h2 id="b-name">Tòa Nhà</h2>
         <p id="b-address">Địa chỉ</p>
-      </div>
-
-      <div class="stats">
-        <div class="stat-card">
-          <div class="stat-val" id="stat-rooms">0</div>
-          <div class="stat-label">Phòng Khám</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="stat-desks" style="color: #10b981;">0</div>
-          <div class="stat-label">Bàn Tiếp Nhận</div>
-        </div>
-      </div>
-
-      <div>
-        <div class="section-title">Danh Sách Khu Khám</div>
-        <div class="zone-list" id="zone-list"></div>
       </div>
 
       <div class="detail-card" id="detail-card">
@@ -322,33 +249,28 @@ export function get3DMapHtml(buildingData: any): string {
       return { x, z };
     }
 
-    // Color definitions for zones
-    const ZONE_COLORS = {
-      'Khu A': 0x1c6ef3, // Blue
-      'Khu B': 0xef476f, // Pink
-      'Khu C': 0xe85d04, // Orange
-      'Khu D': 0x06d6a0, // Teal
-      'Khu E': 0xb5179e, // Magenta
-      'Khu F': 0xffd166, // Yellow
-      'Default': 0x94a3b8
-    };
-
-    function getZoneColor(zoneName) {
-      if (!zoneName) return ZONE_COLORS.Default;
-      for (const prefix in ZONE_COLORS) {
-        if (zoneName.startsWith(prefix)) {
-          return ZONE_COLORS[prefix];
-        }
-      }
-      return ZONE_COLORS.Default;
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+      let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const projX = x1 + t * dx;
+      const projY = y1 + t * dy;
+      return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
     }
+
+    const CLINIC_COLORS = {
+      'OPH': 0xef476f,   // Mắt: Pink
+      'SUR': 0x1c6ef3,   // Ngoại: Blue
+      'ORTH': 0xe85d04,  // CTCH: Orange
+      'Default': 0x64748b
+    };
 
     // Initialize UI info
     const bName = document.getElementById('b-name');
     const bAddress = document.getElementById('b-address');
-    const statRooms = document.getElementById('stat-rooms');
-    const statDesks = document.getElementById('stat-desks');
-    const zoneListDiv = document.getElementById('zone-list');
     const detailCard = document.getElementById('detail-card');
     const detailTitle = document.getElementById('detail-title');
     const detailCode = document.getElementById('detail-code');
@@ -358,16 +280,13 @@ export function get3DMapHtml(buildingData: any): string {
     bName.textContent = MAP_DATA.building.name;
     bAddress.textContent = MAP_DATA.building.addressLabel || 'Khoa Khám Bệnh';
     
-    let totalRoomsCount = 0;
-    let totalDesksCount = 0;
-    const zonesSet = new Set();
     const roomsMap = new Map(); // Store room 3D objects for reference
 
     // Scene Setup
     const container = document.getElementById('canvas-container');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0f19);
-    scene.fog = new THREE.FogExp2(0x0b0f19, 0.005);
+    scene.background = new THREE.Color(0xcbd5e1);
+    scene.fog = new THREE.FogExp2(0xcbd5e1, 0.005);
 
     // Camera
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
@@ -388,14 +307,13 @@ export function get3DMapHtml(buildingData: any): string {
     controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below floor
     controls.minDistance = 10;
     controls.maxDistance = 200;
-    // Set target to center of G2 floor (roughly 60,0,-40 based on seed coordinates)
     controls.target.set(60, 0, -40);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.95);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.25);
     dirLight.position.set(100, 150, 50);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
@@ -409,19 +327,16 @@ export function get3DMapHtml(buildingData: any): string {
     dirLight.shadow.camera.bottom = -d;
     scene.add(dirLight);
 
-    // Grid Floor / Base Guide
-    const gridHelper = new THREE.GridHelper(200, 50, 0x1e293b, 0x0f172a);
+    // Grid Floor / Base Guide (Subtle light grid)
+    const gridHelper = new THREE.GridHelper(200, 50, 0xcbdee9, 0xe2e8f0);
     gridHelper.position.y = -0.01;
     scene.add(gridHelper);
 
     // --- Build 3D Elements from data ---
-    
-    // Group to hold all building assets
     const mapGroup = new THREE.Group();
     scene.add(mapGroup);
 
-    // Track active floor map
-    const activeFloor = MAP_DATA.floors[0]; // Seeded Floor 1
+    const activeFloor = MAP_DATA.floors[0];
     
     if (activeFloor) {
       // 1. Draw Floor Slab
@@ -438,16 +353,16 @@ export function get3DMapHtml(buildingData: any): string {
           const extrudeSettings = { depth: 0.5, bevelEnabled: false };
           const floorGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
           const floorMat = new THREE.MeshStandardMaterial({ 
-            color: 0x1e293b, 
+            color: 0xffffff, 
             transparent: true,
-            opacity: 0.8,
-            roughness: 0.4,
-            metalness: 0.1
+            opacity: 0.9,
+            roughness: 0.5,
+            metalness: 0.05
           });
           const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-          floorMesh.rotation.x = Math.PI / 2; // Lie flat
+          floorMesh.rotation.x = Math.PI / 2;
           floorMesh.scale.set(1, 1, -1);
-          floorMesh.position.y = -0.5; // Sit slightly below y=0
+          floorMesh.position.y = -0.5;
           floorMesh.receiveShadow = true;
           mapGroup.add(floorMesh);
         }
@@ -455,44 +370,92 @@ export function get3DMapHtml(buildingData: any): string {
         console.error("Lỗi vẽ Floor Slab:", e);
       }
 
-      // 2. Build Rooms
+      // 1b. Draw Clinic Boundaries (Colored partitions)
+      if (activeFloor.clinics) {
+        activeFloor.clinics.forEach(clinic => {
+          const color = CLINIC_COLORS[clinic.clinicCode] || CLINIC_COLORS.Default;
+          if (clinic.boundaries) {
+            clinic.boundaries.forEach(boundary => {
+              try {
+                if (boundary.lineGeom && boundary.lineGeom.coordinates) {
+                  const coords = boundary.lineGeom.coordinates;
+                  const p1 = convertCoords(coords[0][0], coords[0][1]);
+                  const p2 = convertCoords(coords[1][0], coords[1][1]);
+                  
+                  const dx = p2.x - p1.x;
+                  const dz = p2.z - p1.z;
+                  const distance = Math.sqrt(dx*dx + dz*dz);
+                  const angle = Math.atan2(dz, dx);
+
+                  const wallGeo = new THREE.BoxGeometry(distance, 3.2, 0.15);
+                  const wallMat = new THREE.MeshStandardMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.25,
+                    roughness: 0.2,
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
+                  });
+                  const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+                  
+                  wallMesh.position.set((p1.x + p2.x)/2, 1.6, (p1.z + p2.z)/2);
+                  wallMesh.rotation.y = -angle;
+                  mapGroup.add(wallMesh);
+
+                  const edges = new THREE.EdgesGeometry(wallGeo);
+                  const wireframe = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+                    color: color,
+                    linewidth: 3,
+                    transparent: true,
+                    opacity: 0.9
+                  }));
+                  wallMesh.add(wireframe);
+                }
+              } catch (err) {
+                console.error("Lỗi vẽ clinic boundary:", err);
+              }
+            });
+          }
+        });
+      }
+
+      // Helper to check closest clinic boundary segment (for clinic-level doors)
+      function findClosestClinicBoundary(pt) {
+        let minClinicDist = Infinity;
+        let closestSeg = null;
+        if (activeFloor.clinics) {
+          activeFloor.clinics.forEach(c => {
+            if (c.boundaries) {
+              c.boundaries.forEach(b => {
+                if (b.lineGeom && b.lineGeom.coordinates) {
+                  const p1 = convertCoords(b.lineGeom.coordinates[0][0], b.lineGeom.coordinates[0][1]);
+                  const p2 = convertCoords(b.lineGeom.coordinates[1][0], b.lineGeom.coordinates[1][1]);
+                  const dist = distToSegment(pt.x, pt.z, p1.x, p1.z, p2.x, p2.z);
+                  if (dist < minClinicDist) {
+                    minClinicDist = dist;
+                    closestSeg = { p1, p2 };
+                  }
+                }
+              });
+            }
+          });
+        }
+        return { closestSeg, dist: minClinicDist };
+      }
+
+      // 2. Build Rooms (With uniform premium blue/teal theme)
       if (activeFloor.rooms) {
         activeFloor.rooms.forEach(room => {
           try {
-            totalRoomsCount++;
-            
-            let zoneName = 'Khu Vực Khác';
-            // Map room code to find zone name
-            if (room.roomCode && room.roomCode.startsWith('G2.2')) {
-              if (room.roomCode === 'G2.2.34' || room.roomCode === 'G2.2.35' || room.roomCode === 'G2.2.33') {
-                zoneName = 'Khu B – Nhi Khoa & Tâm Thần';
-              } else {
-                zoneName = 'Khu A – Nội Khoa Tổng Hợp';
-              }
-            } else if (room.roomCode && room.roomCode.startsWith('G2.4')) {
-              const parts = room.roomCode.split('.');
-              const suffix = parts.length > 2 ? parseInt(parts[2]) : NaN;
-              if (!isNaN(suffix)) {
-                if ([12, 14, 15, 16, 17, 18, 1, 2].includes(suffix)) {
-                  zoneName = 'Khu C – Ngoại Khoa Tổng Hợp';
-                } else if ([8, 11, 24, 25, 28, 29, 4, 5, 6].includes(suffix)) {
-                  zoneName = 'Khu D – Chuyên Khoa Đặc Biệt';
-                } else if ([23, 21, 34].includes(suffix)) {
-                  zoneName = 'Khu E – Sản & Phụ Khoa';
-                }
-              }
-            } else if (room.roomCode && (room.roomCode.startsWith('G2.6') || room.roomCode.startsWith('G2.7'))) {
-              zoneName = 'Khu F – Phục Hồi CN & Y Học Cổ Truyền';
-            }
-            zonesSet.add(zoneName);
+            const clinic = activeFloor.clinics?.find(c => c.id === room.clinicId);
+            const clinicLabel = clinic ? clinic.clinicLabel : 'Khu Vực Khác';
+            const clinicCode = clinic ? clinic.clinicCode : 'Default';
+            const clinicColor = CLINIC_COLORS[clinicCode] || CLINIC_COLORS.Default;
 
-            const color = getZoneColor(zoneName);
+            const roomColor = 0x3b82f6; // Uniform blue for all rooms
 
-            // Get bounds
             if (room.outlineGeom && room.outlineGeom.coordinates) {
               const coords = room.outlineGeom.coordinates[0];
-              
-              // Extrude room walls (hollow box effect or semi-transparent volume block)
               const shape = new THREE.Shape();
               coords.forEach((coord, idx) => {
                 const pt = convertCoords(coord[0], coord[1]);
@@ -500,15 +463,14 @@ export function get3DMapHtml(buildingData: any): string {
                 else shape.lineTo(pt.x, pt.z);
               });
 
-              // Create translucent physical volume block
-              const wallHeight = room.heightMeters || 3;
+              const wallHeight = room.heightMeters || 3.0;
               const extrudeSettings = { depth: wallHeight, bevelEnabled: false };
               const roomGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
               const roomMat = new THREE.MeshStandardMaterial({
-                color: color,
+                color: roomColor,
                 transparent: true,
-                opacity: 0.25,
-                roughness: 0.1,
+                opacity: 0.8,
+                roughness: 0.2,
                 metalness: 0.1,
                 side: THREE.DoubleSide
               });
@@ -518,26 +480,62 @@ export function get3DMapHtml(buildingData: any): string {
               roomMesh.castShadow = true;
               roomMesh.receiveShadow = true;
 
-              // Room wireframe helper
+              // Room wireframe helper (inherits roomMesh rotation/scale automatically)
               const edges = new THREE.EdgesGeometry(roomGeo);
-              const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: color, linewidth: 2, transparent: true, opacity: 0.7 }));
-              line.rotation.x = Math.PI / 2;
-              line.scale.set(1, 1, -1);
+              const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ 
+                color: 0x2563eb, 
+                linewidth: 1.5, 
+                transparent: true, 
+                opacity: 0.65 
+              }));
               roomMesh.add(line);
 
-              // Meta-properties
               roomMesh.userData = {
                 id: room.id,
                 code: room.roomCode,
                 label: room.roomLabel,
-                zone: zoneName,
-                color: color
+                clinicLabel: clinicLabel,
+                clinicColor: clinicColor
               };
 
               mapGroup.add(roomMesh);
               roomsMap.set(room.id, roomMesh);
 
-              // Add HTML Label
+              // 2b. Draw Room Boundaries and identify DOOR segments
+              if (room.boundaries) {
+                room.boundaries.forEach(boundary => {
+                  if (boundary.boundaryType === 'DOOR' && boundary.lineGeom && boundary.lineGeom.coordinates) {
+                    try {
+                      const bCoords = boundary.lineGeom.coordinates;
+                      const bp1 = convertCoords(bCoords[0][0], bCoords[0][1]);
+                      const bp2 = convertCoords(bCoords[1][0], bCoords[1][1]);
+                      
+                      const bdx = bp2.x - bp1.x;
+                      const bdz = bp2.z - bp1.z;
+                      const bdist = Math.sqrt(bdx*bdx + bdz*bdz);
+                      const bangle = Math.atan2(bdz, bdx);
+
+                      // Render precise 3D door box collinear to RoomBoundary segment
+                      const doorGeo = new THREE.BoxGeometry(bdist, 2.0, 0.1);
+                      const doorMat = new THREE.MeshStandardMaterial({
+                        color: 0x38bdf8,
+                        transparent: true,
+                        opacity: 0.85,
+                        roughness: 0.3,
+                        metalness: 0.1
+                      });
+                      const doorMesh = new THREE.Mesh(doorGeo, doorMat);
+                      doorMesh.position.set((bp1.x + bp2.x)/2, 1.0, (bp1.z + bp2.z)/2);
+                      doorMesh.rotation.y = -bangle;
+                      mapGroup.add(doorMesh);
+                    } catch (doorErr) {
+                      console.error("Lỗi vẽ room door:", doorErr);
+                    }
+                  }
+                });
+              }
+
+              // Add HTML label
               if (room.centerGeom && room.centerGeom.coordinates) {
                 const centerPt = convertCoords(room.centerGeom.coordinates[0], room.centerGeom.coordinates[1]);
                 createRoomLabel(room.roomCode, room.roomLabel, centerPt.x, centerPt.z, room.id);
@@ -549,38 +547,47 @@ export function get3DMapHtml(buildingData: any): string {
         });
       }
 
-      // 3. Draw Doors
+      // 3. Draw Clinic-level doors (where roomAId is null)
       if (activeFloor.doors) {
         activeFloor.doors.forEach(door => {
           try {
-            if (door.positionGeom && door.positionGeom.coordinates) {
+            if (door.roomAId === null && door.positionGeom && door.positionGeom.coordinates) {
               const pt = convertCoords(door.positionGeom.coordinates[0], door.positionGeom.coordinates[1]);
-              // Draw small glowing yellow cylinder/sphere for doors
-              const doorGeo = new THREE.BoxGeometry(0.8, 1.8, 0.2);
-              const doorMat = new THREE.MeshBasicMaterial({ 
+              let angle = 0;
+              let width = 1.5; // Clinic doors are door2 by default, so they are wider (1.5m)
+              
+              const { closestSeg, dist } = findClosestClinicBoundary(pt);
+              if (closestSeg && dist < 2.0) {
+                const dx = closestSeg.p2.x - closestSeg.p1.x;
+                const dz = closestSeg.p2.z - closestSeg.p1.z;
+                angle = Math.atan2(dz, dx);
+              }
+              
+              const doorGeo = new THREE.BoxGeometry(width, 2.0, 0.1);
+              const doorMat = new THREE.MeshStandardMaterial({
                 color: 0x38bdf8,
                 transparent: true,
-                opacity: 0.8
+                opacity: 0.85,
+                roughness: 0.3,
+                metalness: 0.1
               });
               const doorMesh = new THREE.Mesh(doorGeo, doorMat);
-              doorMesh.position.set(pt.x, 0.9, pt.z);
+              doorMesh.position.set(pt.x, 1.0, pt.z);
+              doorMesh.rotation.y = -angle;
               mapGroup.add(doorMesh);
             }
           } catch (e) {
-            console.error("Lỗi vẽ door:", e);
+            console.error("Lỗi vẽ clinic door:", e);
           }
         });
       }
 
       // 4. Placed Features (Reception desks from mapData / DB)
-      // Since mapData returned from navigation endpoint includes placedFeatures
       try {
         if (activeFloor.placedFeatures) {
           activeFloor.placedFeatures.forEach(feat => {
-            totalDesksCount++;
             if (feat.geometryGeom && feat.geometryGeom.coordinates) {
               const pt = convertCoords(feat.geometryGeom.coordinates[0], feat.geometryGeom.coordinates[1]);
-              // Draw interactive 3D desk icon (Cylinder with a floating ring)
               const group = new THREE.Group();
               
               const baseGeo = new THREE.CylinderGeometry(0.8, 0.8, 1, 16);
@@ -601,39 +608,11 @@ export function get3DMapHtml(buildingData: any): string {
               mapGroup.add(group);
             }
           });
-        } else {
-          // Fallback or verify placement count
-          statDesks.textContent = '6';
         }
       } catch (e) {
         console.error("Lỗi vẽ features:", e);
-        statDesks.textContent = '6';
       }
     }
-
-    statRooms.textContent = totalRoomsCount;
-    statDesks.textContent = totalDesksCount || '6';
-
-    // Populate zone list UI
-    Array.from(zonesSet).sort().forEach(zoneName => {
-      const colorHex = '#' + getZoneColor(zoneName).toString(16).padStart(6, '0');
-      const item = document.createElement('div');
-      item.className = 'zone-item';
-      item.innerHTML = \`<div class="zone-dot" style="background-color: \${colorHex}"></div>\${zoneName}\`;
-      
-      item.addEventListener('click', () => {
-        // Highlight all rooms belonging to this zone
-        roomsMap.forEach(mesh => {
-          if (mesh.userData.zone === zoneName) {
-            mesh.material.opacity = 0.6;
-            setTimeout(() => {
-              mesh.material.opacity = 0.25;
-            }, 2000);
-          }
-        });
-      });
-      zoneListDiv.appendChild(item);
-    });
 
     // --- HTML overlay text labels ---
     const labelContainer = document.getElementById('label-container');
@@ -642,7 +621,7 @@ export function get3DMapHtml(buildingData: any): string {
     function createRoomLabel(code, label, x, z, roomId) {
       const div = document.createElement('div');
       div.className = 'room-label';
-      div.textContent = code; // show short code
+      div.textContent = code;
       div.dataset.roomId = roomId;
       labelContainer.appendChild(div);
       labelElements.push({ element: div, pos: new THREE.Vector3(x, 1.6, z), roomId });
@@ -654,13 +633,11 @@ export function get3DMapHtml(buildingData: any): string {
         tempV.copy(item.pos);
         tempV.project(camera);
 
-        // Check if behind camera
         if (tempV.z > 1) {
           item.element.style.display = 'none';
           return;
         }
 
-        // Convert projection values to screen space coordinates
         const x = (tempV.x *  .5 + .5) * window.innerWidth;
         const y = (tempV.y * -.5 + .5) * window.innerHeight;
 
@@ -668,7 +645,6 @@ export function get3DMapHtml(buildingData: any): string {
         item.element.style.left = \`\${x}px\`;
         item.element.style.top = \`\${y}px\`;
         
-        // Hide/show labels based on camera distance (zoom level)
         const dist = camera.position.distanceTo(item.pos);
         if (dist > 120) {
           item.element.style.opacity = '0';
@@ -688,7 +664,6 @@ export function get3DMapHtml(buildingData: any): string {
     window.addEventListener('click', onClick);
 
     function onMouseMove(event) {
-      // Raycast only if clicking / hovering canvas (avoid UI overlay clicks)
       if (event.target.tagName !== 'CANVAS') return;
 
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -697,21 +672,20 @@ export function get3DMapHtml(buildingData: any): string {
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(mapGroup.children);
 
-      // Find first Room mesh
       const roomIntersect = intersects.find(intersect => intersect.object.userData && intersect.object.userData.code);
 
       if (roomIntersect) {
         const mesh = roomIntersect.object;
         if (hoveredMesh !== mesh && mesh !== selectedMesh) {
           if (hoveredMesh && hoveredMesh !== selectedMesh) {
-            hoveredMesh.material.opacity = 0.25;
+            hoveredMesh.material.opacity = 0.12;
           }
           hoveredMesh = mesh;
-          hoveredMesh.material.opacity = 0.45;
+          hoveredMesh.material.opacity = 0.35;
         }
       } else {
         if (hoveredMesh && hoveredMesh !== selectedMesh) {
-          hoveredMesh.material.opacity = 0.25;
+          hoveredMesh.material.opacity = 0.12;
         }
         hoveredMesh = null;
       }
@@ -735,17 +709,18 @@ export function get3DMapHtml(buildingData: any): string {
 
     function selectRoom(mesh) {
       if (selectedMesh) {
-        selectedMesh.material.opacity = 0.25;
+        selectedMesh.material.opacity = 0.12;
       }
       selectedMesh = mesh;
-      selectedMesh.material.opacity = 0.6;
+      selectedMesh.material.opacity = 0.45;
       
-      // Update Detail UI
       detailTitle.textContent = mesh.userData.label;
       detailCode.textContent = 'Mã phòng: ' + mesh.userData.code;
-      detailDesc.textContent = 'Phòng khám chuyên khoa thuộc ' + mesh.userData.zone + '. Thiết kế tiêu chuẩn 4m x 5m, bao gồm 4 bức tường chịu lực và 1 cửa ra vào giáp với hành lang trung tâm của tầng.';
-      detailZone.textContent = mesh.userData.zone;
-      detailZone.style.backgroundColor = '#' + mesh.userData.color.toString(16).padStart(6, '0');
+      detailDesc.textContent = 'Phòng khám thuộc ' + mesh.userData.clinicLabel + '.';
+      detailZone.textContent = mesh.userData.clinicLabel;
+      const colorHex = '#' + mesh.userData.clinicColor.toString(16).padStart(6, '0');
+      detailZone.style.backgroundColor = colorHex;
+      detailZone.style.color = '#ffffff';
       detailCard.style.display = 'block';
 
       // Animate camera target towards room center
@@ -753,11 +728,9 @@ export function get3DMapHtml(buildingData: any): string {
       const center = new THREE.Vector3();
       box.getCenter(center);
       
-      // Zoom camera smoothly
       const startTarget = controls.target.clone();
       const endTarget = center.clone();
       const startCamPos = camera.position.clone();
-      // Keep offset but approach
       const offset = camera.position.clone().sub(startTarget);
       
       let progress = 0;
@@ -774,13 +747,12 @@ export function get3DMapHtml(buildingData: any): string {
 
     function deselectRoom() {
       if (selectedMesh) {
-        selectedMesh.material.opacity = 0.25;
+        selectedMesh.material.opacity = 0.12;
         selectedMesh = null;
       }
       detailCard.style.display = 'none';
     }
 
-    // Window resize handler
     window.addEventListener('resize', onWindowResize);
 
     function onWindowResize() {
@@ -789,7 +761,6 @@ export function get3DMapHtml(buildingData: any): string {
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
-    // Animation loop
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -797,7 +768,6 @@ export function get3DMapHtml(buildingData: any): string {
       renderer.render(scene, camera);
     }
     
-    // Start animation loop
     animate();
   </script>
 </body>

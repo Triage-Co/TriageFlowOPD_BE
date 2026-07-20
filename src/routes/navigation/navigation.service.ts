@@ -110,11 +110,47 @@ export class NavigationService {
           }),
         );
 
+        // Query clinics on this floor
+        const clinics = await this.prisma.clinic.findMany({
+          where: { floorId: floor.id },
+        });
+
+        const clinicMaps = await Promise.all(
+          clinics.map(async (clinic) => {
+            const centerGeom = await this.geoService.readGeom('clinic', clinic.id, 'centerGeom');
+            const outlineGeomClinic = await this.geoService.readGeom('clinic', clinic.id, 'outlineGeom');
+
+            // Query boundaries for this clinic
+            const boundaries = await this.prisma.clinicBoundary.findMany({
+              where: { clinicId: clinic.id },
+              orderBy: { seqNo: 'asc' },
+            });
+
+            const boundaryMaps = await Promise.all(
+              boundaries.map(async (boundary) => {
+                const lineGeom = await this.geoService.readGeom('clinic_boundary', boundary.id, 'lineGeom');
+                return {
+                  ...boundary,
+                  lineGeom,
+                };
+              }),
+            );
+
+            return {
+              ...clinic,
+              centerGeom,
+              outlineGeom: outlineGeomClinic,
+              boundaries: boundaryMaps,
+            };
+          }),
+        );
+
         return {
           ...floor,
           outlineGeom,
           rooms: roomMaps,
           doors: doorMaps,
+          clinics: clinicMaps,
         };
       }),
     );
