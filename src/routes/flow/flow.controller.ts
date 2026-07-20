@@ -56,7 +56,7 @@ export class FlowController {
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard)
   @ApiOperation({
-    summary: '[AUTH] Tìm flow đang chạy (PENDING/IN_PROGRESS) theo Patient ID',
+    summary: '[AUTH] Tìm flow đang chạy (IN_PROGRESS) theo Patient ID',
   })
   async findIsActiveByPatientId(@Param('patient_id') patientId: string) {
     return this.flowService.findIsActiveByPatientId(patientId);

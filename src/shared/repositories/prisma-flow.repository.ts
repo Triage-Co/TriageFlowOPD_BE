@@ -52,14 +52,11 @@ export class PrismaFlowRepository implements IFlowRepository {
     const rawFlow = await this.prismaService.flow.findMany({
       where: {
         status: {
-          in: ['IN_PROGRESS', 'PENDING'],
+          in: ['IN_PROGRESS'],
         },
         booking: {
           patient_id: patient_id,
         },
-        created_at: {
-          gte: startOfToday
-        }
       },
       include: findQuery,
     });
