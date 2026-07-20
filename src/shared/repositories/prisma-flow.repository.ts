@@ -47,8 +47,6 @@ const findQuery = {
 export class PrismaFlowRepository implements IFlowRepository {
   constructor(private readonly prismaService: PrismaService) {}
   async findIsActiveByPatientId(patient_id: string): Promise<any> {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
     const rawFlow = await this.prismaService.flow.findMany({
       where: {
         status: {
