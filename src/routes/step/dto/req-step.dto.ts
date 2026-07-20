@@ -135,3 +135,19 @@ export class UpdateStepStatusReqDto {
   @IsNotEmpty({ message: 'Trạng thái không được để trống' })
   step_status: StepStatusEnum;
 }
+
+export class FindByIdAndPatientIdReqDto {
+  @ApiProperty({
+    description: 'ID của bệnh nhân',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID('4', { message: 'patient_id phải là UUID' })
+  patient_id: string;
+
+  @ApiProperty({
+    description: 'ID của Step',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+  })
+  @IsUUID('4', { message: 'step_id phải là UUID' })
+  step_id: string;
+}

@@ -1,3 +1,5 @@
+import { Step } from "@prisma/client";
+
 export interface IStepRepository {
   createParentStep(data: any): Promise<any>;
   createSubStep(data: any): Promise<any>;
@@ -8,8 +10,10 @@ export interface IStepRepository {
   delete(id: string): Promise<any>;
   findByIdAndAccountId(account_id: string, id: string): Promise<any>;
   findSubStepsByParentId(parentId: string): Promise<any>;
-
   findDependentSteps(stepId: string): Promise<any>;
-
   findDependenciesOfStep(stepId: string): Promise<any>;
+  findStepByIdAndPatientId(
+    stepId: string,
+    patientId: string,
+  ): Promise<Step | null>;
 }

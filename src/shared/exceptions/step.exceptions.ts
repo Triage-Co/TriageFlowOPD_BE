@@ -28,6 +28,13 @@ export const StepErrors = {
       `Không tìm thấy bước với id: ${step_id} nào trong hệ thống của người dùng: ${account_id}.`,
     );
   },
+  StepNotFoundByIdAndPatientId: (patientId: string, stepId: string) => {
+    throw new StepException(
+      HttpStatus.NOT_FOUND,
+      'Không tìm thấy dữ liệu',
+      `Không tìm thấy bước với id: ${stepId} nào trong hệ thống của bệnh nhân: ${patientId}.`,
+    );
+  },
   StepNotFoundById: (step_id: string) => {
     throw new StepException(
       HttpStatus.NOT_FOUND,

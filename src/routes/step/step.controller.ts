@@ -14,6 +14,7 @@ import {
   CreateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
+  FindByIdAndPatientIdReqDto,
   UpdateStepReqDto,
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
@@ -28,7 +29,7 @@ import { roles } from '../../shared/decorator/role.decorator';
 export class StepController {
   constructor(private readonly stepService: StepService) {}
 
-  @Get('account/:step_id')
+  @Get(':step_id/me')
   @ApiOperation({
     summary: 'Tìm step theo step id của user',
   })
@@ -37,10 +38,17 @@ export class StepController {
     return this.stepService.findByIdAndAccountId(id, step_id);
   }
 
-  @Get(':step_id')
+  @Get(':step_id/patient')
   @ApiOperation({
-    summary: 'Tìm step theo step id của user',
+    summary: 'Tìm step theo step id và id của patient',
   })
+  findByIdAndPatientId(
+    @Body() findByIdAndPatientIdReqDto: FindByIdAndPatientIdReqDto,
+  ) {
+    return this.stepService.findByIdAndPatientId(findByIdAndPatientIdReqDto);
+  }
+
+  @Get(':step_id')
   @roles(
     'ADMIN',
     'DOCTOR',

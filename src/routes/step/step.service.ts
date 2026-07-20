@@ -8,6 +8,7 @@ import {
   CreateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
+  FindByIdAndPatientIdReqDto,
   UpdateStepReqDto,
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
@@ -72,6 +73,27 @@ export class StepService {
       data: data,
     };
   }
+
+  async findByIdAndPatientId(
+    findByIdAndPatientIdReqDto: FindByIdAndPatientIdReqDto,
+  ) {
+    const { patient_id, step_id } = findByIdAndPatientIdReqDto;
+    const data = await this.stepRepository.findStepByIdAndPatientId(
+      patient_id,
+      step_id,
+    );
+
+    if (!data) {
+      throw StepErrors.StepNotFoundByIdAndPatientId(patient_id, step_id);
+    }
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy bước thành công',
+      data: data,
+    };
+  }
+
   async findById(id: string) {
     const data = await this.stepRepository.findById(id);
 
