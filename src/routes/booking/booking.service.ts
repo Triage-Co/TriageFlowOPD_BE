@@ -217,6 +217,15 @@ export class BookingService {
             flow_id: step.flow_id,
           },
         });
+
+        await this.STEP.update({
+          data: {
+            step_status: "COMPLETED",
+          }, 
+          where:  {
+            step_id: step_id
+          }
+        })
       }
 
       if (step.queues.length > 0) {
