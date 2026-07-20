@@ -606,6 +606,7 @@ model Floor {
   nodes          Node[]
   doors          Door[]
   placedFeatures PlacedFeature[]
+  clinics        Clinic[]
 
   @@unique([buildingId, floorNumber])
   @@index([buildingId])
@@ -635,6 +636,8 @@ model PhysicalRoom {
   shifts             Shift[]
   steps              Step[]
   rooms              Room[]
+  clinicId           String?         @db.Uuid
+  clinic             Clinic?         @relation(fields: [clinicId], references: [id])
 
   @@unique([floorId, roomCode])
   @@index([floorId])
@@ -682,6 +685,8 @@ model Door {
   roomA      PhysicalRoom?  @relation("DoorRoomA", fields: [roomAId], references: [id])
   roomB      PhysicalRoom?  @relation("DoorRoomB", fields: [roomBId], references: [id])
   boundaries RoomBoundary[]
+  clinicId   String?        @db.Uuid
+  clinic     Clinic?        @relation(fields: [clinicId], references: [id])
 
   @@index([floorId, active])
   @@index([nodeId])
@@ -808,9 +813,48 @@ model PlacedFeature {
   floor    Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
   room     PhysicalRoom?   @relation(fields: [roomId], references: [id])
   template FeatureTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  clinicId String?         @db.Uuid
+  clinic   Clinic?         @relation(fields: [clinicId], references: [id])
 
   @@index([floorId, templateId])
   @@map("placed_feature")
+}
+
+model Clinic {
+  id             String                                  @id @default(uuid()) @db.Uuid
+  floorId        String                                  @db.Uuid
+  clinicCode     String
+  clinicLabel    String
+  description    String?
+  centerGeom     Unsupported("geometry(Point, 4326)")?
+  outlineGeom    Unsupported("geometry(Polygon, 4326)")?
+  createdAt      DateTime                                @default(now()) @db.Timestamptz()
+  updatedAt      DateTime                                @default(now()) @updatedAt @db.Timestamptz()
+
+  floor          Floor                                   @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  boundaries     ClinicBoundary[]
+  physicalRooms  PhysicalRoom[]
+  placedFeatures PlacedFeature[]
+  doors          Door[]
+
+  @@unique([floorId, clinicCode])
+  @@index([floorId])
+  @@map("clinic")
+}
+
+model ClinicBoundary {
+  id           String                                     @id @default(uuid()) @db.Uuid
+  clinicId     String                                     @db.Uuid
+  seqNo        Int
+  lineGeom     Unsupported("geometry(LineString, 4326)")?
+  boundaryType BoundaryType
+  hasWall      Boolean                                    @default(true)
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, seqNo])
+  @@index([clinicId])
+  @@map("clinic_boundary")
 }
 
 // ─── Blockage (independent module) ───────────────────────────────────────────

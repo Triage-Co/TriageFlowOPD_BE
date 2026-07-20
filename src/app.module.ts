@@ -6,6 +6,8 @@ import { BuildingModule } from './routes/building/building.module';
 import { FloorModule } from './routes/floor/floor.module';
 import { PhysicalRoomModule } from './routes/physical-room/physical-room.module';
 import { RoomBoundaryModule } from './routes/room-boundary/room-boundary.module';
+import { ClinicModule } from './routes/clinic/clinic.module';
+import { ClinicBoundaryModule } from './routes/clinic-boundary/clinic-boundary.module';
 import { DoorModule } from './routes/door/door.module';
 import { CategoryModule } from './routes/category/category.module';
 import { PoiModule } from './routes/poi/poi.module';
@@ -78,6 +80,8 @@ import { QueueModule } from './routes/queue/queue.module';
     FloorModule,
     PhysicalRoomModule,
     RoomBoundaryModule,
+    ClinicModule,
+    ClinicBoundaryModule,
     DoorModule,
     CategoryModule,
     PoiModule,
