@@ -274,12 +274,16 @@ export class FlowService {
     timeZone: 'Asia/Ho_Chi_Minh',
   })
   async changeFlowStatus() {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
     await this.prismaService.flow.updateMany({
       where: {
         status: {
           in: ['IN_PROGRESS', 'PENDING'],
         },
-        //thêm createAt và check
+        created_at: {
+          lt: startOfToday,
+        },
       },
       data: {
         status: 'ABANDONED',

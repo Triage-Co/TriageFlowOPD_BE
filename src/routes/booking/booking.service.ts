@@ -208,6 +208,17 @@ export class BookingService {
         );
       }
 
+      if (step.flow_id) {
+        await this.FLOW.update({
+          data: {
+            status: 'IN_PROGRESS',
+          },
+          where: {
+            flow_id: step.flow_id,
+          },
+        });
+      }
+
       if (step.queues.length > 0) {
         return {
           code: 200,
