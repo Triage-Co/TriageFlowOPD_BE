@@ -279,6 +279,7 @@ model Room {
 
 model Step {
   step_id        String             @id @default(uuid()) @db.Uuid
+  step_name      String?
   flow_id        String?            @db.Uuid
   room_id        String?            @db.Uuid
   staff_id       String?            @db.Uuid
