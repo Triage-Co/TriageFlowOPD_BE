@@ -150,6 +150,7 @@ export class BookingService {
           room_id: existedShiftData?.room_id,
           staff_id: existedShiftData?.staff_id,
           docNo: createPaymentData.data.orderCode,
+          step_name: 'Đặt Khám',
           payment_status: 'PENDING',
         },
       });
@@ -220,12 +221,12 @@ export class BookingService {
 
         await this.STEP.update({
           data: {
-            step_status: "COMPLETED",
-          }, 
-          where:  {
-            step_id: step_id
-          }
-        })
+            step_status: 'COMPLETED',
+          },
+          where: {
+            step_id: step_id,
+          },
+        });
       }
 
       if (step.queues.length > 0) {
