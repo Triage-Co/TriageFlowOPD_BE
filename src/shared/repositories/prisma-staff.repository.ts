@@ -7,6 +7,19 @@ import { Prisma, RoleTypeEnum } from '@prisma/client';
 export class PrismaStaffRepository implements IStaffRepository {
   constructor(private readonly prismaService: PrismaService) {}
 
+  create(
+    data: Prisma.StaffUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<any> {
+    const db = tx || this.prismaService;
+
+    return db.staff.create({
+      data: {
+        ...data,
+      },
+    });
+  }
+
   update(
     id: string,
     data: Prisma.StaffUncheckedUpdateInput,
@@ -27,11 +40,7 @@ export class PrismaStaffRepository implements IStaffRepository {
   findAll(): Promise<any> {
     return this.prismaService.staff.findMany({
       include: {
-        account: {
-          omit: {
-            account_id: true,
-          },
-        },
+        account: true,
       },
     });
   }
@@ -42,11 +51,7 @@ export class PrismaStaffRepository implements IStaffRepository {
         staff_id: id,
       },
       include: {
-        account: {
-          omit: {
-            account_id: true,
-          },
-        },
+        account: true,
       },
     });
   }
@@ -55,19 +60,6 @@ export class PrismaStaffRepository implements IStaffRepository {
     return this.prismaService.staff.delete({
       where: {
         staff_id: id,
-      },
-    });
-  }
-
-  create(
-    data: Prisma.StaffUncheckedCreateInput,
-    tx?: Prisma.TransactionClient,
-  ): Promise<any> {
-    const db = tx || this.prismaService;
-
-    return db.staff.create({
-      data: {
-        ...data,
       },
     });
   }

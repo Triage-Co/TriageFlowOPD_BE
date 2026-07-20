@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger';
 import { GenderTypeEnum, RoleTypeEnum } from '@prisma/client';
 import {
   IsEmail,
@@ -14,8 +14,8 @@ import {
 } from 'class-validator';
 
 const STAFF_ROLES = [
-  RoleTypeEnum.ANCILLARY_STAFFS,
-  RoleTypeEnum.ANCILLARY_STAFFS,
+  RoleTypeEnum.LAB_TECHNICIAN,
+  RoleTypeEnum.PHARMACIST,
   RoleTypeEnum.DOCTOR,
   RoleTypeEnum.NURSE,
   RoleTypeEnum.RECEPTIONIST,
@@ -114,3 +114,7 @@ export class CreateStaffReqDto {
   @IsOptional()
   specialty_id: string;
 }
+
+export class UpdateStaffReqDto extends PartialType(
+  OmitType(CreateStaffReqDto, ['email', 'password']),
+) {}

@@ -46,6 +46,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           const index = meta?.driverAdapterError?.cause?.constraint?.index;
 
           const field = index?.replace(/^[^_]+_/, '').replace(/_fkey$/, '');
+          message = `Dữ liệu không tồn tại`;
 
           detail = `Không thể tham chiếu dữ liệu ở trường: ${field ?? 'không xác định'}`;
 

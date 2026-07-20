@@ -6,6 +6,8 @@ import {
 } from '../interfaces/i-auth-provider.interface';
 import { SupabaseService } from '../config/supabase.service';
 import { BanReqDto } from '../../routes/account/dto/req-account.dto';
+import { UserResponse } from '@supabase/supabase-js';
+import { SupabaseMetadata } from '../types/supabase-auth.type';
 
 @Injectable()
 export class SupabaseAuthProvider implements IAuthProvider {
@@ -32,10 +34,14 @@ export class SupabaseAuthProvider implements IAuthProvider {
         ban_duration: 'none',
       });
   }
-  adminCreateAccount(data: any): Promise<any> {
+  adminCreateAccount(
+    email: string,
+    password: string,
+    data: SupabaseMetadata,
+  ): Promise<UserResponse> {
     return this.supabaseService.getClient().auth.admin.createUser({
-      email: data.email,
-      password: data.password,
+      email: email,
+      password: password,
       email_confirm: true,
       user_metadata: {
         gender: data.gender,

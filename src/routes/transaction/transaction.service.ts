@@ -6,7 +6,7 @@ import { PrismaService } from '../../shared/config/prisma.service';
 import { CreateTransactionRequestDto } from './dto/request-transaction.dto';
 import { PayOS } from '@payos/node';
 import { PrismaClient } from '@prisma/client';
-import { ResponseType } from '../../shared/type/response.type';
+import { ResponseType } from '../../shared/types/response.type';
 
 @Injectable()
 export class TransactionService {

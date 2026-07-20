@@ -63,7 +63,14 @@ export class FlowController {
   }
 
   @Get()
-  @roles('ADMIN', 'DOCTOR', 'NURSE', 'ANCILLARY_STAFFS', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'RECEPTIONIST',
+  )
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
@@ -74,7 +81,14 @@ export class FlowController {
   }
 
   @Get(':id')
-  @roles('ADMIN', 'DOCTOR', 'NURSE', 'ANCILLARY_STAFFS', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'RECEPTIONIST',
+  )
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({

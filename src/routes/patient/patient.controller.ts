@@ -100,7 +100,14 @@ export class PatientController {
   }
 
   @Post()
-  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'DOCTOR',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF - ADMIN] tạo bệnh nhân',
@@ -111,7 +118,14 @@ export class PatientController {
   }
 
   @Get()
-  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'DOCTOR',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy tất cả bệnh nhân',
@@ -121,7 +135,14 @@ export class PatientController {
   }
 
   @Get(':patient_id')
-  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'DOCTOR',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy bệnh nhân theo patient id',
@@ -131,7 +152,14 @@ export class PatientController {
   }
 
   @Patch('/:patient_id')
-  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'DOCTOR',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF - ADMIN] cập nhật bệnh nhân theo patient id',
@@ -145,7 +173,14 @@ export class PatientController {
   }
 
   @Delete(':patient_id')
-  @roles('ADMIN', 'ANCILLARY_STAFFS', 'DOCTOR', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'DOCTOR',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary: '[STAFF - ADMIN] xóa bệnh nhân theo patient id',

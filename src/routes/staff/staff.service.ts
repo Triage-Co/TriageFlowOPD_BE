@@ -1,14 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { UpdateStaffDto } from './dto/update-staff.dto';
 import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
 import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.interface';
-import { CreateStaffReqDto } from './dto/req-staff.dto';
+import { CreateStaffReqDto, UpdateStaffReqDto } from './dto/req-staff.dto';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
-import { Staff } from '@prisma/client';
+import { Account, Staff } from '@prisma/client';
 import { resend } from '../../shared/config/resend.config';
 import { getWelcomeEmailHtml } from '../../shared/template/email.template';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { ResponseType } from '../../shared/types/response.type';
+import { StaffResDto } from './dto/res-staff';
 
 @Injectable()
 export class StaffService {
@@ -23,7 +24,9 @@ export class StaffService {
 
   private readonly logger = new Logger(StaffService.name);
 
-  async create(createStaffReqDto: CreateStaffReqDto) {
+  async create(
+    createStaffReqDto: CreateStaffReqDto,
+  ): Promise<ResponseType<StaffResDto>> {
     const {
       license_number,
       email,
@@ -51,23 +54,26 @@ export class StaffService {
       full_name,
       specialty_id,
     };
+
     const existedEmail = await this.accountRepository.findByEmail(email);
 
-    if (existedEmail) {
-      throw AuthErrors.EmailExists;
-    }
+    if (existedEmail) throw AuthErrors.EmailExists(email);
 
-    const { data: supabaseData, error } =
-      await this.authProvider.adminCreateAccount({
+    const existedPhone = await this.accountRepository.findByPhone(phone);
+
+    if (existedPhone) throw AuthErrors.PhoneExists(phone);
+
+    const { data: supabaseData, error: supabaseError } =
+      await this.authProvider.adminCreateAccount(email, password, {
         email,
-        password,
         user_name,
         gender,
         role,
+        phone,
       });
 
-    if (error) {
-      switch (error.code) {
+    if (supabaseError) {
+      switch (supabaseError.code) {
         case 'email_not_confirmed': {
           throw AuthErrors.EmailNotConfirmed;
         }
@@ -77,7 +83,7 @@ export class StaffService {
         default: {
           throw AuthErrors.ProviderError(
             'Không thể đăng ký tài khoản',
-            error.message,
+            supabaseError.message,
           );
         }
       }
@@ -91,6 +97,7 @@ export class StaffService {
     }
 
     const account_id = supabaseData.user.id;
+
     try {
       const rs = await this.prismaService.$transaction(async (tx) => {
         const accountData = await this.accountRepository.create(
@@ -110,18 +117,14 @@ export class StaffService {
         );
 
         return {
-          staffData,
-          accountData,
+          ...staffData,
+          account: accountData,
         };
       });
-      const htmlContext = getWelcomeEmailHtml(email, password);
-      await resend.emails.send({
-        from: 'noreply@triageflow.me',
-        to: email,
-        subject: 'Chào mừng bạn gia nhập hệ thống',
-        html: htmlContext,
-      });
 
+      this.sendWelcomeEmailAsync(email, password).catch((e) => {
+        this.logger.error(`Lỗi xảy ra khi gửi mail đến ${email}`, e);
+      });
       return {
         code: 200,
         status: 'success',
@@ -142,7 +145,74 @@ export class StaffService {
     }
   }
 
-  async findAll() {
+  async update(
+    id: string,
+    updateStaffReqDto: UpdateStaffReqDto,
+  ): Promise<ResponseType<StaffResDto>> {
+    const { role, gender, user_name, phone, ...staffDto } = updateStaffReqDto;
+    const isUpdatingAuthInfo = user_name || gender || role || phone;
+    let oldAccountData: Account | null = null;
+    if (isUpdatingAuthInfo) {
+      oldAccountData = await this.accountRepository.findById(id);
+      if (!oldAccountData) throw AuthErrors.UserNotFoundById(id);
+
+      const { error } = await this.authProvider.updateUserById(id, {
+        user_name,
+        gender,
+        role,
+        phone,
+      });
+      if (error) {
+        this.logger.error(`Supabase update lỗi cho user ${id}`, error);
+      }
+    }
+
+    try {
+      const rs = await this.prismaService.$transaction(async (tx) => {
+        let accountData = null;
+        if (isUpdatingAuthInfo) {
+          accountData = await this.accountRepository.update(
+            id,
+            { user_name, gender, role, phone },
+            tx,
+          );
+        }
+        const staffData =
+          Object.keys(staffDto).length > 0
+            ? await this.staffRepository.update(id, staffDto, tx)
+            : null;
+
+        return { ...staffData, account: accountData };
+      });
+
+      return {
+        code: 200,
+        status: 'success',
+        message: `Cập nhật nhân viên với id ${id} thành công`,
+        data: rs,
+      };
+    } catch (error) {
+      this.logger.error('đã xảy ra lỗi đang rollback', error);
+      if (isUpdatingAuthInfo && oldAccountData) {
+        try {
+          await this.authProvider.updateUserById(id, {
+            user_name: oldAccountData.user_name,
+            gender: oldAccountData.gender,
+            role: oldAccountData.role,
+            phone: oldAccountData.phone,
+          });
+        } catch (rollbackErr) {
+          this.logger.error(
+            'Cảnh báo: Rollback Supabase thất bại',
+            rollbackErr,
+          );
+        }
+      }
+      throw error;
+    }
+  }
+
+  async findAll(): Promise<ResponseType<StaffResDto[]>> {
     const data = await this.staffRepository.findAll();
 
     return {
@@ -153,8 +223,12 @@ export class StaffService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string): Promise<ResponseType<StaffResDto>> {
     const data = await this.staffRepository.findById(id);
+
+    if (!data) {
+      throw AuthErrors.UserNotFoundById(id);
+    }
 
     return {
       code: 200,
@@ -164,74 +238,13 @@ export class StaffService {
     };
   }
 
-  async update(id: string, updateStaffDto: UpdateStaffDto) {
-    const { role, gender, user_name, phone, ...staffDto } = updateStaffDto;
-
-    try {
-      const oldAccountData = await this.accountRepository.findById(id);
-      const oldStaffData = await this.staffRepository.findById(id);
-      const rs = await this.prismaService.$transaction(async (tx) => {
-        const data: Staff = await this.staffRepository.update(id, staffDto, tx);
-
-        if (user_name || gender || role || phone) {
-          await this.accountRepository.update(
-            data.staff_id,
-            {
-              user_name,
-              gender,
-              role,
-              phone,
-            },
-            tx,
-          );
-        }
-
-        return data;
-      });
-
-      if (user_name || gender || role || phone) {
-        const metadata = { user_name, gender, role };
-
-        const { error } = await this.authProvider.updateUserById(
-          rs.staff_id,
-          metadata,
-        );
-
-        if (error) {
-          this.logger.error(
-            `Supabase update lỗi cho user ${rs.staff_id}`,
-            error,
-          );
-
-          await this.accountRepository.update(rs.staff_id, {
-            user_name: oldAccountData.user_name,
-            gender: oldAccountData.gender,
-            role: oldAccountData.role,
-          });
-
-          await this.staffRepository.update(rs.staff_id, {
-            license_number: oldStaffData.license_number,
-            experience_years: oldStaffData.experience_years,
-            full_name: oldStaffData.full_name,
-            specialty_id: oldStaffData.specialty_id,
-          });
-
-          throw AuthErrors.ProviderError(
-            'Không thể đồng bộ hệ thống, đã hoàn tác thay đổi',
-            error.message,
-          );
-        }
-      }
-
-      return {
-        code: 200,
-        status: 'success',
-        message: `Cập nhật nhân viên với id ${id} thành công`,
-        data: rs,
-      };
-    } catch (error) {
-      this.logger.error('đã xảy ra lỗi đang roleback', error);
-      throw error;
-    }
+  private async sendWelcomeEmailAsync(email: string, password: string) {
+    const htmlContext = getWelcomeEmailHtml(email, password);
+    await resend.emails.send({
+      from: 'noreply@triageflow.me',
+      to: email,
+      subject: 'Chào mừng bạn gia nhập hệ thống',
+      html: htmlContext,
+    });
   }
 }

@@ -41,7 +41,14 @@ export class StepController {
   @ApiOperation({
     summary: 'Tìm step theo step id của user',
   })
-  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsRoleGuard)
   @ApiOperation({
     summary: 'Tìm step theo step id của staff',
@@ -79,7 +86,7 @@ export class StepController {
     return this.stepService.createDependency(createDependencyReqDto);
   }
   @Patch(':step_id/complete')
-  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE')
+  @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
     summary: 'Cập nhật trạng thái step của staff',
@@ -89,7 +96,14 @@ export class StepController {
   }
 
   @Patch(':step_id')
-  @roles('ADMIN', 'DOCTOR', 'RECEPTIONIST', 'NURSE', 'ANCILLARY_STAFFS')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'RECEPTIONIST',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+  )
   @UseGuards(IsRoleGuard)
   @ApiOperation({
     summary:
@@ -103,7 +117,14 @@ export class StepController {
   }
 
   @Patch(':step_id/status')
-  @roles('ADMIN', 'DOCTOR', 'ANCILLARY_STAFFS', 'NURSE', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'NURSE',
+    'RECEPTIONIST',
+  )
   @UseGuards(IsRoleGuard)
   @ApiOperation({
     summary: 'Cập nhật trạng thái của step (IN_PROGRESS, CANCELLED...)',
