@@ -135,10 +135,13 @@ model Patient {
   createdAt           DateTime       @default(now()) @db.Timestamptz()
   updatedAt           DateTime       @default(now()) @updatedAt @db.Timestamptz()
 
+  blood_type     String?
+  allergy_notes  String?
+
   account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
   bookings       Booking[]
   patientAnswers Patient_Answer[]
-  medicalRecords Medical_Record[]
+  visitSessions  Visit_Session[]
 
   @@index([full_name, account_id, dob])
   @@map("patient")
@@ -439,15 +442,46 @@ model Triage_Information {
   @@map("triage_information")
 }
 
-model Medical_Record {
-  medical_record_id String  @id @default(uuid()) @db.Uuid
-  patient_id        String? @db.Uuid
-  clinical_history  Json    @db.JsonB
-  allergies         Json    @db.JsonB
+enum ClinicalDocumentTypeEnum {
+  PRESCRIPTION
+  LAB_TEST
+  IMAGING_TEST
+  PROCEDURE
+  OTHER
+}
 
-  patient Patient? @relation(fields: [patient_id], references: [patient_id])
+model Visit_Session {
+  visit_session_id   String              @id @default(uuid()) @db.Uuid
+  patient_id         String              @db.Uuid
+  visit_date         DateTime            @default(now()) @db.Timestamptz()
+  chief_complaint    String?
+  heart_rate         Int?
+  blood_pressure_sys Int?
+  blood_pressure_dia Int?
+  temperature        Float?
+  spo2               Int?
+  diagnosis          String?             @db.Text
+  final_diagnosis    String?
+  hpi                String?             @db.Text
+  pmh                String?             @db.Text
+  pe                 Json?               @db.JsonB
 
-  @@map("medical_record")
+  patient            Patient             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  clinicalDocuments  Clinical_Document[]
+
+  @@map("visit_session")
+}
+
+model Clinical_Document {
+  clinical_document_id String                   @id @default(uuid()) @db.Uuid
+  visit_session_id     String                   @db.Uuid
+  document_type        ClinicalDocumentTypeEnum
+  payload_data         Json                     @db.JsonB
+  his_reference_id     String?
+
+  visitSession         Visit_Session            @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
+
+  @@map("clinical_document")
 }
 
 model Triage_Config {

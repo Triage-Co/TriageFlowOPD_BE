@@ -63,3 +63,5 @@ init/*
 /init
 init
 init/data.ts
+
+*.seed.ts

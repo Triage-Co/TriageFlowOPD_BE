@@ -32,6 +32,8 @@ import { StaffModule } from './routes/staff/staff.module';
 import { AccountModule } from './routes/account/account.module';
 import { FlowModule } from './routes/flow/flow.module';
 import { SpecialtyModule } from './routes/specialty/specialty.module';
+import { VisitSessionModule } from './routes/visit-session/visit-session.module';
+import { ClinicalDocumentModule } from './routes/clinical-document/clinical-document.module';
 
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
@@ -99,6 +101,8 @@ import { QueueModule } from './routes/queue/queue.module';
     SpecialtyModule,
     TemplateModule,
     QueueModule,
+    VisitSessionModule,
+    ClinicalDocumentModule,
   ],
 })
 export class AppModule {}
