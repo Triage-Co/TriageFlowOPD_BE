@@ -30,6 +30,26 @@ export class ClinicalDocumentService {
     return this.clinicalDocumentRepository.findAll(visit_session_id);
   }
 
+  async findByVisitSession(visitSessionId: string, reqUser: any) {
+    const session = await this.visitSessionRepository.findById(visitSessionId);
+    if (!session) {
+      throw new NotFoundException(`Visit session with ID ${visitSessionId} not found`);
+    }
+
+    const account = await this.accountRepository.findById(reqUser.id);
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    if (account.role === 'USER') {
+      if (session.patient.account_id !== reqUser.id) {
+        throw new ForbiddenException("You do not have permission to view this visit session's clinical documents");
+      }
+    }
+
+    return this.clinicalDocumentRepository.findAll(visitSessionId);
+  }
+
   async getMyDocuments(accountId: string) {
     const patients = await this.patientRepository.findAll(accountId);
     if (!patients || patients.length === 0) {

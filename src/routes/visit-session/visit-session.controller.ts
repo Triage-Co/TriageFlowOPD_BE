@@ -64,6 +64,19 @@ export class VisitSessionController {
     return this.visitSessionService.getMySessions(id);
   }
 
+  @Get('patient/:patient_id')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ALL] Lấy danh sách phiên khám theo ID bệnh nhân',
+    description: 'Endpoint lấy toàn bộ các phiên khám của một bệnh nhân cụ thể. Nhân viên y tế có thể xem của bất kỳ bệnh nhân nào, Bệnh nhân (USER) chỉ có thể xem của chính mình hoặc người phụ thuộc thuộc tài khoản của họ.',
+  })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách phiên khám thành công.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập vào thông tin bệnh nhân khác.' })
+  findByPatient(@Param('patient_id') patient_id: string, @Req() req: any) {
+    return this.visitSessionService.findByPatient(patient_id, req.user);
+  }
+
   @Get(':id')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()

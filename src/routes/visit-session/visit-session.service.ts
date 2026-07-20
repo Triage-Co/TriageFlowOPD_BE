@@ -27,6 +27,22 @@ export class VisitSessionService {
     return this.visitSessionRepository.findAll(patient_id);
   }
 
+  async findByPatient(patientId: string, reqUser: any) {
+    const account = await this.accountRepository.findById(reqUser.id);
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    if (account.role === 'USER') {
+      const patient = await this.patientRepository.findOne(patientId, reqUser.id);
+      if (!patient) {
+        throw new ForbiddenException("You do not have permission to access this patient's records");
+      }
+    }
+
+    return this.visitSessionRepository.findAll(patientId);
+  }
+
   async getMySessions(accountId: string) {
     const patients = await this.patientRepository.findAll(accountId);
     if (!patients || patients.length === 0) {

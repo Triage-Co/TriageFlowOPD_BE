@@ -62,6 +62,18 @@ export class ClinicalDocumentController {
     return this.clinicalDocumentService.getMyDocuments(id);
   }
 
+  @Get('visit-session/:visit_session_id')
+  @ApiOperation({
+    summary: '[ALL] Lấy danh sách tài liệu lâm sàng theo ID phiên khám',
+    description: 'Endpoint lấy toàn bộ các tài liệu lâm sàng của một phiên khám cụ thể. Nhân viên y tế có thể xem của bất kỳ phiên khám nào, Bệnh nhân (USER) chỉ có thể xem nếu phiên khám đó thuộc về chính họ.',
+  })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách tài liệu lâm sàng thành công.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập vào tài liệu của phiên khám này.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy phiên khám bệnh.' })
+  findByVisitSession(@Param('visit_session_id') visit_session_id: string, @Req() req: any) {
+    return this.clinicalDocumentService.findByVisitSession(visit_session_id, req.user);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: '[ALL] Lấy chi tiết tài liệu lâm sàng theo ID',
