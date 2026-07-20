@@ -368,6 +368,15 @@ export class DoctorService {
                   booking_id: true,
                 },
                 include: {
+                  steps: {
+                    select: {
+                      queues: {
+                        select: {
+                          queue_number: true,
+                        },
+                      },
+                    },
+                  },
                   booking: {
                     omit: {
                       patient_id: true,
