@@ -135,8 +135,8 @@ model Patient {
   createdAt           DateTime       @default(now()) @db.Timestamptz()
   updatedAt           DateTime       @default(now()) @updatedAt @db.Timestamptz()
 
-  blood_type     String?
-  allergy_notes  String?
+  blood_type    String?
+  allergy_notes String?
 
   account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
   bookings       Booking[]
@@ -284,6 +284,7 @@ model Step {
   room_id        String?            @db.Uuid
   staff_id       String?            @db.Uuid
   step_status    StepStatusEnum     @default(PENDING)
+  qr_text        String?
   docNo          Int?
   payment_status PaymentStatusEnum?
   created_at     DateTime           @default(now()) @db.Timestamptz()
@@ -452,23 +453,23 @@ enum ClinicalDocumentTypeEnum {
 }
 
 model Visit_Session {
-  visit_session_id   String              @id @default(uuid()) @db.Uuid
-  patient_id         String              @db.Uuid
-  visit_date         DateTime            @default(now()) @db.Timestamptz()
+  visit_session_id   String   @id @default(uuid()) @db.Uuid
+  patient_id         String   @db.Uuid
+  visit_date         DateTime @default(now()) @db.Timestamptz()
   chief_complaint    String?
   heart_rate         Int?
   blood_pressure_sys Int?
   blood_pressure_dia Int?
   temperature        Float?
   spo2               Int?
-  diagnosis          String?             @db.Text
+  diagnosis          String?  @db.Text
   final_diagnosis    String?
-  hpi                String?             @db.Text
-  pmh                String?             @db.Text
-  pe                 Json?               @db.JsonB
+  hpi                String?  @db.Text
+  pmh                String?  @db.Text
+  pe                 Json?    @db.JsonB
 
-  patient            Patient             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
-  clinicalDocuments  Clinical_Document[]
+  patient           Patient             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  clinicalDocuments Clinical_Document[]
 
   @@map("visit_session")
 }
@@ -480,7 +481,7 @@ model Clinical_Document {
   payload_data         Json                     @db.JsonB
   his_reference_id     String?
 
-  visitSession         Visit_Session            @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
+  visitSession Visit_Session @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
 
   @@map("clinical_document")
 }
@@ -821,17 +822,17 @@ model PlacedFeature {
 }
 
 model Clinic {
-  id             String                                  @id @default(uuid()) @db.Uuid
-  floorId        String                                  @db.Uuid
-  clinicCode     String
-  clinicLabel    String
-  description    String?
-  centerGeom     Unsupported("geometry(Point, 4326)")?
-  outlineGeom    Unsupported("geometry(Polygon, 4326)")?
-  createdAt      DateTime                                @default(now()) @db.Timestamptz()
-  updatedAt      DateTime                                @default(now()) @updatedAt @db.Timestamptz()
+  id          String                                  @id @default(uuid()) @db.Uuid
+  floorId     String                                  @db.Uuid
+  clinicCode  String
+  clinicLabel String
+  description String?
+  centerGeom  Unsupported("geometry(Point, 4326)")?
+  outlineGeom Unsupported("geometry(Polygon, 4326)")?
+  createdAt   DateTime                                @default(now()) @db.Timestamptz()
+  updatedAt   DateTime                                @default(now()) @updatedAt @db.Timestamptz()
 
-  floor          Floor                                   @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  floor          Floor            @relation(fields: [floorId], references: [id], onDelete: Cascade)
   boundaries     ClinicBoundary[]
   physicalRooms  PhysicalRoom[]
   placedFeatures PlacedFeature[]

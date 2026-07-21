@@ -1,11 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IStepRepository } from '../interfaces/i-step.repository';
-import { Prisma, Step } from '@prisma/client';
+import { PaymentStatusEnum, Prisma, Step } from '@prisma/client';
 
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findPendingPaymentStepsByPatientId(patientId: string): Promise<Step[]> {
+    return this.prismaService.step.findMany({
+      where: {
+        flow: {
+          booking: {
+            patient_id: patientId,
+          },
+        },
+        payment_status: PaymentStatusEnum.PENDING,
+      },
+    });
+  }
   findStepByIdAndPatientId(
     stepId: string,
     patientId: string,
@@ -179,12 +191,7 @@ export class PrismaStepRepository implements IStepRepository {
   ): Promise<Step> {
     const db = tx || this.prismaService;
     return db.step.create({
-      data: {
-        flow_id: data.flow_id,
-        room_id: data.room_id,
-        step_status: 'PENDING',
-        staff_id: data.staff_id,
-      },
+      data,
     });
   }
 
@@ -194,12 +201,7 @@ export class PrismaStepRepository implements IStepRepository {
   ): Promise<Step> {
     const db = tx || this.prismaService;
     return db.step.create({
-      data: {
-        parent_step_id: data.parent_step_id,
-        room_id: data.room_id,
-        step_status: 'PENDING',
-        staff_id: data.staff_id,
-      },
+      data,
     });
   }
 

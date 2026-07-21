@@ -154,12 +154,14 @@ export class BookingService {
             step_name: 'Đặt khám',
             step_status: StepStatusEnum.IN_PROGRESS,
             payment_status: PaymentStatusEnum.PENDING,
+            qr_text: createPaymentData.data.qrCode,
           },
           tx,
         );
 
         return {
           step_id: step.step_id,
+          booking_id: booking.booking_id,
           payment: createPaymentData,
         };
       });
