@@ -15,6 +15,9 @@ export class PrismaStepRepository implements IStepRepository {
           },
         },
         payment_status: PaymentStatusEnum.PENDING,
+        step_status: {
+          in: ['IN_PROGRESS', 'PENDING'],
+        },
       },
     });
   }

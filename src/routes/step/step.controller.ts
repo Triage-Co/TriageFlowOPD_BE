@@ -33,6 +33,9 @@ export class StepController {
   constructor(private readonly stepService: StepService) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Lấy danh sách các bước mà bệnh nhân chưa thanh toán',
+  })
   findPendingPaymentStepsByPatientId(@Query('patient_id') patientId: string) {
     return this.stepService.findPendingPaymentStepsByPatientId(patientId);
   }
