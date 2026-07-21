@@ -36,6 +36,8 @@ class EnvClass {
   RESEND_KEY: string;
   @IsString({ message: 'Thiếu KIOSK_KEY TRONG FILE .ENV' })
   KIOSK_KEY: string;
+  @IsString({ message: 'Thiếu CRON_SECRET TRONG FILE .ENV' })
+  CRON_SECRET: string;
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

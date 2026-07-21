@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IStepRepository } from '../interfaces/i-step.repository';
-import { Step } from '@prisma/client';
+import { Prisma, Step } from '@prisma/client';
 
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
@@ -173,8 +173,12 @@ export class PrismaStepRepository implements IStepRepository {
     });
   }
 
-  createParentStep(data: any): Promise<any> {
-    return this.prismaService.step.create({
+  createParentStep(
+    data: Prisma.StepUncheckedCreateWithoutParent_stepInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step> {
+    const db = tx || this.prismaService;
+    return db.step.create({
       data: {
         flow_id: data.flow_id,
         room_id: data.room_id,
@@ -184,8 +188,12 @@ export class PrismaStepRepository implements IStepRepository {
     });
   }
 
-  createSubStep(data: any): Promise<any> {
-    return this.prismaService.step.create({
+  createSubStep(
+    data: Prisma.StepUncheckedCreateWithoutFlowInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step> {
+    const db = tx || this.prismaService;
+    return db.step.create({
       data: {
         parent_step_id: data.parent_step_id,
         room_id: data.room_id,

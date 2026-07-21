@@ -41,6 +41,7 @@ import { NavigationModule } from './routes/navigation/navigation.module';
 import { TemplateModule } from './routes/template/template.module';
 import { JwtModule } from '@nestjs/jwt';
 import { QueueModule } from './routes/queue/queue.module';
+import { CronModule } from './routes/cron/cron.module';
 
 @Module({
   imports: [
@@ -103,6 +104,7 @@ import { QueueModule } from './routes/queue/queue.module';
     QueueModule,
     VisitSessionModule,
     ClinicalDocumentModule,
+    CronModule,
   ],
 })
 export class AppModule {}
