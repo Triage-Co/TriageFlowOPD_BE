@@ -1,10 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateFlowDto } from './dto/create-flow.dto';
-import { UpdateFlowDto } from './dto/update-flow.dto';
 import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { TemplateStepDto } from '../template/dto/create-template.dto';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class FlowService {
@@ -271,24 +269,24 @@ export class FlowService {
     );
   }
 
-  @Cron('59 59 23 * * *', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-  })
-  async changeFlowStatus() {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    await this.prismaService.flow.updateMany({
-      where: {
-        status: {
-          in: ['IN_PROGRESS', 'PENDING'],
-        },
-        created_at: {
-          lt: startOfToday,
-        },
-      },
-      data: {
-        status: 'ABANDONED',
-      },
-    });
-  }
+  // @Cron('59 59 23 * * *', {
+  //   timeZone: 'Asia/Ho_Chi_Minh',
+  // })
+  // async changeFlowStatus() {
+  //   const startOfToday = new Date();
+  //   startOfToday.setHours(0, 0, 0, 0);
+  //   await this.prismaService.flow.updateMany({
+  //     where: {
+  //       status: {
+  //         in: ['IN_PROGRESS', 'PENDING'],
+  //       },
+  //       created_at: {
+  //         lt: startOfToday,
+  //       },
+  //     },
+  //     data: {
+  //       status: 'ABANDONED',
+  //     },
+  //   });
+  // }
 }

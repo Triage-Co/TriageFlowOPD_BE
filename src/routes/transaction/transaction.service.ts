@@ -4,7 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule';
 import { randomInt } from 'crypto';
 import { PayosService } from '../../shared/config/payos.service';
 import { PrismaService } from '../../shared/config/prisma.service';
@@ -139,26 +139,26 @@ export class TransactionService {
   }
 
 
-  @Cron(CronExpression.EVERY_MINUTE)
-  async handleExpiredTransactions() {
-    try {
-      const expirationTime = new Date();
-      expirationTime.setMinutes(expirationTime.getMinutes() - 15);
-      await this.TRANSACTION.updateMany({
-        where: {
-          status: 'PENDING',
-          transDate: {
-            lte: expirationTime,
-          },
-        },
-        data: {
-          status: 'CANCELLED',
-        },
-      });
-    } catch (error) {
-      this.logger.error('Lỗi khi chạy cron job hủy giao dịch:', error);
-    }
-  }
+  // @Cron(CronExpression.EVERY_MINUTE)
+  // async handleExpiredTransactions() {
+  //   try {
+  //     const expirationTime = new Date();
+  //     expirationTime.setMinutes(expirationTime.getMinutes() - 15);
+  //     await this.TRANSACTION.updateMany({
+  //       where: {
+  //         status: 'PENDING',
+  //         transDate: {
+  //           lte: expirationTime,
+  //         },
+  //       },
+  //       data: {
+  //         status: 'CANCELLED',
+  //       },
+  //     });
+  //   } catch (error) {
+  //     this.logger.error('Lỗi khi chạy cron job hủy giao dịch:', error);
+  //   }
+  // }
 
   async findOne(id: string) {
     try {
