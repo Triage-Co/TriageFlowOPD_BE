@@ -1,4 +1,4 @@
-import { Prisma, Step } from "@prisma/client";
+import { Prisma, Step } from '@prisma/client';
 
 export interface IStepRepository {
   createParentStep(
@@ -22,4 +22,5 @@ export interface IStepRepository {
     stepId: string,
     patientId: string,
   ): Promise<Step | null>;
+  findPendingPaymentStepsByPatientId(patientId: string): Promise<Step[]>;
 }

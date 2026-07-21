@@ -11,14 +11,7 @@ export class PrismaShiftRepository implements IShiftRepository {
   ): Promise<Shift> {
     const db = tx || this.prismaService;
     return db.shift.create({
-      data: {
-        room_id: data.room_id,
-        shift_id: data.shift_id,
-        staff_id: data.staff_id,
-        start_time: data.staff_id,
-        end_time: data.end_time,
-        date: data.date,
-      },
+      data,
     });
   }
 }

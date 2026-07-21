@@ -14,9 +14,7 @@ export class PrismaStaffRepository implements IStaffRepository {
     const db = tx || this.prismaService;
 
     return db.staff.create({
-      data: {
-        ...data,
-      },
+      data,
     });
   }
 

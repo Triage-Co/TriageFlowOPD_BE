@@ -223,39 +223,39 @@ export class FlowService {
 
         await saveDependenciesRecursively(templateSteps);
 
-        for (const stepId of createdStepIds) {
-          const currentStep = await tx.step.findUnique({
-            where: { step_id: stepId },
-            select: { parent_step_id: true },
-          });
+        // for (const stepId of createdStepIds) {
+        //   const currentStep = await tx.step.findUnique({
+        //     where: { step_id: stepId },
+        //     select: { parent_step_id: true },
+        //   });
 
-          const dependencyCount = await tx.step_Dependency.count({
-            where: { step_id: stepId },
-          });
+        //   const dependencyCount = await tx.step_Dependency.count({
+        //     where: { step_id: stepId },
+        //   });
 
-          let isReadyToProgress = false;
+        //   let isReadyToProgress = false;
 
-          if (dependencyCount == 0) {
-            if (!currentStep?.parent_step_id) {
-              isReadyToProgress = true;
-            } else {
-              const parentStep = await tx.step.findUnique({
-                where: { step_id: currentStep.parent_step_id },
-                select: { step_status: true },
-              });
+        //   if (dependencyCount == 0) {
+        //     if (!currentStep?.parent_step_id) {
+        //       isReadyToProgress = true;
+        //     } else {
+        //       const parentStep = await tx.step.findUnique({
+        //         where: { step_id: currentStep.parent_step_id },
+        //         select: { step_status: true },
+        //       });
 
-              if (parentStep?.step_status === 'IN_PROGRESS') {
-                isReadyToProgress = true;
-              }
-            }
-          }
-          if (isReadyToProgress) {
-            await tx.step.update({
-              where: { step_id: stepId },
-              data: { step_status: 'IN_PROGRESS' },
-            });
-          }
-        }
+        //       if (parentStep?.step_status === 'IN_PROGRESS') {
+        //         isReadyToProgress = true;
+        //       }
+        //     }
+        //   }
+        //   if (isReadyToProgress) {
+        //     await tx.step.update({
+        //       where: { step_id: stepId },
+        //       data: { step_status: 'IN_PROGRESS' },
+        //     });
+        //   }
+        // }
 
         return {
           code: 200,

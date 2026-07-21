@@ -53,9 +53,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     const db = tx || this.prismaService;
 
     return db.flow.create({
-      data: {
-        booking_id: data.booking_id,
-      },
+      data,
     });
   }
   async findIsActiveByPatientId(patient_id: string): Promise<any> {
