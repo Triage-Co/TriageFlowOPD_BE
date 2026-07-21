@@ -7,13 +7,20 @@ import {
 import {
   BookingSpecialtyDto,
   CreateBookingRequestDto,
-  UpdateBookingRequestDto,
 } from './dto/request-booking.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { PrismaClient } from '@prisma/client';
+import {
+  PaymentStatusEnum,
+  PrismaClient,
+  StepStatusEnum,
+} from '@prisma/client';
 import { TransactionService } from '../transaction/transaction.service';
 import type { INotificationRepository } from '../../shared/interfaces/i-notification.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
+import type { IBookingRepository } from '../../shared/interfaces/i-booking.repository';
+import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
+import type { IShiftRepository } from '../../shared/interfaces/i-shift.repository';
+import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 
 @Injectable()
 export class BookingService {
@@ -34,6 +41,14 @@ export class BookingService {
     private readonly notificationRepository: INotificationRepository,
     @Inject('IPatientRepository')
     private readonly patientRepository: IPatientRepository,
+    @Inject('IBookingRepository')
+    private readonly bookingRepository: IBookingRepository,
+    @Inject('IFlowRepository')
+    private readonly flowRepository: IFlowRepository,
+    @Inject('IShiftRepository')
+    private readonly shiftRepository: IShiftRepository,
+    @Inject('IStepRepository')
+    private readonly stepRepository: IStepRepository,
   ) {
     this.BOOKING = this.prismaService.booking;
     this.SHIFT = this.prismaService.shift;
@@ -49,86 +64,53 @@ export class BookingService {
 
   async create(createBookingRequestDto: CreateBookingRequestDto) {
     try {
-      const exitedPatient = await this.PATIENT.findUnique({
-        where: {
-          patient_id: createBookingRequestDto.patient_id,
-        },
-      });
+      const { patient_id, slot_id } = createBookingRequestDto;
 
-      if (!exitedPatient) {
-        throw new NotFoundException({
-          message: 'Không tìm thấy bệnh nhân',
-          detail: `Không tìm thấy bệnh nhân với id ${createBookingRequestDto.patient_id}`,
-        });
-      }
-
-      const exitedSlot = await this.SLOT.findUnique({
-        where: {
-          slot_id: createBookingRequestDto.slot_id,
-        },
-        include: {
-          shift: {
-            include: {
-              slots: {
-                orderBy: {
-                  start_time: 'asc',
-                },
+      const [existedPatient, existedSlot] = await Promise.all([
+        this.PATIENT.findUnique({
+          where: { patient_id },
+          select: {
+            patient_id: true,
+            account_id: true,
+          },
+        }),
+        this.SLOT.findUnique({
+          where: { slot_id },
+          select: {
+            slot_id: true,
+            capacity: true,
+            start_time: true,
+            end_time: true,
+            shift: {
+              select: {
+                staff_id: true,
+                room_id: true,
               },
             },
           },
-        },
-      });
+        }),
+      ]);
 
-      if (!exitedSlot) {
+      if (!existedPatient) {
+        throw new NotFoundException({
+          message: 'Không tìm thấy bệnh nhân',
+          detail: `Không tìm thấy bệnh nhân với id ${patient_id}`,
+        });
+      }
+
+      if (!existedSlot) {
         throw new NotFoundException({
           message: 'Không tìm thấy slot',
-          detail: `Không tìm thấy slot với id ${createBookingRequestDto.slot_id}`,
+          detail: `Không tìm thấy slot với id ${slot_id}`,
         });
       }
 
-      if (exitedSlot?.capacity! <= 0) {
+      if (existedSlot.capacity <= 0) {
         throw new BadRequestException({
           message: 'Hết slot trong khung giờ',
-          detail: `Không còn slot trong khung giờ ${exitedSlot.start_time}-${exitedSlot.end_time}`,
+          detail: `Không còn slot trong khung giờ ${existedSlot.start_time}-${existedSlot.end_time}`,
         });
       }
-
-      const data = await this.BOOKING.create({
-        data: {
-          ...createBookingRequestDto,
-        },
-      });
-
-      const createFlowData = await this.FLOW.create({
-        data: {
-          booking_id: data.booking_id,
-        },
-        include: {
-          booking: {
-            include: {
-              slot: true,
-            },
-          },
-        },
-      });
-
-      const existedShiftData = await this.SHIFT.findFirst({
-        where: {
-          shift_id: createFlowData.booking.slot.shift_id,
-        },
-        include: {
-          room: true,
-        },
-      });
-
-      // const slotIndex = exitedSlot.shift.slots.findIndex(
-      //   (s) => s.slot_id === createBookingRequestDto.slot_id
-      // );
-
-      // const MAX_CAPACITY_PER_SLOT = 10;
-      // const orderInCurrentSlot = MAX_CAPACITY_PER_SLOT - exitedSlot.capacity + 1;
-
-      // const generatedQueueNumber = (slotIndex * MAX_CAPACITY_PER_SLOT) + orderInCurrentSlot;
 
       const createPaymentData = await this.transactionService.create({
         amount: 2000,
@@ -136,41 +118,57 @@ export class BookingService {
           'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
         returnUrl:
           'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
-        clientId: exitedPatient.account_id,
+        clientId: existedPatient.account_id,
         transType: 'APPOINTMENT_PAYMENT',
       });
 
-      if (!('data' in createPaymentData)) {
-        return (createPaymentData?.detail as any).error?.desc || createFlowData;
+      if (!createPaymentData || !('data' in createPaymentData)) {
+        throw new BadRequestException(
+          (createPaymentData?.detail as any).error?.desc ||
+            'Lỗi tạo giao dịch thanh toán',
+        );
       }
+      const rs = await this.prismaService.$transaction(async (tx) => {
+        const booking = await this.bookingRepository.create(
+          createBookingRequestDto,
+          tx,
+        );
 
-      const createStepData = await this.STEP.create({
-        data: {
-          flow_id: createFlowData.flow_id,
-          room_id: existedShiftData?.room_id,
-          staff_id: existedShiftData?.staff_id,
-          docNo: createPaymentData.data.orderCode,
-          step_name: 'Đặt Khám',
-          payment_status: 'PENDING',
-        },
+        const flow = await this.flowRepository.create(
+          { booking_id: booking.booking_id },
+          tx,
+        );
+
+        const shift = existedSlot.shift;
+
+        if (!shift) {
+          throw new NotFoundException('Không tìm thấy ca trực');
+        }
+
+        const step = await this.stepRepository.createParentStep(
+          {
+            flow_id: flow.flow_id,
+            room_id: shift.room_id,
+            staff_id: shift.staff_id,
+            docNo: createPaymentData.data.orderCode,
+            step_name: 'Đặt khám',
+            step_status: StepStatusEnum.IN_PROGRESS,
+            payment_status: PaymentStatusEnum.PENDING,
+          },
+          tx,
+        );
+
+        return {
+          step_id: step.step_id,
+          payment: createPaymentData,
+        };
       });
-
-      // await this.QUEUE.create({
-      //   data: {
-      //     step_id: createStepData.step_id,
-      //     queue_number: generatedQueueNumber + ""
-      //   }
-      // })
 
       return {
         code: 200,
         message: 'tạo lịch thành công',
         status: 'success',
-        data: {
-          step_id: createStepData.step_id,
-          data,
-          payment: createPaymentData,
-        },
+        data: rs,
       };
     } catch (error) {
       throw error;

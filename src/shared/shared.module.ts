@@ -15,6 +15,8 @@ import { PrismaFlowRepository } from './repositories/prisma-flow.repository';
 import { PrismaTemplateRepository } from './repositories/prisma-template.repository';
 import { PrismaVisitSessionRepository } from './repositories/prisma-visit-session.repository';
 import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical-document.repository';
+import { PrismaBookingRepository } from './repositories/prisma-booking.repository';
+import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
 
 @Global()
 @Module({
@@ -72,6 +74,14 @@ import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical
       provide: 'IClinicalDocumentRepository',
       useClass: PrismaClinicalDocumentRepository,
     },
+    {
+      provide: 'IBookingRepository',
+      useClass: PrismaBookingRepository,
+    },
+    {
+      provide: 'IShiftRepository',
+      useClass: PrismaShiftRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -90,6 +100,8 @@ import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical
     'ITemplateRepository',
     'IVisitSessionRepository',
     'IClinicalDocumentRepository',
+    'IBookingRepository',
+    'IShiftRepository',
   ],
 })
 export class SharedModule {}
