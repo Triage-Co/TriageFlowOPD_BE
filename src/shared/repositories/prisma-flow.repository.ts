@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IFlowRepository } from '../interfaces/i-flow.repository';
-import { Flow } from '@prisma/client';
+import { Flow, Prisma } from '@prisma/client';
 
 const flowIncludeQuery = {
   steps: {
@@ -46,6 +46,18 @@ const findQuery = {
 @Injectable()
 export class PrismaFlowRepository implements IFlowRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  create(
+    data: Prisma.FlowUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Flow> {
+    const db = tx || this.prismaService;
+
+    return db.flow.create({
+      data: {
+        booking_id: data.booking_id,
+      },
+    });
+  }
   async findIsActiveByPatientId(patient_id: string): Promise<any> {
     const rawFlow = await this.prismaService.flow.findMany({
       where: {

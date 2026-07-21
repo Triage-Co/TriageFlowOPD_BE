@@ -1,8 +1,14 @@
-import { Step } from "@prisma/client";
+import { Prisma, Step } from "@prisma/client";
 
 export interface IStepRepository {
-  createParentStep(data: any): Promise<any>;
-  createSubStep(data: any): Promise<any>;
+  createParentStep(
+    data: Prisma.StepUncheckedCreateWithoutParent_stepInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step>;
+  createSubStep(
+    data: Prisma.StepUncheckedCreateWithoutFlowInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step>;
   createDependency(waitingStepId: string, requiredStepId: string): Promise<any>;
   update(id: string, data: any): Promise<any>;
   findAll(): Promise<any>;
