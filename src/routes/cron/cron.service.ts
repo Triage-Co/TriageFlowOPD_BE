@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { StepStatusEnum } from '@prisma/client';
+import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
 
 @Injectable()
 export class CronService {
   constructor(private readonly prismaService: PrismaService) {}
-  async updateExpired() {
+  async updateFlowAndStepExpired() {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
@@ -63,5 +63,27 @@ export class CronService {
         updatedCount: flowResult.count,
       };
     });
+  }
+
+  async updateTransactionStatus() {
+    const currentDate = new Date();
+    currentDate.setMinutes(currentDate.getMinutes() - 10);
+    const rs = await this.prismaService.transaction.updateMany({
+      where: {
+        transDate: {
+          lte: currentDate,
+        },
+        status: {
+          in: [PaymentStatusEnum.PENDING],
+        },
+      },
+      data: {
+        status: PaymentStatusEnum.CANCELLED,
+      },
+    });
+    return {
+      message: 'Cập nhật Transaction quá hạn thành công',
+      updatedCount: rs.count,
+    };
   }
 }
