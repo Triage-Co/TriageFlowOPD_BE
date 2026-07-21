@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 @Injectable()
 export class DoctorService {
@@ -94,12 +95,13 @@ export class DoctorService {
           },
         });
       } else {
-        const dateTime = new Date(dateTimeStr);
+        const timeZone = 'Asia/Ho_Chi_Minh';
 
-        const start = new Date(dateTime);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(dateTime);
-        end.setHours(23, 59, 59, 999);
+        const targetDate = new Date(dateTimeStr);
+        const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+
+        const start = toDate(`${dateString}T00:00:00`, { timeZone });
+        const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
 
         data = await this.STAFF.findMany({
           include: {
@@ -159,7 +161,13 @@ export class DoctorService {
     dateTimeStr: string,
   ) {
     try {
-      const dateTime = new Date(dateTimeStr);
+
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const targetDate = new Date(dateTimeStr);
+      const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+
+      const start = toDate(`${dateString}T00:00:00`, { timeZone });
+      const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
 
       const existedSpecialtyCode = await this.SPECIALTY.findFirst({
         where: {
@@ -182,7 +190,10 @@ export class DoctorService {
           specialty: true,
           shifts: {
             where: {
-              date: dateTime,
+              date: {
+                gte: start,
+                lte: end,
+              },
             },
             select: {
               slots: true,
@@ -248,10 +259,13 @@ export class DoctorService {
   }
   async findOneWithSlotAndDate(id: string, dateTimeStr: string) {
     try {
-      const start = new Date(dateTimeStr);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(dateTimeStr);
-      end.setHours(23, 59, 59, 999);
+      const timeZone = 'Asia/Ho_Chi_Minh';
+
+      const targetDate = new Date(dateTimeStr);
+      const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+
+      const start = toDate(`${dateString}T00:00:00`, { timeZone });
+      const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
       const existedShift = await this.SHIFT.findFirst({
         where: {
           date: {
@@ -332,10 +346,13 @@ export class DoctorService {
       };
 
       if (dateStr) {
-        const start = new Date(dateStr);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(dateStr);
-        end.setHours(23, 59, 59, 999);
+        const timeZone = 'Asia/Ho_Chi_Minh';
+
+        const targetDate = new Date(dateStr);
+        const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+
+        const start = toDate(`${dateString}T00:00:00`, { timeZone });
+        const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
         whereCondition.step.flow = {
           booking: {
             slot: {

@@ -68,6 +68,9 @@ importers:
       class-validator:
         specifier: ^0.15.1
         version: 0.15.1
+      date-fns-tz:
+        specifier: ^3.2.0
+        version: 3.2.0(date-fns@4.4.0)
       dotenv:
         specifier: ^17.2.1
         version: 17.4.2
@@ -2273,6 +2276,11 @@ packages:
 
   d3-voronoi@1.1.2:
     resolution: {integrity: sha512-RhGS1u2vavcO7ay7ZNAPo4xeDh/VYeGof3x5ZLJBQgYhLegxr3s5IykvWmJ94FTU6mcbtp4sloqZ54mP6R4Utw==}
+
+  date-fns-tz@3.2.0:
+    resolution: {integrity: sha512-sg8HqoTEulcbbbVXeg84u5UnlsQa8GS5QXMqjjYIhS4abEVVKIUwe0/l/UhrZdKaL/W5eWZNlbTeEIiOXTcsBQ==}
+    peerDependencies:
+      date-fns: ^3.0.0 || ^4.0.0
 
   date-fns@4.4.0:
     resolution: {integrity: sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==}
@@ -7400,6 +7408,10 @@ snapshots:
       d3-array: 1.2.4
 
   d3-voronoi@1.1.2: {}
+
+  date-fns-tz@3.2.0(date-fns@4.4.0):
+    dependencies:
+      date-fns: 4.4.0
 
   date-fns@4.4.0: {}
 

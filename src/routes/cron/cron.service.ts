@@ -1,13 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 @Injectable()
 export class CronService {
   constructor(private readonly prismaService: PrismaService) {}
   async updateFlowAndStepExpired() {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const now = new Date();
+    const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone });
 
     return this.prismaService.$transaction(async (tx) => {
       const expiredFlows = await tx.flow.findMany({

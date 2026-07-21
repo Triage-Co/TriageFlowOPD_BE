@@ -14,6 +14,7 @@ import {
   PrismaClient,
   StepStatusEnum,
 } from '@prisma/client';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { TransactionService } from '../transaction/transaction.service';
 import type { INotificationRepository } from '../../shared/interfaces/i-notification.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
@@ -21,6 +22,7 @@ import type { IBookingRepository } from '../../shared/interfaces/i-booking.repos
 import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
 import type { IShiftRepository } from '../../shared/interfaces/i-shift.repository';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
+import type { ITriageInformationRepository } from '../../shared/interfaces/i-triage-information.repository';
 
 @Injectable()
 export class BookingService {
@@ -49,6 +51,8 @@ export class BookingService {
     private readonly shiftRepository: IShiftRepository,
     @Inject('IStepRepository')
     private readonly stepRepository: IStepRepository,
+    @Inject('ITriageInformationRepository')
+    private readonly triageInformationRepository: ITriageInformationRepository,
   ) {
     this.BOOKING = this.prismaService.booking;
     this.SHIFT = this.prismaService.shift;
@@ -367,47 +371,63 @@ export class BookingService {
   }
 
   async bookingWithSpecialty(bookingSpecialtyDto: BookingSpecialtyDto) {
-    const exitedTriageInfor = await this.TRIAGE_INFOR.findFirst({
-      where: {
-        interview_token: bookingSpecialtyDto.interview_token,
-      },
-    });
+    const { interview_token, patient_id } = bookingSpecialtyDto;
+    const exitedTriageInformation =
+      await this.triageInformationRepository.findOneByInterviewToken(
+        interview_token,
+      );
 
-    if (!exitedTriageInfor) {
+    if (!exitedTriageInformation) {
       throw new NotFoundException({
         detail: 'Không tìm thấy chuẩn đoán bệnh trong hệ thống',
         message: 'Không tìm thấy chuẩn đoán bệnh trong hệ thống',
       });
     }
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const now = new Date();
 
-    console.log(exitedTriageInfor.specialty_id);
-    const currentDate = new Date();
-    const currentHours = `${currentDate.getHours().toString().padStart(2, '0')}:${currentDate.getMinutes().toString().padStart(2, '0')}`;
+    const currentHours = formatInTimeZone(now, timeZone, 'HH:mm');
 
-    console.log(currentHours);
+    const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+    const startOfToday = toDate(`${todayDateString}T00:00:00`, { timeZone });
 
     const availableSlots = await this.SLOT.findMany({
       where: {
-        start_time: {
-          gte: currentHours,
-        },
         capacity: {
           gt: 0,
         },
         shift: {
           room: {
-            specialty_id: exitedTriageInfor.specialty_id,
+            specialty_id: exitedTriageInformation.specialty_id,
           },
         },
+        OR: [
+          {
+            shift: {
+              date: startOfToday,
+            },
+            start_time: {
+              gte: currentHours,
+            },
+          },
+          {
+            shift: {
+              date: {
+                gt: startOfToday,
+              },
+            },
+          },
+        ],
       },
-      include: {
-        shift: {
-          include: {
-            room: true,
-          },
-        },
+      select: {
+        slot_id: true,
       },
       orderBy: [
+        {
+          shift: {
+            date: 'asc',
+          },
+        },
         {
           start_time: 'asc',
         },
@@ -427,7 +447,7 @@ export class BookingService {
     const bestSlot = availableSlots[0];
 
     const createBookingData: CreateBookingRequestDto = {
-      patient_id: bookingSpecialtyDto.patient_id,
+      patient_id: patient_id,
       slot_id: bestSlot.slot_id,
     };
 

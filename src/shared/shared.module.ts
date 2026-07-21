@@ -17,6 +17,7 @@ import { PrismaVisitSessionRepository } from './repositories/prisma-visit-sessio
 import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical-document.repository';
 import { PrismaBookingRepository } from './repositories/prisma-booking.repository';
 import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
+import { PrismaTriageInformationRepository } from './repositories/prisma-triage-information.repository';
 
 @Global()
 @Module({
@@ -82,6 +83,10 @@ import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
       provide: 'IShiftRepository',
       useClass: PrismaShiftRepository,
     },
+    {
+      provide: 'ITriageInformationRepository',
+      useClass: PrismaTriageInformationRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -102,6 +107,7 @@ import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
     'IClinicalDocumentRepository',
     'IBookingRepository',
     'IShiftRepository',
+    'ITriageInformationRepository',
   ],
 })
 export class SharedModule {}
