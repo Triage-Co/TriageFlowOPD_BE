@@ -84,6 +84,34 @@ export class VisitSessionService {
     return this.visitSessionRepository.update(id, updateDto);
   }
 
+  async findLatestByPatient(patientId: string, reqUser: any) {
+    const account = await this.accountRepository.findById(reqUser.id);
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    if (account.role === 'USER') {
+      const patient = await this.patientRepository.findOne(patientId, reqUser.id);
+      if (!patient) {
+        throw new ForbiddenException("You do not have permission to access this patient's records");
+      }
+    }
+
+    const session = await this.visitSessionRepository.findLatestByPatient(patientId);
+    if (!session) {
+      throw new NotFoundException(`No visit session found for patient ID ${patientId}`);
+    }
+    return session;
+  }
+
+  async updateLatestByPatient(patientId: string, updateDto: UpdateVisitSessionReqDto) {
+    const session = await this.visitSessionRepository.findLatestByPatient(patientId);
+    if (!session) {
+      throw new NotFoundException(`No visit session found for patient ID ${patientId}`);
+    }
+    return this.visitSessionRepository.update(session.visit_session_id, updateDto);
+  }
+
   async remove(id: string) {
     const session = await this.visitSessionRepository.findById(id);
     if (!session) {

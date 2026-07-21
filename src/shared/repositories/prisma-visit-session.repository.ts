@@ -43,6 +43,19 @@ export class PrismaVisitSessionRepository implements IVisitSessionRepository {
     });
   }
 
+  findLatestByPatient(patientId: string): Promise<any> {
+    return this.prismaService.visit_Session.findFirst({
+      where: { patient_id: patientId },
+      orderBy: {
+        visit_date: 'desc',
+      },
+      include: {
+        patient: true,
+        clinicalDocuments: true,
+      },
+    });
+  }
+
   delete(id: string, tx?: Prisma.TransactionClient): Promise<any> {
     const db = tx || this.prismaService;
     return db.visit_Session.delete({

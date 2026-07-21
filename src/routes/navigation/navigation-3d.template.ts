@@ -148,6 +148,123 @@ export function get3DMapHtml(buildingData: any): string {
       color: #1d4ed8;
     }
 
+    /* Pathfinding Navigation Box */
+    .nav-section {
+      background: rgba(0, 0, 0, 0.02);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .nav-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .nav-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-input-group label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748b;
+    }
+    .nav-input-group select {
+      width: 100%;
+      padding: 8px 10px;
+      background: #ffffff;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      color: #0f172a;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .nav-input-group select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    .nav-button-group {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-primary {
+      flex: 1;
+      padding: 8px 14px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+      transition: all 0.2s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+    .btn-secondary {
+      padding: 8px 14px;
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+      font-size: 12px;
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    .route-info-box {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+      color: #065f46;
+      display: none;
+    }
+
+    /* Detail Card Action Buttons */
+    .detail-action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .btn-action-primary {
+      width: 100%;
+      padding: 8px 12px;
+      background: #ffffff;
+      color: #3b82f6;
+      font-weight: 600;
+      font-size: 11px;
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+    .btn-action-primary:hover {
+      background: rgba(59, 130, 246, 0.05);
+      border-color: #3b82f6;
+    }
+
     /* Help overlay */
     .help-overlay {
       position: absolute;
@@ -213,11 +330,39 @@ export function get3DMapHtml(buildingData: any): string {
         <p id="b-address">Địa chỉ</p>
       </div>
 
+      <!-- Navigation & Pathfinding UI Section -->
+      <div class="nav-section">
+        <div class="nav-section-title">🗺️ TÌM ĐƯỜNG ĐI</div>
+        <div class="nav-input-group">
+          <label for="route-start">Điểm xuất phát:</label>
+          <select id="route-start">
+            <option value="">-- Chọn phòng đi --</option>
+          </select>
+        </div>
+        <div class="nav-input-group">
+          <label for="route-target">Điểm đến:</label>
+          <select id="route-target">
+            <option value="">-- Chọn phòng đến --</option>
+          </select>
+        </div>
+        <div class="nav-button-group">
+          <button id="btn-find-route" class="btn-primary">Tìm Đường</button>
+          <button id="btn-clear-route" class="btn-secondary">Xóa</button>
+        </div>
+        <div id="route-info" class="route-info-box"></div>
+      </div>
+
       <div class="detail-card" id="detail-card">
         <h3 id="detail-title">Tên phòng</h3>
         <p id="detail-code">Mã phòng</p>
         <p id="detail-desc">Mô tả chi tiết phòng khám</p>
-        <span class="detail-badge" id="detail-zone">Khu khám</span>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <span class="detail-badge" id="detail-zone">Khu khám</span>
+        </div>
+        <div class="detail-action-buttons">
+          <button id="btn-set-start" class="btn-action-primary">📍 Đặt làm điểm xuất phát</button>
+          <button id="btn-set-target" class="btn-action-primary">🏁 Đặt làm điểm đến</button>
+        </div>
       </div>
     </div>
 
@@ -469,7 +614,7 @@ export function get3DMapHtml(buildingData: any): string {
               const roomMat = new THREE.MeshStandardMaterial({
                 color: roomColor,
                 transparent: true,
-                opacity: 0.8,
+                opacity: 0.28,
                 roughness: 0.2,
                 metalness: 0.1,
                 side: THREE.DoubleSide
@@ -678,14 +823,14 @@ export function get3DMapHtml(buildingData: any): string {
         const mesh = roomIntersect.object;
         if (hoveredMesh !== mesh && mesh !== selectedMesh) {
           if (hoveredMesh && hoveredMesh !== selectedMesh) {
-            hoveredMesh.material.opacity = 0.12;
+            hoveredMesh.material.opacity = 0.28;
           }
           hoveredMesh = mesh;
-          hoveredMesh.material.opacity = 0.35;
+          hoveredMesh.material.opacity = 0.45;
         }
       } else {
         if (hoveredMesh && hoveredMesh !== selectedMesh) {
-          hoveredMesh.material.opacity = 0.12;
+          hoveredMesh.material.opacity = 0.28;
         }
         hoveredMesh = null;
       }
@@ -707,12 +852,15 @@ export function get3DMapHtml(buildingData: any): string {
       }
     }
 
+    let selectedRoomIdForActions = null; // Track selected room for Action buttons
+
     function selectRoom(mesh) {
       if (selectedMesh) {
-        selectedMesh.material.opacity = 0.12;
+        selectedMesh.material.opacity = 0.28;
       }
       selectedMesh = mesh;
-      selectedMesh.material.opacity = 0.45;
+      selectedMesh.material.opacity = 0.55;
+      selectedRoomIdForActions = mesh.userData.id;
       
       detailTitle.textContent = mesh.userData.label;
       detailCode.textContent = 'Mã phòng: ' + mesh.userData.code;
@@ -747,10 +895,168 @@ export function get3DMapHtml(buildingData: any): string {
 
     function deselectRoom() {
       if (selectedMesh) {
-        selectedMesh.material.opacity = 0.12;
+        selectedMesh.material.opacity = 0.28;
         selectedMesh = null;
       }
+      selectedRoomIdForActions = null;
       detailCard.style.display = 'none';
+    }
+
+    // --- Pathfinding Integration ---
+    const selectStart = document.getElementById('route-start');
+    const selectTarget = document.getElementById('route-target');
+    const btnFindRoute = document.getElementById('btn-find-route');
+    const btnClearRoute = document.getElementById('btn-clear-route');
+    const btnSetStart = document.getElementById('btn-set-start');
+    const btnSetTarget = document.getElementById('btn-set-target');
+    const routeInfoBox = document.getElementById('route-info');
+
+    // Populate selects with rooms sorted alphabetically by roomCode
+    if (activeFloor && activeFloor.rooms) {
+      const sortedRooms = [...activeFloor.rooms].sort((a, b) => a.roomCode.localeCompare(b.roomCode));
+      sortedRooms.forEach(room => {
+        const label = room.roomLabel.includes('Phòng trống') ? \`\${room.roomCode} - Phòng trống\` : \`\${room.roomCode} - \${room.roomLabel}\`;
+        
+        const optStart = document.createElement('option');
+        optStart.value = room.id;
+        optStart.textContent = label;
+        selectStart.appendChild(optStart);
+
+        const optTarget = document.createElement('option');
+        optTarget.value = room.id;
+        optTarget.textContent = label;
+        selectTarget.appendChild(optTarget);
+      });
+    }
+
+    // Detail card set points listeners
+    btnSetStart.addEventListener('click', () => {
+      if (selectedRoomIdForActions) {
+        selectStart.value = selectedRoomIdForActions;
+        if (selectTarget.value) {
+          calculateRoute();
+        }
+      }
+    });
+
+    btnSetTarget.addEventListener('click', () => {
+      if (selectedRoomIdForActions) {
+        selectTarget.value = selectedRoomIdForActions;
+        if (selectStart.value) {
+          calculateRoute();
+        }
+      }
+    });
+
+    btnFindRoute.addEventListener('click', calculateRoute);
+    btnClearRoute.addEventListener('click', clearRoute);
+
+    let activePathMesh = null;
+
+    async function calculateRoute() {
+      const startId = selectStart.value;
+      const targetId = selectTarget.value;
+
+      if (!startId || !targetId) {
+        alert('Vui lòng chọn đầy đủ điểm xuất phát và điểm đến!');
+        return;
+      }
+      if (startId === targetId) {
+        alert('Điểm xuất phát và điểm đến không được trùng nhau!');
+        return;
+      }
+
+      routeInfoBox.innerHTML = '⚡ <i>Đang tính toán đường đi tối ưu...</i>';
+      routeInfoBox.style.display = 'block';
+
+      try {
+        const res = await fetch(\`/api/navigation/route?startType=ROOM&startId=\${startId}&targetType=ROOM&targetId=\${targetId}\`);
+        const payload = await res.json();
+        
+        if (payload.status === 'success' && payload.data && payload.data.path && payload.data.path.length > 0) {
+          const routeData = payload.data;
+          routeInfoBox.innerHTML = \`🟢 <b>Tìm đường thành công!</b><br>📏 Quãng đường: <b>\${routeData.totalDistance.toFixed(1)} mét</b>\`;
+          draw3DPath(routeData.path);
+        } else {
+          routeInfoBox.innerHTML = '❌ <b>Không tìm thấy đường đi!</b><br>Đồ thị liên kết có thể chưa được sinh hoàn thiện.';
+          clear3DPath();
+        }
+      } catch (err) {
+        console.error('Lỗi tính đường đi:', err);
+        routeInfoBox.innerHTML = '❌ <b>Lỗi kết nối!</b> Không thể gọi API tìm đường.';
+        clear3DPath();
+      }
+    }
+
+    function draw3DPath(pathNodes) {
+      clear3DPath();
+
+      if (!pathNodes || pathNodes.length < 2) return;
+
+      // 1. Convert node coordinates to 3D vectors
+      const points = pathNodes.map(node => {
+        const pt = convertCoords(node.coords[0], node.coords[1]);
+        // Elevate slightly (0.4m) so it sits floating nicely above the floor slab
+        return new THREE.Vector3(pt.x, 0.4, pt.z);
+      });
+
+      // 2. Build 3D Tube geometry for neon path effect
+      try {
+        const curve = new THREE.CatmullRomCurve3(points);
+        const tubeGeo = new THREE.TubeGeometry(curve, points.length * 4, 0.18, 8, false);
+        const tubeMat = new THREE.MeshStandardMaterial({
+          color: 0x06b6d4, // Cyan Neon
+          emissive: 0x0891b2,
+          emissiveIntensity: 0.6,
+          roughness: 0.1,
+          metalness: 0.8,
+          transparent: true,
+          opacity: 0.85
+        });
+
+        activePathMesh = new THREE.Mesh(tubeGeo, tubeMat);
+        mapGroup.add(activePathMesh);
+      } catch (err) {
+        console.error("Lỗi vẽ 3D Path Tube:", err);
+      }
+
+      // 3. Highlight Start and Target rooms visually
+      const startNode = pathNodes[0];
+      const targetNode = pathNodes[pathNodes.length - 1];
+
+      roomsMap.forEach((mesh) => {
+        const id = mesh.userData.id;
+        mesh.material.color.setHex(0x3b82f6); // Reset color
+        mesh.material.opacity = 0.28;
+
+        if (id === startNode.metadata?.roomId) {
+          mesh.material.color.setHex(0x10b981); // Start is Green
+          mesh.material.opacity = 0.55;
+        } else if (id === targetNode.metadata?.roomId) {
+          mesh.material.color.setHex(0xef476f); // Target is Red
+          mesh.material.opacity = 0.55;
+        }
+      });
+    }
+
+    function clear3DPath() {
+      if (activePathMesh) {
+        mapGroup.remove(activePathMesh);
+        activePathMesh.geometry.dispose();
+        activePathMesh.material.dispose();
+        activePathMesh = null;
+      }
+      roomsMap.forEach((mesh) => {
+        mesh.material.color.setHex(0x3b82f6);
+        mesh.material.opacity = 0.28;
+      });
+    }
+
+    function clearRoute() {
+      selectStart.value = '';
+      selectTarget.value = '';
+      routeInfoBox.style.display = 'none';
+      clear3DPath();
     }
 
     window.addEventListener('resize', onWindowResize);
@@ -761,10 +1067,19 @@ export function get3DMapHtml(buildingData: any): string {
       renderer.setSize(window.innerWidth, window.innerHeight);
     }
 
+    let pulseTime = 0;
+
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
       updateLabels();
+
+      // Pulsing effect for the active path mesh
+      if (activePathMesh) {
+        pulseTime += 0.05;
+        activePathMesh.material.emissiveIntensity = 0.5 + Math.sin(pulseTime) * 0.35;
+      }
+
       renderer.render(scene, camera);
     }
     
