@@ -1,31 +1,67 @@
 import { Injectable } from '@nestjs/common';
-import { CreateCronDto } from './dto/create-cron.dto';
-import { UpdateCronDto } from './dto/update-cron.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { StepStatusEnum } from '@prisma/client';
 
 @Injectable()
 export class CronService {
   constructor(private readonly prismaService: PrismaService) {}
   async updateExpired() {
-    let startOfDay = new Date();
+    const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const result = await this.prismaService.flow.updateMany({
-      where: {
-        created_at: {
-          lt: startOfDay,
-        },
-        status: {
-          in: ['PENDING', 'IN_PROGRESS'],
-        },
-      },
-      data: {
-        status: 'ABANDONED',
-      },
-    });
 
-    return {
-      message: 'Cập nhật trạng thái Flow quá hạn thành công',
-      updatedCount: result.count,
-    };
+    return this.prismaService.$transaction(async (tx) => {
+      const expiredFlows = await tx.flow.findMany({
+        where: {
+          created_at: {
+            lt: startOfDay,
+          },
+          status: {
+            in: ['PENDING', 'IN_PROGRESS'],
+          },
+        },
+        select: {
+          flow_id: true,
+        },
+      });
+
+      const flowIds = expiredFlows.map((f) => f.flow_id);
+
+      if (flowIds.length === 0) {
+        return {
+          message: 'Không có Flow quá hạn',
+          updatedCount: 0,
+        };
+      }
+
+      const flowResult = await tx.flow.updateMany({
+        where: {
+          flow_id: {
+            in: flowIds,
+          },
+        },
+        data: {
+          status: 'ABANDONED',
+        },
+      });
+
+      await tx.step.updateMany({
+        where: {
+          flow_id: {
+            in: flowIds,
+          },
+          step_status: {
+            in: ['PENDING', 'IN_PROGRESS'],
+          },
+        },
+        data: {
+          step_status: StepStatusEnum.CANCELLED,
+        },
+      });
+
+      return {
+        message: 'Cập nhật Flow và Step quá hạn thành công',
+        updatedCount: flowResult.count,
+      };
+    });
   }
 }
