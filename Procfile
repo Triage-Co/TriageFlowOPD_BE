@@ -1,1 +1,1 @@
-web: web: node dist/main.ts
+web: pnpm run start:prod
