@@ -121,7 +121,6 @@ import { JwtStrategy } from './guards/jwt.strategy';
     'ITriageInformationRepository',
     'ISlotRepository',
     PassportModule,
-    JwtStrategy
   ],
 })
 export class SharedModule { }

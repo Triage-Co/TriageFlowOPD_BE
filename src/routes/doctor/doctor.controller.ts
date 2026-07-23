@@ -22,6 +22,7 @@ export class DoctorController {
   constructor(private readonly doctorService: DoctorService) { }
 
   @Get('patients')
+  @ApiBearerAuth()
   @UseGuards(AuthGuard("jwt"))
   @ApiQuery({
     name: 'date',
@@ -34,6 +35,7 @@ export class DoctorController {
   }
 
   @Get('patients/queue/:id')
+  @ApiBearerAuth()
   @UseGuards(AuthGuard("jwt"))
   getPatientByQueueId(@Req() req: any, @Param('id') queueId: string) {
     const { id } = req.user;

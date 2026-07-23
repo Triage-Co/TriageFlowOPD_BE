@@ -322,6 +322,7 @@ export class AuthService {
   }
 
   async getProfile(id: string) {
+    console.log(id)
     const existedAccount = await this.accountRepository.findById(id);
 
     if (!existedAccount) {

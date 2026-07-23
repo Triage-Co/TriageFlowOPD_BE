@@ -29,13 +29,6 @@ export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
 
-  @Get('/profile')
-  @UseGuards(AuthGuard("jwt"))
-  getProfile(@Req() req: any) {
-    const { id } = req.user;
-    return this.authService.getProfile(id);
-  }
-
   @Post('/register')
   signUp(@Body() signUpDto: SignUpReqDto) {
     return this.authService.signUp(signUpDto);
@@ -73,6 +66,16 @@ export class AuthController {
     return this.authService.verifyAndResetPassword(
       verifyAndResetPasswordRequestDto,
     );
+  }
+
+
+  @Get('/profile')
+  @ApiBearerAuth()
+  @UseGuards(AuthGuard("jwt"))
+  getProfile(@Req() req: any) {
+    console.log("t", req.user)
+    const { id } = req.user;
+    return this.authService.getProfile(id);
   }
 
   @Post('/refresh')

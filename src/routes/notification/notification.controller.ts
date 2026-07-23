@@ -2,12 +2,13 @@ import { Controller, Get, Param, Delete, Req, UseGuards } from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
 
 @ApiBearerAuth()
-@UseGuards(IsAuthGuard)
+@UseGuards(AuthGuard("jwt"))
 @Controller('notification')
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(private readonly notificationService: NotificationService) { }
 
   @Get()
   findAll(@Req() req: any) {
