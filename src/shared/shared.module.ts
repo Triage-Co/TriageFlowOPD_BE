@@ -21,10 +21,16 @@ import { PrismaTriageInformationRepository } from './repositories/prisma-triage-
 import { QueueGateway } from './gateways/queue.gateway';
 import { PrismaSlotRepository } from './repositories/prisma-slot.repository';
 import { QueueService } from '../routes/queue/queue.service';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './guards/jwt.strategy';
 
 @Global()
 @Module({
+  imports: [
+    PassportModule.register({ defaultStrategy: "jwt" })
+  ],
   providers: [
+    JwtStrategy,
     ConfigService,
     SupabaseService,
     PrismaService,
@@ -39,10 +45,6 @@ import { QueueService } from '../routes/queue/queue.service';
     {
       provide: 'IAccountRepository',
       useClass: PrismaAccountRepository,
-    },
-    {
-      provide: 'IPatientRepository',
-      useClass: PrismaPatientRepository,
     },
     {
       provide: 'IStaffRepository',
@@ -108,7 +110,6 @@ import { QueueService } from '../routes/queue/queue.service';
     'IPatientRepository',
     'IStaffRepository',
     'IRoomRepository',
-    'IPatientRepository',
     'INotificationRepository',
     'IStepRepository',
     'IFlowRepository',
@@ -119,6 +120,8 @@ import { QueueService } from '../routes/queue/queue.service';
     'IShiftRepository',
     'ITriageInformationRepository',
     'ISlotRepository',
+    PassportModule,
+    JwtStrategy
   ],
 })
-export class SharedModule {}
+export class SharedModule { }

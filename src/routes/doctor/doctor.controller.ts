@@ -15,14 +15,14 @@ import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('doctor')
 export class DoctorController {
-  constructor(private readonly doctorService: DoctorService) {}
+  constructor(private readonly doctorService: DoctorService) { }
 
   @Get('patients')
-  @ApiBearerAuth()
-  @UseGuards(IsAuthGuard)
+  @UseGuards(AuthGuard("jwt"))
   @ApiQuery({
     name: 'date',
     example: '2026-07-04',
@@ -34,8 +34,7 @@ export class DoctorController {
   }
 
   @Get('patients/queue/:id')
-  @ApiBearerAuth()
-  @UseGuards(IsAuthGuard)
+  @UseGuards(AuthGuard("jwt"))
   getPatientByQueueId(@Req() req: any, @Param('id') queueId: string) {
     const { id } = req.user;
     return this.doctorService.getPatientByQueueId(queueId, id);
