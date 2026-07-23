@@ -161,7 +161,6 @@ export class DoctorService {
     dateTimeStr: string,
   ) {
     try {
-
       const timeZone = 'Asia/Ho_Chi_Minh';
       const targetDate = new Date(dateTimeStr);
       const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
@@ -374,11 +373,6 @@ export class DoctorService {
         },
         include: {
           step: {
-            omit: {
-              flow_id: true,
-              room_id: true,
-              staff_id: true,
-            },
             include: {
               flow: {
                 omit: {

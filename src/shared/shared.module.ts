@@ -18,6 +18,9 @@ import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical
 import { PrismaBookingRepository } from './repositories/prisma-booking.repository';
 import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
 import { PrismaTriageInformationRepository } from './repositories/prisma-triage-information.repository';
+import { QueueGateway } from './gateways/queue.gateway';
+import { PrismaSlotRepository } from './repositories/prisma-slot.repository';
+import { QueueService } from '../routes/queue/queue.service';
 
 @Global()
 @Module({
@@ -26,6 +29,8 @@ import { PrismaTriageInformationRepository } from './repositories/prisma-triage-
     SupabaseService,
     PrismaService,
     PayosService,
+    QueueGateway,
+    QueueService,
     GeoService,
     {
       provide: 'IAuthProvider',
@@ -87,11 +92,16 @@ import { PrismaTriageInformationRepository } from './repositories/prisma-triage-
       provide: 'ITriageInformationRepository',
       useClass: PrismaTriageInformationRepository,
     },
+    {
+      provide: 'ISlotRepository',
+      useClass: PrismaSlotRepository,
+    },
   ],
   exports: [
     SupabaseService,
     PrismaService,
     PayosService,
+    QueueGateway,
     GeoService,
     'IAuthProvider',
     'IAccountRepository',
@@ -108,6 +118,7 @@ import { PrismaTriageInformationRepository } from './repositories/prisma-triage-
     'IBookingRepository',
     'IShiftRepository',
     'ITriageInformationRepository',
+    'ISlotRepository',
   ],
 })
 export class SharedModule {}

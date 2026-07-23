@@ -23,6 +23,7 @@ import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository'
 import type { IShiftRepository } from '../../shared/interfaces/i-shift.repository';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import type { ITriageInformationRepository } from '../../shared/interfaces/i-triage-information.repository';
+import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
 
 @Injectable()
 export class BookingService {
@@ -53,6 +54,8 @@ export class BookingService {
     private readonly stepRepository: IStepRepository,
     @Inject('ITriageInformationRepository')
     private readonly triageInformationRepository: ITriageInformationRepository,
+    @Inject('ISlotRepository')
+    private readonly SlotRepository: ISlotRepository,
   ) {
     this.BOOKING = this.prismaService.booking;
     this.SHIFT = this.prismaService.shift;
@@ -152,11 +155,11 @@ export class BookingService {
         const step = await this.stepRepository.createParentStep(
           {
             flow_id: flow.flow_id,
-            room_id: shift.room_id,
-            staff_id: shift.staff_id,
+            // room_id: shift.room_id,
+            // staff_id: shift.staff_id,
             docNo: createPaymentData.data.orderCode,
             step_name: 'Đặt khám',
-            step_status: StepStatusEnum.IN_PROGRESS,
+            step_status: StepStatusEnum.PENDING,
             payment_status: PaymentStatusEnum.PENDING,
             qr_text: createPaymentData.data.qrCode,
           },
@@ -196,7 +199,11 @@ export class BookingService {
             include: {
               booking: {
                 include: {
-                  slot: true,
+                  slot: {
+                    include: {
+                      shift: true,
+                    },
+                  },
                 },
               },
             },
@@ -206,11 +213,39 @@ export class BookingService {
 
       if (!step) throw new NotFoundException('Không tìm thấy Step');
 
-      console.log(step.payment_status);
       if (step.payment_status !== 'SUCCESSED') {
         throw new BadRequestException(
           'Vui lòng thanh toán trước khi lấy số thứ tự',
         );
+      }
+
+      if (step.step_status == StepStatusEnum.COMPLETED) {
+        const existingStepKhamBenh = await this.STEP.findFirst({
+          where: {
+            step_name: 'Khám bệnh',
+            flow_id: step.flow_id,
+          },
+          include: {
+            room: {
+              include: {
+                specialty: true,
+              },
+            },
+            queues: true,
+          },
+        });
+
+        return {
+          code: 200,
+          status: 'success',
+          message: 'Bạn đã có số thứ tự',
+          data: {
+            slot: step.flow?.booking.slot,
+            room: existingStepKhamBenh?.room,
+            specialty: existingStepKhamBenh?.room?.specialty,
+            queue: existingStepKhamBenh?.queues,
+          },
+        };
       }
 
       if (step.flow_id) {
@@ -274,10 +309,19 @@ export class BookingService {
         },
       });
 
+      const shiftData = step.flow?.booking.slot.shift;
+      const stepKhamBenh = await this.stepRepository.createParentStep({
+        room_id: shiftData?.room_id,
+        flow_id: step.flow_id,
+        staff_id: shiftData?.staff_id,
+        step_name: 'Khám bệnh',
+        step_status: 'PENDING',
+      });
+
       const createQueueData = await this.QUEUE.create({
         data: {
-          step_id: step_id,
-          queue_number: generateNumber + '',
+          step_id: stepKhamBenh.step_id,
+          queue_number: generateNumber.toString(),
         },
         include: {
           step: {
@@ -292,7 +336,19 @@ export class BookingService {
                 include: {
                   booking: {
                     include: {
-                      slot: true,
+                      slot: {
+                        include: {
+                          shift: {
+                            include: {
+                              room: {
+                                include: {
+                                  specialty: true,
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -304,7 +360,7 @@ export class BookingService {
 
       if (createQueueData) {
         await this.notificationRepository.create({
-          account_id: step.staff_id,
+          account_id: shiftData?.staff_id,
           message: `Bạn có lượt khám mới lúc ${findSlotData?.start_time} tại phòng ${step.room?.room_name} với số ${createQueueData.queue_number}`,
         });
       }
@@ -327,7 +383,7 @@ export class BookingService {
 
   async findAll() {
     try {
-      const data = await this.BOOKING.findMany();
+      const data = await this.bookingRepository.findMany();
       if (!data) {
         throw new NotFoundException({
           message: 'Danh sách rỗng',
@@ -347,11 +403,7 @@ export class BookingService {
 
   async findOne(id: string) {
     try {
-      const data = await this.BOOKING.findUnique({
-        where: {
-          booking_id: id,
-        },
-      });
+      const data = await this.bookingRepository.findOne(id);
 
       if (!data) {
         throw new NotFoundException({
@@ -383,6 +435,13 @@ export class BookingService {
         message: 'Không tìm thấy chuẩn đoán bệnh trong hệ thống',
       });
     }
+
+    if (!exitedTriageInformation.specialty_id) {
+      throw new NotFoundException({
+        detail: 'Không tìm thấy chuyên khoa trong chuẩn đoán',
+        message: 'Không tìm thấy chuyên khoa trong chuẩn đoán',
+      });
+    }
     const timeZone = 'Asia/Ho_Chi_Minh';
     const now = new Date();
 
@@ -391,51 +450,11 @@ export class BookingService {
     const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const startOfToday = toDate(`${todayDateString}T00:00:00`, { timeZone });
 
-    const availableSlots = await this.SLOT.findMany({
-      where: {
-        capacity: {
-          gt: 0,
-        },
-        shift: {
-          room: {
-            specialty_id: exitedTriageInformation.specialty_id,
-          },
-        },
-        OR: [
-          {
-            shift: {
-              date: startOfToday,
-            },
-            start_time: {
-              gte: currentHours,
-            },
-          },
-          {
-            shift: {
-              date: {
-                gt: startOfToday,
-              },
-            },
-          },
-        ],
-      },
-      select: {
-        slot_id: true,
-      },
-      orderBy: [
-        {
-          shift: {
-            date: 'asc',
-          },
-        },
-        {
-          start_time: 'asc',
-        },
-        {
-          capacity: 'desc',
-        },
-      ],
-    });
+    const availableSlots = await this.SlotRepository.findAvailableSlots(
+      exitedTriageInformation.specialty_id,
+      currentHours,
+      startOfToday,
+    );
 
     if (!availableSlots || availableSlots.length === 0) {
       throw new NotFoundException({
