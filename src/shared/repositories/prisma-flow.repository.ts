@@ -3,26 +3,7 @@ import { PrismaService } from '../config/prisma.service';
 import { IFlowRepository } from '../interfaces/i-flow.repository';
 import { Flow, Prisma } from '@prisma/client';
 
-const flowIncludeQuery = {
-  steps: {
-    include: {
-      dependencies: true,
-      room: true,
-      sub_step: {
-        include: {
-          room: true,
-          dependencies: true,
-        },
-      },
-      parent_step: {
-        include: {
-          room: true,
-          dependencies: true,
-        },
-      },
-    },
-  },
-};
+
 
 const findQuery = {
   steps: {
