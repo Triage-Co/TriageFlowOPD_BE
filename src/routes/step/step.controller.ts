@@ -32,6 +32,14 @@ import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 export class StepController {
   constructor(private readonly stepService: StepService) {}
 
+  @Get()
+  @ApiOperation({
+    summary: 'Lấy danh sách các bước mà bệnh nhân chưa thanh toán',
+  })
+  findPendingPaymentStepsByPatientId(@Query('patient_id') patientId: string) {
+    return this.stepService.findPendingPaymentStepsByPatientId(patientId);
+  }
+
   @Get(':step_id/me')
   @ApiOperation({
     summary: 'Tìm step theo step id của account (đăng nhập với account)',

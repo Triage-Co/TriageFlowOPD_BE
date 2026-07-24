@@ -1,10 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CreateFlowDto } from './dto/create-flow.dto';
-import { UpdateFlowDto } from './dto/update-flow.dto';
 import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { TemplateStepDto } from '../template/dto/create-template.dto';
-import { Cron, CronExpression } from '@nestjs/schedule';
+// import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class FlowService {
@@ -223,39 +221,39 @@ export class FlowService {
 
         await saveDependenciesRecursively(templateSteps);
 
-        for (const stepId of createdStepIds) {
-          const currentStep = await tx.step.findUnique({
-            where: { step_id: stepId },
-            select: { parent_step_id: true },
-          });
+        // for (const stepId of createdStepIds) {
+        //   const currentStep = await tx.step.findUnique({
+        //     where: { step_id: stepId },
+        //     select: { parent_step_id: true },
+        //   });
 
-          const dependencyCount = await tx.step_Dependency.count({
-            where: { step_id: stepId },
-          });
+        //   const dependencyCount = await tx.step_Dependency.count({
+        //     where: { step_id: stepId },
+        //   });
 
-          let isReadyToProgress = false;
+        //   let isReadyToProgress = false;
 
-          if (dependencyCount == 0) {
-            if (!currentStep?.parent_step_id) {
-              isReadyToProgress = true;
-            } else {
-              const parentStep = await tx.step.findUnique({
-                where: { step_id: currentStep.parent_step_id },
-                select: { step_status: true },
-              });
+        //   if (dependencyCount == 0) {
+        //     if (!currentStep?.parent_step_id) {
+        //       isReadyToProgress = true;
+        //     } else {
+        //       const parentStep = await tx.step.findUnique({
+        //         where: { step_id: currentStep.parent_step_id },
+        //         select: { step_status: true },
+        //       });
 
-              if (parentStep?.step_status === 'IN_PROGRESS') {
-                isReadyToProgress = true;
-              }
-            }
-          }
-          if (isReadyToProgress) {
-            await tx.step.update({
-              where: { step_id: stepId },
-              data: { step_status: 'IN_PROGRESS' },
-            });
-          }
-        }
+        //       if (parentStep?.step_status === 'IN_PROGRESS') {
+        //         isReadyToProgress = true;
+        //       }
+        //     }
+        //   }
+        //   if (isReadyToProgress) {
+        //     await tx.step.update({
+        //       where: { step_id: stepId },
+        //       data: { step_status: 'IN_PROGRESS' },
+        //     });
+        //   }
+        // }
 
         return {
           code: 200,
@@ -271,24 +269,24 @@ export class FlowService {
     );
   }
 
-  @Cron('59 59 23 * * *', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-  })
-  async changeFlowStatus() {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    await this.prismaService.flow.updateMany({
-      where: {
-        status: {
-          in: ['IN_PROGRESS', 'PENDING'],
-        },
-        created_at: {
-          lt: startOfToday,
-        },
-      },
-      data: {
-        status: 'ABANDONED',
-      },
-    });
-  }
+  // @Cron('59 59 23 * * *', {
+  //   timeZone: 'Asia/Ho_Chi_Minh',
+  // })
+  // async changeFlowStatus() {
+  //   const startOfToday = new Date();
+  //   startOfToday.setHours(0, 0, 0, 0);
+  //   await this.prismaService.flow.updateMany({
+  //     where: {
+  //       status: {
+  //         in: ['IN_PROGRESS', 'PENDING'],
+  //       },
+  //       created_at: {
+  //         lt: startOfToday,
+  //       },
+  //     },
+  //     data: {
+  //       status: 'ABANDONED',
+  //     },
+  //   });
+  // }
 }

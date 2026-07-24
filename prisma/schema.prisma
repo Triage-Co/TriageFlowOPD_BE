@@ -284,7 +284,11 @@ model Step {
   room_id        String?            @db.Uuid
   staff_id       String?            @db.Uuid
   step_status    StepStatusEnum     @default(PENDING)
+<<<<<<< HEAD
   qr_text        String?            @db.Text
+=======
+  qr_text        String?
+>>>>>>> f5bc3d31600ab3311b2469f9b92f8a0a153f431e
   docNo          Int?
   payment_status PaymentStatusEnum?
   created_at     DateTime           @default(now()) @db.Timestamptz()
@@ -823,19 +827,32 @@ model PlacedFeature {
   @@map("placed_feature")
 }
 
+<<<<<<< HEAD
 model Area {
   id          String                                  @id @default(uuid()) @db.Uuid
   floorId     String                                  @db.Uuid
   areaCode    String
   areaLabel   String
+=======
+model Clinic {
+  id          String                                  @id @default(uuid()) @db.Uuid
+  floorId     String                                  @db.Uuid
+  clinicCode  String
+  clinicLabel String
+>>>>>>> f5bc3d31600ab3311b2469f9b92f8a0a153f431e
   description String?
   centerGeom  Unsupported("geometry(Point, 4326)")?
   outlineGeom Unsupported("geometry(Polygon, 4326)")?
   createdAt   DateTime                                @default(now()) @db.Timestamptz()
   updatedAt   DateTime                                @default(now()) @updatedAt @db.Timestamptz()
 
+<<<<<<< HEAD
   floor          Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
   boundaries     Boundary[]
+=======
+  floor          Floor            @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  boundaries     ClinicBoundary[]
+>>>>>>> f5bc3d31600ab3311b2469f9b92f8a0a153f431e
   physicalRooms  PhysicalRoom[]
   placedFeatures PlacedFeature[]
   doors          Door[]

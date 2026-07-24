@@ -10,10 +10,7 @@ export class PrismaBookingRepository implements IBookingRepository {
   ): Promise<Booking> {
     const db = tx || this.prismaService;
     return db.booking.create({
-      data: {
-        patient_id: data.patient_id,
-        slot_id: data.slot_id,
-      },
+      data,
     });
   }
 }

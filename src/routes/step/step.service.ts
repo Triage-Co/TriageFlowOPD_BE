@@ -211,4 +211,15 @@ export class StepService {
       data: updatedStep,
     };
   }
+
+  async findPendingPaymentStepsByPatientId(patientId: string) {
+    const steps =
+      await this.stepRepository.findPendingPaymentStepsByPatientId(patientId);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy danh sách các bước thành công',
+      data: steps,
+    };
+  }
 }
