@@ -606,7 +606,8 @@ model Floor {
   nodes          Node[]
   doors          Door[]
   placedFeatures PlacedFeature[]
-  clinics        Clinic[]
+  areas          Area[]
+  boundaries     Boundary[]
 
   @@unique([buildingId, floorNumber])
   @@index([buildingId])
@@ -627,8 +628,8 @@ model PhysicalRoom {
   updatedAt    DateTime                                @default(now()) @updatedAt @db.Timestamptz()
 
   floor              Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
-  boundaries         RoomBoundary[]
-  adjacentBoundaries RoomBoundary[]  @relation("AdjacentRoom")
+  boundaries         Boundary[]
+  adjacentBoundaries Boundary[]      @relation("AdjacentRoom")
   pois               Poi[]
   placedFeatures     PlacedFeature[]
   doorsAsRoomA       Door[]          @relation("DoorRoomA")
@@ -636,41 +637,43 @@ model PhysicalRoom {
   shifts             Shift[]
   steps              Step[]
   rooms              Room[]
-  clinicId           String?         @db.Uuid
-  clinic             Clinic?         @relation(fields: [clinicId], references: [id])
+  areaId             String?         @db.Uuid
+  area               Area?           @relation(fields: [areaId], references: [id])
 
   @@unique([floorId, roomCode])
   @@index([floorId])
   @@map("physical_room")
 }
 
-model RoomBoundary {
+model Boundary {
   id             String                                     @id @default(uuid()) @db.Uuid
-  roomId         String                                     @db.Uuid
+  floorId        String                                     @db.Uuid
+  roomId         String?                                    @db.Uuid
+  areaId         String?                                    @db.Uuid
   seqNo          Int
-  // LineString replaces start/end points — supports curved walls and arcs
   lineGeom       Unsupported("geometry(LineString, 4326)")?
   boundaryType   BoundaryType
   adjacentRoomId String?                                    @db.Uuid
   hasWall        Boolean                                    @default(true)
-  // If this boundary segment is a door, reference the Door record
   doorId         String?                                    @db.Uuid
+  label          String?
 
-  room         PhysicalRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  floor        Floor         @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  room         PhysicalRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  area         Area?         @relation(fields: [areaId], references: [id], onDelete: Cascade)
   adjacentRoom PhysicalRoom? @relation("AdjacentRoom", fields: [adjacentRoomId], references: [id])
-  // SetNull: boundary persists with doorId=null if the Door record is removed
   door         Door?         @relation(fields: [doorId], references: [id], onDelete: SetNull)
 
-  @@unique([roomId, seqNo])
+  @@index([floorId])
   @@index([roomId])
-  @@map("room_boundary")
+  @@index([areaId])
+  @@map("boundary")
 }
 
 model Door {
   id           String                                @id @default(uuid()) @db.Uuid
   floorId      String                                @db.Uuid
   nodeId       String?                               @db.Uuid // routing graph node at this door
-  // Both room links are nullable: corridor door → roomA set, roomB = null
   roomAId      String?                               @db.Uuid
   roomBId      String?                               @db.Uuid
   positionGeom Unsupported("geometry(Point, 4326)")?
@@ -679,14 +682,13 @@ model Door {
   active       Boolean                               @default(true)
   createdAt    DateTime                              @default(now()) @db.Timestamptz()
 
-  floor      Floor          @relation(fields: [floorId], references: [id], onDelete: Cascade)
-  // SetNull: door persists with nodeId=null if the routing Node is removed
-  node       Node?          @relation(fields: [nodeId], references: [id], onDelete: SetNull)
-  roomA      PhysicalRoom?  @relation("DoorRoomA", fields: [roomAId], references: [id])
-  roomB      PhysicalRoom?  @relation("DoorRoomB", fields: [roomBId], references: [id])
-  boundaries RoomBoundary[]
-  clinicId   String?        @db.Uuid
-  clinic     Clinic?        @relation(fields: [clinicId], references: [id])
+  floor      Floor         @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  node       Node?         @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  roomA      PhysicalRoom? @relation("DoorRoomA", fields: [roomAId], references: [id])
+  roomB      PhysicalRoom? @relation("DoorRoomB", fields: [roomBId], references: [id])
+  boundaries Boundary[]
+  areaId     String?       @db.Uuid
+  area       Area?         @relation(fields: [areaId], references: [id])
 
   @@index([floorId, active])
   @@index([nodeId])
@@ -810,51 +812,36 @@ model PlacedFeature {
   geometryGeom     Unsupported("geometry")?
   customProperties Json?
 
-  floor    Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
-  room     PhysicalRoom?   @relation(fields: [roomId], references: [id])
-  template FeatureTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  clinicId String?         @db.Uuid
-  clinic   Clinic?         @relation(fields: [clinicId], references: [id])
+  floor      Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  room       PhysicalRoom?   @relation(fields: [roomId], references: [id])
+  template   FeatureTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  areaId     String?         @db.Uuid
+  area       Area?           @relation(fields: [areaId], references: [id])
 
   @@index([floorId, templateId])
   @@map("placed_feature")
 }
 
-model Clinic {
-  id             String                                  @id @default(uuid()) @db.Uuid
-  floorId        String                                  @db.Uuid
-  clinicCode     String
-  clinicLabel    String
-  description    String?
-  centerGeom     Unsupported("geometry(Point, 4326)")?
-  outlineGeom    Unsupported("geometry(Polygon, 4326)")?
-  createdAt      DateTime                                @default(now()) @db.Timestamptz()
-  updatedAt      DateTime                                @default(now()) @updatedAt @db.Timestamptz()
+model Area {
+  id          String                                  @id @default(uuid()) @db.Uuid
+  floorId     String                                  @db.Uuid
+  areaCode    String
+  areaLabel   String
+  description String?
+  centerGeom  Unsupported("geometry(Point, 4326)")?
+  outlineGeom Unsupported("geometry(Polygon, 4326)")?
+  createdAt   DateTime                                @default(now()) @db.Timestamptz()
+  updatedAt   DateTime                                @default(now()) @updatedAt @db.Timestamptz()
 
-  floor          Floor                                   @relation(fields: [floorId], references: [id], onDelete: Cascade)
-  boundaries     ClinicBoundary[]
+  floor          Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  boundaries     Boundary[]
   physicalRooms  PhysicalRoom[]
   placedFeatures PlacedFeature[]
   doors          Door[]
 
-  @@unique([floorId, clinicCode])
+  @@unique([floorId, areaCode])
   @@index([floorId])
-  @@map("clinic")
-}
-
-model ClinicBoundary {
-  id           String                                     @id @default(uuid()) @db.Uuid
-  clinicId     String                                     @db.Uuid
-  seqNo        Int
-  lineGeom     Unsupported("geometry(LineString, 4326)")?
-  boundaryType BoundaryType
-  hasWall      Boolean                                    @default(true)
-
-  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
-
-  @@unique([clinicId, seqNo])
-  @@index([clinicId])
-  @@map("clinic_boundary")
+  @@map("area")
 }
 
 // ─── Blockage (independent module) ───────────────────────────────────────────
