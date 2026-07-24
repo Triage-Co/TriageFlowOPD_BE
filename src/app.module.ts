@@ -37,12 +37,20 @@ import { CronModule } from './routes/cron/cron.module';
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
-        const store = await redisStore({
-          url: process.env.REDIS_URL,
-        });
-        return {
-          store,
-        };
+        try {
+          const store = await redisStore({
+            url: process.env.REDIS_URL,
+          });
+          return {
+            store,
+          };
+        } catch (error) {
+          console.warn('Redis connection failed, falling back to in-memory cache:', error.message);
+          return {
+            store: 'memory',
+            ttl: 300,
+          };
+        }
       },
     }),
     ConfigModule.forRoot({
