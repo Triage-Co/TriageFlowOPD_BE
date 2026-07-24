@@ -64,6 +64,37 @@ export class VisitSessionController {
     return this.visitSessionService.getMySessions(id);
   }
 
+  @Get('patient/:patient_id/latest')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ALL] Lấy phiên khám mới nhất của bệnh nhân',
+    description: 'Endpoint lấy phiên khám mới nhất của một bệnh nhân cụ thể. Nhân viên y tế có thể xem của bất kỳ bệnh nhân nào, Bệnh nhân (USER) chỉ có thể xem của chính mình hoặc người phụ thuộc thuộc tài khoản của họ.',
+  })
+  @ApiResponse({ status: 200, description: 'Lấy phiên khám mới nhất thành công.' })
+  @ApiResponse({ status: 403, description: 'Không có quyền truy cập vào thông tin bệnh nhân khác.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy phiên khám nào.' })
+  findLatestByPatient(@Param('patient_id') patient_id: string, @Req() req: any) {
+    return this.visitSessionService.findLatestByPatient(patient_id, req.user);
+  }
+
+  @Patch('patient/:patient_id/latest')
+  @roles('DOCTOR', 'NURSE', 'RECEPTIONIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[STAFF - ADMIN] Cập nhật phiên khám mới nhất của bệnh nhân',
+    description: 'Endpoint dành cho Nhân viên y tế cập nhật thông tin phiên khám mới nhất của bệnh nhân.',
+  })
+  @ApiResponse({ status: 200, description: 'Cập nhật phiên khám thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy phiên khám nào.' })
+  updateLatestByPatient(
+    @Param('patient_id') patient_id: string,
+    @Body() updateDto: UpdateVisitSessionReqDto,
+  ) {
+    return this.visitSessionService.updateLatestByPatient(patient_id, updateDto);
+  }
+
   @Get('patient/:patient_id')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()

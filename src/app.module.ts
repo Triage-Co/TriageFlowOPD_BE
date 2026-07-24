@@ -2,22 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SharedModule } from './shared/shared.module';
 import { ScheduleModule } from '@nestjs/schedule';
-import { BuildingModule } from './routes/building/building.module';
-import { FloorModule } from './routes/floor/floor.module';
-import { PhysicalRoomModule } from './routes/physical-room/physical-room.module';
-import { RoomBoundaryModule } from './routes/room-boundary/room-boundary.module';
-import { ClinicModule } from './routes/clinic/clinic.module';
-import { ClinicBoundaryModule } from './routes/clinic-boundary/clinic-boundary.module';
-import { DoorModule } from './routes/door/door.module';
-import { CategoryModule } from './routes/category/category.module';
-import { PoiModule } from './routes/poi/poi.module';
-import { NodeModule } from './routes/node/node.module';
-import { EdgeModule } from './routes/edge/edge.module';
-import { ConnectorModule } from './routes/connector/connector.module';
-import { GraphModule } from './routes/graph/graph.module';
-import { FeatureTemplateModule } from './routes/feature-template/feature-template.module';
-import { PlacedFeatureModule } from './routes/placed-feature/placed-feature.module';
-import { BlockageModule } from './routes/blockage/blockage.module';
+
+import { MapModule } from './routes/map/map.module';
+import { NavigationModule } from './routes/navigation/navigation.module';
+
 import { AuthModule } from './routes/auth/auth.module';
 import { ShiftModule } from './routes/shift/shift.module';
 import { RoomModule } from './routes/room/room.module';
@@ -39,7 +27,6 @@ import { ClinicalDocumentModule } from './routes/clinical-document/clinical-docu
 
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
-import { NavigationModule } from './routes/navigation/navigation.module';
 import { TemplateModule } from './routes/template/template.module';
 import { JwtModule } from '@nestjs/jwt';
 import { QueueModule } from './routes/queue/queue.module';
@@ -50,12 +37,20 @@ import { CronModule } from './routes/cron/cron.module';
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => {
-        const store = await redisStore({
-          url: process.env.REDIS_URL,
-        });
-        return {
-          store,
-        };
+        try {
+          const store = await redisStore({
+            url: process.env.REDIS_URL,
+          });
+          return {
+            store,
+          };
+        } catch (error) {
+          console.warn('Redis connection failed, falling back to in-memory cache:', error.message);
+          return {
+            store: 'memory',
+            ttl: 300,
+          };
+        }
       },
     }),
     ConfigModule.forRoot({
@@ -70,6 +65,8 @@ import { CronModule } from './routes/cron/cron.module';
     }),
     ScheduleModule.forRoot(),
     SharedModule,
+    MapModule,
+    NavigationModule,
     AuthModule,
     JwtModule,
     StaffModule,
@@ -77,22 +74,6 @@ import { CronModule } from './routes/cron/cron.module';
     RoomModule,
     BookingModule,
     StepModule,
-    BuildingModule,
-    FloorModule,
-    PhysicalRoomModule,
-    RoomBoundaryModule,
-    ClinicModule,
-    ClinicBoundaryModule,
-    DoorModule,
-    CategoryModule,
-    PoiModule,
-    NodeModule,
-    EdgeModule,
-    ConnectorModule,
-    GraphModule,
-    FeatureTemplateModule,
-    PlacedFeatureModule,
-    BlockageModule,
     TriageConfigModule,
     TransactionModule,
     InfermedicaModule,
@@ -101,7 +82,6 @@ import { CronModule } from './routes/cron/cron.module';
     NotificationModule,
     VnptModule,
     AccountModule,
-    NavigationModule,
     FlowModule,
     SpecialtyModule,
     TemplateModule,
