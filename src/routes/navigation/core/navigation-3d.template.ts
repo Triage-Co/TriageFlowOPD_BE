@@ -522,9 +522,13 @@ export function get3DMapHtml(buildingData: any): string {
           floorMesh.receiveShadow = true;
           mapGroup.add(floorMesh);
         }
-      } catch      if (activeFloor.areas) {
+      } catch (err) {
+        console.error("Lỗi vẽ floor outline:", err);
+      }
+
+      // 1b. Draw Area boundaries (ĐÃ ĐỒNG BỘ Y NHƯ ROOM WALLS)
+      if (activeFloor.areas) {
         activeFloor.areas.forEach(area => {
-          const color = AREA_COLORS[area.areaCode] || AREA_COLORS.Default;
           if (area.boundaries) {
             area.boundaries.forEach(boundary => {
               try {
@@ -536,10 +540,11 @@ export function get3DMapHtml(buildingData: any): string {
                   const dx = p2.x - p1.x;
                   const dz = p2.z - p1.z;
                   const distance = Math.sqrt(dx*dx + dz*dz);
+                  if (distance < 0.05) return; // skip zero-length segments
                   const angle = Math.atan2(dz, dx);
 
                   if (boundary.boundaryType === 'DOOR') {
-                    // Render precise 3D door box collinear to Area Boundary segment (thickness 0.2m)
+                    // Cửa Area chuẩn hóa kích thước giống cửa Room
                     const doorGeo = new THREE.BoxGeometry(distance, 2.0, 0.2);
                     const doorMat = new THREE.MeshStandardMaterial({
                       color: 0x38bdf8,
@@ -551,7 +556,7 @@ export function get3DMapHtml(buildingData: any): string {
                     doorMesh.rotation.y = -angle;
                     mapGroup.add(doorMesh);
                   } else {
-                    // Render standard wall (thickness 0.15m, height 3.0m, color gray/white)
+                    // Tường Area chuẩn hóa 100% giống tường Room: cao 3.0m, dày 0.15m, màu 0xe2e8f0
                     const wallGeo = new THREE.BoxGeometry(distance, 3.0, 0.15);
                     const wallMat = new THREE.MeshStandardMaterial({
                       color: 0xe2e8f0,
@@ -559,7 +564,6 @@ export function get3DMapHtml(buildingData: any): string {
                       metalness: 0.1
                     });
                     const wallMesh = new THREE.Mesh(wallGeo, wallMat);
-                    
                     wallMesh.position.set((p1.x + p2.x)/2, 1.5, (p1.z + p2.z)/2);
                     wallMesh.rotation.y = -angle;
                     mapGroup.add(wallMesh);
@@ -580,13 +584,9 @@ export function get3DMapHtml(buildingData: any): string {
             });
           }
         });
-      } (err) {
-                console.error("Lỗi vẽ clinic boundary:", err);
-              }
-            });
-          }
-        });
-      // 1c. Draw Standalone Boundaries (Railings, freestanding walls, partitions)
+      }
+
+      // 1c. Draw Standalone Boundaries (ĐÃ ĐỒNG BỘ Y NHƯ ROOM WALLS)
       if (activeFloor.standaloneBoundaries) {
         activeFloor.standaloneBoundaries.forEach(boundary => {
           try {
@@ -598,26 +598,49 @@ export function get3DMapHtml(buildingData: any): string {
               const dx = p2.x - p1.x;
               const dz = p2.z - p1.z;
               const distance = Math.sqrt(dx*dx + dz*dz);
+              if (distance < 0.05) return; // skip zero-length segments
               const angle = Math.atan2(dz, dx);
 
-              const wallGeo = new THREE.BoxGeometry(distance, 1.2, 0.1);
-              const wallMat = new THREE.MeshStandardMaterial({
-                color: 0x64748b,
-                roughness: 0.5,
-                metalness: 0.2
-              });
-              const wallMesh = new THREE.Mesh(wallGeo, wallMat);
-              wallMesh.position.set((p1.x + p2.x)/2, 0.6, (p1.z + p2.z)/2);
-              wallMesh.rotation.y = -angle;
-              mapGroup.add(wallMesh);
+              if (boundary.boundaryType === 'DOOR') {
+                // Cửa bao ngoài/vách ngăn chuẩn hóa kích thước giống cửa Room
+                const doorGeo = new THREE.BoxGeometry(distance, 2.0, 0.2);
+                const doorMat = new THREE.MeshStandardMaterial({
+                  color: 0x38bdf8,
+                  roughness: 0.3,
+                  metalness: 0.2
+                });
+                const doorMesh = new THREE.Mesh(doorGeo, doorMat);
+                doorMesh.position.set((p1.x + p2.x)/2, 1.0, (p1.z + p2.z)/2);
+                doorMesh.rotation.y = -angle;
+                mapGroup.add(doorMesh);
+              } else {
+                // Tất cả Tường bao ngoài & Vách ngăn chuẩn hóa 100% giống tường Room
+                const wallGeo = new THREE.BoxGeometry(distance, 3.0, 0.15);
+                const wallMat = new THREE.MeshStandardMaterial({
+                  color: 0xe2e8f0,
+                  roughness: 0.4,
+                  metalness: 0.1
+                });
+                const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+                wallMesh.position.set((p1.x + p2.x)/2, 1.5, (p1.z + p2.z)/2);
+                wallMesh.rotation.y = -angle;
+                mapGroup.add(wallMesh);
+
+                const edges = new THREE.EdgesGeometry(wallGeo);
+                const wireframe = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+                  color: 0x94a3b8,
+                  linewidth: 1.5,
+                  transparent: true,
+                  opacity: 0.2
+                }));
+                wallMesh.add(wireframe);
+              }
             }
           } catch (err) {
             console.error("Lỗi vẽ standalone boundary:", err);
           }
         });
       }
-
-
 
       // 2. Build Rooms (With uniform premium blue/teal theme)
       if (activeFloor.rooms) {
@@ -732,8 +755,6 @@ export function get3DMapHtml(buildingData: any): string {
           }
         });
       }
-
-
 
       // 3. Draw Navigation Nodes as small circular dots
       try {
@@ -923,9 +944,9 @@ export function get3DMapHtml(buildingData: any): string {
       
       detailTitle.textContent = mesh.userData.label;
       detailCode.textContent = 'Mã phòng: ' + mesh.userData.code;
-      detailDesc.textContent = 'Phòng khám thuộc ' + mesh.userData.clinicLabel + '.';
-      detailZone.textContent = mesh.userData.clinicLabel;
-      const colorHex = '#' + mesh.userData.clinicColor.toString(16).padStart(6, '0');
+      detailDesc.textContent = 'Phòng khám thuộc ' + mesh.userData.areaLabel + '.';
+      detailZone.textContent = mesh.userData.areaLabel;
+      const colorHex = '#' + mesh.userData.areaColor.toString(16).padStart(6, '0');
       detailZone.style.backgroundColor = colorHex;
       detailZone.style.color = '#ffffff';
       detailCard.style.display = 'block';
