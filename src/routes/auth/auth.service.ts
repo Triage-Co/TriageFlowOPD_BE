@@ -39,11 +39,7 @@ export class AuthService {
 
   async signUp(signUpRequestDto: SignUpReqDto) {
     const { user_name, gender, email, password, phone } = signUpRequestDto;
-
-    if (await this.accountRepository.findByEmail(email)) {
-      throw AuthErrors.EmailExists(email);
-    }
-
+    console.time('1');
     const { data, error } = await this.authProvider.signUp(email, password, {
       user_name,
       gender,
@@ -67,6 +63,7 @@ export class AuthService {
         }
       }
     }
+    console.timeEnd('1');
 
     if (!data?.user?.id) {
       throw AuthErrors.ProviderError(
@@ -79,6 +76,8 @@ export class AuthService {
     let isLocalAccountCreated = false;
 
     try {
+      console.time('2');
+
       const newAccount = await this.accountRepository.create({
         account_id: account_id,
         email: email,
@@ -89,6 +88,7 @@ export class AuthService {
       });
 
       isLocalAccountCreated = true;
+      console.timeEnd('2');
 
       return {
         code: 200,
@@ -128,10 +128,6 @@ export class AuthService {
 
   async signInWithEmail(signInWithEmailRequestDto: SignInWithEmailRequestDto) {
     const { email, password } = signInWithEmailRequestDto;
-
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
 
     const { data, error } = await this.authProvider.signInWithPassword(
       email,
@@ -179,10 +175,6 @@ export class AuthService {
   async signInWithOtp(signInWithOtpRequestDto: SignInWithOtpRequestDto) {
     const { email } = signInWithOtpRequestDto;
 
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
-
     const { error } = await this.authProvider.signInWithOtp(email);
 
     if (error) {
@@ -196,44 +188,8 @@ export class AuthService {
     };
   }
 
-  async SignInWithCitizenId(
-    signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
-  ) {
-    const existedPatient: Patient =
-      await this.patientRepository.findByCitizenId(
-        signInWithCitizenIdRequestDto.citizen_id,
-      );
-    if (!existedPatient) {
-      throw AuthErrors.PatientNotFoundByCitizenId(
-        signInWithCitizenIdRequestDto.citizen_id,
-      );
-    }
-
-    const payload = {
-      sub: existedPatient.patient_id,
-      id: existedPatient.patient_id,
-      patient: existedPatient,
-    };
-    const token = await this.jwtService.signAsync(payload);
-
-    return {
-      code: 200,
-      status: 'success',
-      message: 'Đăng nhập thành công',
-      data: {
-        token: token,
-        patient_id: existedPatient.patient_id,
-        citizen_id: existedPatient.citizen_id,
-      },
-    };
-  }
-
   async verifyOtpSignIn(verifyOtpSignInRequestDto: VerifyOtpSignInRequestDto) {
     const { email, otp } = verifyOtpSignInRequestDto;
-
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
 
     const { data, error } = await this.authProvider.verifyOtp(
       email,
@@ -267,10 +223,6 @@ export class AuthService {
   async forgotPassword(forgotPasswordRequestDto: ForgotPasswordRequestDto) {
     const { email } = forgotPasswordRequestDto;
 
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
-
     const { error } = await this.authProvider.resetPasswordForEmail(email);
 
     if (error) {
@@ -288,10 +240,6 @@ export class AuthService {
     verifyAndResetPasswordRequestDto: VerifyAndResetPasswordRequestDto,
   ) {
     const { email, otp, new_password } = verifyAndResetPasswordRequestDto;
-
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
 
     const { data, error } = await this.authProvider.verifyOtp(
       email,
@@ -374,9 +322,10 @@ export class AuthService {
   }
 
   async getProfile(id: string) {
-    const existedAccout = await this.accountRepository.findById(id);
+    console.log(id)
+    const existedAccount = await this.accountRepository.findById(id);
 
-    if (!existedAccout) {
+    if (!existedAccount) {
       throw AuthErrors.UserNotFoundById(id);
     }
 
@@ -384,7 +333,7 @@ export class AuthService {
       code: 200,
       message: 'Lấy thông tin người dùng thành công',
       status: 'success',
-      data: existedAccout,
+      data: existedAccount,
     };
   }
 

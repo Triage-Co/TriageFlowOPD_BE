@@ -5,9 +5,9 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaAccountRepository implements IAccountRepository {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prismaService: PrismaService) { }
   findByPhone(phone: string): Promise<any> {
-    return this.prismaService.account.findFirst({
+    return this.prismaService.account.findUnique({
       where: {
         phone: phone,
       },
@@ -26,7 +26,7 @@ export class PrismaAccountRepository implements IAccountRepository {
   }
 
   findByEmail(email: string): Promise<any> {
-    return this.prismaService.account.findFirst({
+    return this.prismaService.account.findUnique({
       where: {
         email: email,
       },
@@ -34,12 +34,13 @@ export class PrismaAccountRepository implements IAccountRepository {
   }
 
   findById(account_id: string): Promise<any> {
-    return this.prismaService.account.findFirst({
+    return this.prismaService.account.findUnique({
       where: {
         account_id: account_id,
       },
     });
   }
+
   update(
     account_id: string,
     data: Prisma.AccountUncheckedUpdateInput,

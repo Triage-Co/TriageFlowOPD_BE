@@ -58,7 +58,7 @@ export class ClinicalDocumentController {
   })
   @ApiResponse({ status: 200, description: 'Lấy danh sách tài liệu lâm sàng của bản thân thành công.' })
   findMyDocuments(@Req() req: any) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.clinicalDocumentService.getMyDocuments(id);
   }
 

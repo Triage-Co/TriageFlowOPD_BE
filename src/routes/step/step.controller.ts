@@ -45,7 +45,7 @@ export class StepController {
     summary: 'Tìm step theo step id của account (đăng nhập với account)',
   })
   findByIdAndAccountId(@Req() req: any, @Param('step_id') step_id: string) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.stepService.findByIdAndAccountId(id, step_id);
   }
 

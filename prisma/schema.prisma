@@ -120,7 +120,9 @@ model Account {
   patients Patient[]
   staffs   Staff[]
 
-  @@index([user_name, role])
+  @@index([email])
+  @@index([phone])
+  @@index([role])
   @@map("account")
 }
 
@@ -143,7 +145,8 @@ model Patient {
   patientAnswers Patient_Answer[]
   visitSessions  Visit_Session[]
 
-  @@index([full_name, account_id, dob])
+  @@index([citizen_id])
+  @@index([account_id])
   @@map("patient")
 }
 
@@ -162,7 +165,8 @@ model Staff {
   shifts    Shift[]
   steps     Step[]
 
-  @@index([license_number, specialty_id])
+  @@index([specialty_id])
+  @@index([full_name])
   @@map("staff")
 }
 
@@ -200,6 +204,7 @@ model Slot {
 
   @@index([start_time, end_time])
   @@index([status])
+  @@index([shift_id, start_time, capacity])
   @@map("slot")
 }
 
@@ -222,6 +227,8 @@ model Shift {
   physicalRoomId String?       @db.Uuid
 
   @@index([date, start_time, end_time])
+  @@index([room_id])
+  @@index([room_id, date])
   @@map("shift")
 }
 
@@ -241,6 +248,8 @@ model Booking {
   visitSession  Visit_Session?
 
   @@index([patient_id, slot_id, status])
+  @@index([patient_id])
+  @@index([slot_id])
   @@map("booking")
 }
 
@@ -255,6 +264,8 @@ model Flow {
   steps         Step[]
   prescriptions Prescription[]
 
+  @@index([booking_id])
+  @@index([status])
   @@map("flow")
 }
 
@@ -305,6 +316,8 @@ model Step {
   dependencies   Step_Dependency[] @relation("StepNeedsToWait") //step con (phải đước hoàn thành -> step cha mới hoàn thành)
   dependedBy     Step_Dependency[] @relation("StepIsDependedOn") //step mình hoàn thành -> step tiếp theo được làm tiếp
 
+  @@index([step_status])
+  @@index([payment_status])
   @@map("step")
 }
 

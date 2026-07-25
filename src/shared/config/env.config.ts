@@ -12,8 +12,6 @@ class EnvClass {
   SUPABASE_KEY: string;
   @IsString({ message: 'Thiếu SUPABASE_URL TRONG FILE .ENV' })
   SUPABASE_URL: string;
-  @IsString({ message: 'Thiếu PORT TRONG FILE .ENV' })
-  PORT: string;
   @IsString({ message: 'Thiếu INFERMEDICA_APP_KEY TRONG FILE .ENV' })
   INFERMEDICA_APP_KEY: string;
   @IsString({ message: 'Thiếu INFERMEDICA_KEY TRONG FILE .ENV' })
@@ -38,6 +36,8 @@ class EnvClass {
   KIOSK_KEY: string;
   @IsString({ message: 'Thiếu CRON_SECRET TRONG FILE .ENV' })
   CRON_SECRET: string;
+  @IsString({ message: 'Thiếu SUPABASE_JWKS_URL TRONG FILE .ENV' })
+  SUPABASE_JWKS_URL: string;
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

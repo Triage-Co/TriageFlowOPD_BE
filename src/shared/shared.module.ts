@@ -17,14 +17,26 @@ import { PrismaVisitSessionRepository } from './repositories/prisma-visit-sessio
 import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical-document.repository';
 import { PrismaBookingRepository } from './repositories/prisma-booking.repository';
 import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
+import { PrismaTriageInformationRepository } from './repositories/prisma-triage-information.repository';
+import { QueueGateway } from './gateways/queue.gateway';
+import { PrismaSlotRepository } from './repositories/prisma-slot.repository';
+import { QueueService } from '../routes/queue/queue.service';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './guards/jwt.strategy';
 
 @Global()
 @Module({
+  imports: [
+    PassportModule.register({ defaultStrategy: "jwt" })
+  ],
   providers: [
+    JwtStrategy,
     ConfigService,
     SupabaseService,
     PrismaService,
     PayosService,
+    QueueGateway,
+    QueueService,
     GeoService,
     {
       provide: 'IAuthProvider',
@@ -33,10 +45,6 @@ import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
     {
       provide: 'IAccountRepository',
       useClass: PrismaAccountRepository,
-    },
-    {
-      provide: 'IPatientRepository',
-      useClass: PrismaPatientRepository,
     },
     {
       provide: 'IStaffRepository',
@@ -82,18 +90,26 @@ import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
       provide: 'IShiftRepository',
       useClass: PrismaShiftRepository,
     },
+    {
+      provide: 'ITriageInformationRepository',
+      useClass: PrismaTriageInformationRepository,
+    },
+    {
+      provide: 'ISlotRepository',
+      useClass: PrismaSlotRepository,
+    },
   ],
   exports: [
     SupabaseService,
     PrismaService,
     PayosService,
+    QueueGateway,
     GeoService,
     'IAuthProvider',
     'IAccountRepository',
     'IPatientRepository',
     'IStaffRepository',
     'IRoomRepository',
-    'IPatientRepository',
     'INotificationRepository',
     'IStepRepository',
     'IFlowRepository',
@@ -102,6 +118,9 @@ import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
     'IClinicalDocumentRepository',
     'IBookingRepository',
     'IShiftRepository',
+    'ITriageInformationRepository',
+    'ISlotRepository',
+    PassportModule,
   ],
 })
-export class SharedModule {}
+export class SharedModule { }

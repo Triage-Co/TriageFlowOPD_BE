@@ -22,10 +22,12 @@ import {
 } from './dto/request-auth.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
+
 
   @Post('/register')
   signUp(@Body() signUpDto: SignUpReqDto) {
@@ -39,12 +41,6 @@ export class AuthController {
     return this.authService.signInWithEmail(signInWithEmailRequestDto);
   }
 
-  @Post('/login/citizen-id')
-  signInWithCitizenId(
-    @Body() signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
-  ) {
-    return this.authService.SignInWithCitizenId(signInWithCitizenIdRequestDto);
-  }
 
   @Post('/otp/send')
   signInWithOtp(@Body() signInWithOtpRequestDto: SignInWithOtpRequestDto) {
@@ -72,6 +68,15 @@ export class AuthController {
     );
   }
 
+
+  @Get('/profile')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard)
+  getProfile(@Req() req: any) {
+    const id = req.user.id || req.user.sub;
+    return this.authService.getProfile(id);
+  }
+
   @Post('/refresh')
   refreshToken(@Body() refreshTokenRequestDto: RefreshTokenRequestDto) {
     return this.authService.refreshToken(refreshTokenRequestDto);
@@ -82,13 +87,7 @@ export class AuthController {
     return this.authService.signOut(signOutRequestDto);
   }
 
-  @Get('/profile')
-  @ApiBearerAuth()
-  @UseGuards(IsAuthGuard)
-  getProfile(@Req() req: any) {
-    const { id } = req.user;
-    return this.authService.getProfile(id);
-  }
+
 
   @Patch('/update')
   @ApiBearerAuth()

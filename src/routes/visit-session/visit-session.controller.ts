@@ -60,7 +60,7 @@ export class VisitSessionController {
   })
   @ApiResponse({ status: 200, description: 'Lấy các phiên khám bệnh của bản thân thành công.' })
   findMySessions(@Req() req: any) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.visitSessionService.getMySessions(id);
   }
 

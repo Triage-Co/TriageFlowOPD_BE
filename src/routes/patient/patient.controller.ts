@@ -33,7 +33,7 @@ export class PatientController {
     summary: '[KIOSK] lấy thông tin bệnh nhân (cần đăng nhập)',
   })
   findByKiosk(@Req() req: any) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.patientService.getOne(id);
   }
 
@@ -47,7 +47,7 @@ export class PatientController {
     @Req() req: any,
     @Body() createPatientDto: CreatePatientReqDto,
   ) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.patientService.create(id, createPatientDto);
   }
 
@@ -69,7 +69,7 @@ export class PatientController {
     summary: '[USER] xóa bệnh nhân theo patient id',
   })
   removeMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
-    const { id } = req['user'];
+     const id = req.user.id || req.user.sub;
     return this.patientService.remove(id, patient_id);
   }
 
@@ -80,7 +80,7 @@ export class PatientController {
     summary: '[USER] lấy bệnh nhân theo patient id',
   })
   findMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
-    const { id } = req['user'];
+     const id = req.user.id || req.user.sub;
     return this.patientService.getMyPatient(patient_id, id);
   }
 
@@ -95,7 +95,7 @@ export class PatientController {
     @Param('patient_id') patient_id: string,
     @Body() updatePatientReqDto: UpdatePatientReqDto,
   ) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.patientService.update(patient_id, updatePatientReqDto, id);
   }
 
