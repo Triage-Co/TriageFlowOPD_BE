@@ -22,7 +22,7 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  // app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalInterceptors(new ExcludeTimestampInterceptor());
 
   const config = new DocumentBuilder()

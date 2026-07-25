@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Header, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { NavigationService } from './navigation.service';
 import { GetRouteDto } from './dto/get-route.dto';
@@ -69,6 +69,7 @@ export class NavigationController {
   }
 
   @Get('building/:buildingId/3d')
+  @Header('Content-Type', 'text/html')
   @ApiOperation({
     summary: 'Hiển thị bản đồ 3D tương tác sử dụng ThreeJS',
     description: 'API trả về một trang HTML render trực tiếp bản đồ 3D tương tác của tòa nhà sử dụng thư viện ThreeJS. Hỗ trợ xoay, phóng to, thu nhỏ và hiển thị các khu khám bệnh trực quan.',
@@ -78,9 +79,7 @@ export class NavigationController {
     description: 'ID của tòa nhà cần lấy dữ liệu bản đồ 3D (dạng UUID)',
     example: '17854b86-79d1-4c60-b776-784742c2597e',
   })
-  async getBuilding3dMap(@Param('buildingId') buildingId: string, @Res() res: any) {
-    const html = await this.navigationService.getBuilding3dMap(buildingId);
-    res.setHeader('Content-Type', 'text/html');
-    return res.status(200).send(html);
+  async getBuilding3dMap(@Param('buildingId') buildingId: string) {
+    return await this.navigationService.getBuilding3dMap(buildingId);
   }
 }

@@ -408,14 +408,14 @@ async function main() {
   }
 
   const floor = await prisma.floor.findUnique({
-    where: { buildingId_floorNumber: { buildingId: building.id, floorNumber: 2 } },
+    where: { buildingId_floorNumber: { buildingId: building.id, floorNumber: 1 } },
   });
   if (!floor) {
-    throw new Error(`Floor 2 of building "${BUILDING_NAME}" not found. Please run the seed first.`);
+    throw new Error(`Floor 1 of building "${BUILDING_NAME}" not found. Please run the seed first.`);
   }
 
   console.log(`🏢 Building: ${building.name} (${building.id})`);
-  console.log(`📐 Floor 2: ${floor.id}`);
+  console.log(`📐 Floor 1: ${floor.id}`);
 
   await generateGraph(floor.id);
 }
