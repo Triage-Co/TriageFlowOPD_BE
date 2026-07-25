@@ -23,17 +23,33 @@ jobs:
         with:
           node-version: '24.x'
 
-      - name: npm install, build, and test
+      - name: npm install, build, and package
         run: |
-          npm install
+          # 1. Cài đặt toàn bộ thư viện để có công cụ build NestJS
+          npm ci
+          
+          # 2. Build code (tạo ra thư mục dist/)
+          npm run build
+          
+          # 3. Xóa sạch thư mục node_modules hiện tại
+          rm -rf node_modules
+          
+          # 4. Cài đặt lại node_modules nhưng CHỈ LẤY các thư viện dành cho Production
+          npm ci --omit=dev
+          
+          # 5. Sinh Prisma Client thẳng vào thư mục node_modules sạch vừa tạo
           npx prisma generate
-          npm run build --if-present
+
+      - name: Create deployment package
+        run: |
+          # 6. Đóng gói ra file zip, loại bỏ hoàn toàn thư mục prisma/ và các rác khác
+          zip -ry deploy-package.zip dist/ package.json node_modules/
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: deploy-package.zip # Chỉ upload đúng file zip này
 
   deploy:
     runs-on: ubuntu-latest
@@ -61,5 +77,4 @@ jobs:
         with:
           app-name: 'TriageFlow'
           slot-name: 'Production'
-          package: .
-          
+          package: deploy-package.zip # Deploy từ file zip
