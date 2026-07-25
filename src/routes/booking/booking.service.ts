@@ -249,22 +249,41 @@ export class BookingService {
       }
 
       if (step.flow_id) {
-        await this.FLOW.update({
-          data: {
-            status: 'IN_PROGRESS',
-          },
-          where: {
-            flow_id: step.flow_id,
-          },
-        });
+        const flowId = step.flow_id;
+        await this.prismaService.$transaction(async (tx) => {
+          await tx.flow.update({
+            data: {
+              status: 'IN_PROGRESS',
+            },
+            where: {
+              flow_id: flowId,
+            },
+          });
 
-        await this.STEP.update({
-          data: {
-            step_status: 'COMPLETED',
-          },
-          where: {
-            step_id: step_id,
-          },
+          await tx.step.update({
+            data: {
+              step_status: 'COMPLETED',
+            },
+            where: {
+              step_id: step_id,
+            },
+          });
+
+          const bookingId = step.flow?.booking.booking_id;
+          const patientId = step.flow?.booking.patient_id;
+          if (bookingId && patientId) {
+            const existingSession = await tx.visit_Session.findUnique({
+              where: { booking_id: bookingId },
+            });
+            if (!existingSession) {
+              await tx.visit_Session.create({
+                data: {
+                  patient_id: patientId,
+                  booking_id: bookingId,
+                },
+              });
+            }
+          }
         });
       }
 

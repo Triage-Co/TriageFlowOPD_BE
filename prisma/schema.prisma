@@ -245,6 +245,7 @@ model Booking {
   flows         Flow[]
   prescriptions Prescription[]
   serviceOrders Service_Order[]
+  visitSession  Visit_Session?
 
   @@index([patient_id, slot_id, status])
   @@index([patient_id])
@@ -483,6 +484,8 @@ model Visit_Session {
 
   patient           Patient             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
   clinicalDocuments Clinical_Document[]
+  booking_id         String?             @unique @db.Uuid
+  booking            Booking?            @relation(fields: [booking_id], references: [booking_id], onDelete: SetNull)
 
   @@map("visit_session")
 }

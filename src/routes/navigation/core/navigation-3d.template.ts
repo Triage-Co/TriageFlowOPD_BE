@@ -1,3 +1,5 @@
+import { getWalkableZoneScript } from './walkable-zone-3d.template';
+
 export function get3DMapHtml(buildingData: any): string {
   const buildingJson = JSON.stringify(buildingData);
 
@@ -348,6 +350,8 @@ export function get3DMapHtml(buildingData: any): string {
         <div class="nav-button-group">
           <button id="btn-find-route" class="btn-primary">Tìm Đường</button>
           <button id="btn-clear-route" class="btn-secondary">Xóa</button>
+          <button id="btn-toggle-walkable" class="btn-secondary" style="grid-column: span 2; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;">🚶 Walkable Zone</button>
+          <button id="btn-toggle-nodes" class="btn-secondary active" style="grid-column: span 2; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; background: #6366f1; color: white; border-color: #4f46e5;">📍 Nodes: Hiện</button>
         </div>
         <div id="route-info" class="route-info-box"></div>
       </div>
@@ -381,6 +385,8 @@ export function get3DMapHtml(buildingData: any): string {
   <script>
     // Embed building map data directly
     const MAP_DATA = ${buildingJson};
+    
+    ${getWalkableZoneScript()}
     
     // Config coordinate projection
     const BASE_LON = 0;
@@ -491,6 +497,9 @@ export function get3DMapHtml(buildingData: any): string {
     // --- Build 3D Elements from data ---
     const mapGroup = new THREE.Group();
     scene.add(mapGroup);
+
+    const nodesGroup = new THREE.Group();
+    mapGroup.add(nodesGroup);
 
     const activeFloor = MAP_DATA.floors[0];
     
@@ -756,41 +765,45 @@ export function get3DMapHtml(buildingData: any): string {
         });
       }
 
-      // 3. Draw Navigation Nodes as small circular dots
+      // 3. Draw Navigation Nodes & Graph Edges
       try {
         if (activeFloor.nodes && activeFloor.nodes.length > 0) {
+          const nodePosMap = new Map();
+
           activeFloor.nodes.forEach(node => {
             if (!node.coordsGeom || !node.coordsGeom.coordinates) return;
 
             const pt = convertCoords(node.coordsGeom.coordinates[0], node.coordsGeom.coordinates[1]);
+            nodePosMap.set(node.id, pt);
+
             const nodeColor = NODE_COLORS[node.type] || NODE_COLORS.Default;
 
-            // Flat disc on the floor + small sphere for visibility from any angle
-            const dotGeo = new THREE.CircleGeometry(0.35, 16);
+            // Disk on floor
+            const dotGeo = new THREE.CircleGeometry(0.4, 16);
             const dotMat = new THREE.MeshStandardMaterial({
               color: nodeColor,
               emissive: nodeColor,
-              emissiveIntensity: 0.35,
-              roughness: 0.4,
+              emissiveIntensity: 0.5,
+              roughness: 0.3,
               metalness: 0.2,
               side: THREE.DoubleSide
             });
             const dotMesh = new THREE.Mesh(dotGeo, dotMat);
             dotMesh.rotation.x = -Math.PI / 2;
             dotMesh.position.set(pt.x, 0.08, pt.z);
-            dotMesh.receiveShadow = false;
 
-            const nodeGeo = new THREE.SphereGeometry(0.18, 12, 12);
+            // 3D Sphere Marker
+            const radius = node.type === 'CORRIDOR' ? 0.25 : 0.3;
+            const nodeGeo = new THREE.SphereGeometry(radius, 16, 16);
             const nodeMat = new THREE.MeshStandardMaterial({
               color: nodeColor,
               emissive: nodeColor,
-              emissiveIntensity: 0.45,
-              roughness: 0.3,
-              metalness: 0.4
+              emissiveIntensity: 0.6,
+              roughness: 0.2,
+              metalness: 0.3
             });
             const nodeMesh = new THREE.Mesh(nodeGeo, nodeMat);
-            nodeMesh.position.set(pt.x, 0.22, pt.z);
-            nodeMesh.castShadow = true;
+            nodeMesh.position.set(pt.x, 0.3, pt.z);
 
             nodeMesh.userData = {
               id: node.id,
@@ -799,12 +812,41 @@ export function get3DMapHtml(buildingData: any): string {
             };
             dotMesh.userData = nodeMesh.userData;
 
-            mapGroup.add(dotMesh);
-            mapGroup.add(nodeMesh);
+            nodesGroup.add(dotMesh);
+            nodesGroup.add(nodeMesh);
           });
+
+          // Draw Graph Edges (Connecting Lines)
+          if (activeFloor.edges && activeFloor.edges.length > 0) {
+            const edgeMaterial = new THREE.LineBasicMaterial({
+              color: 0x818cf8, // Indigo graph edge line
+              linewidth: 2,
+              transparent: true,
+              opacity: 0.75
+            });
+
+            const seenEdgeKeys = new Set();
+            activeFloor.edges.forEach(edge => {
+              const p1 = nodePosMap.get(edge.fromNodeId);
+              const p2 = nodePosMap.get(edge.toNodeId);
+              if (!p1 || !p2) return;
+
+              const edgeKey = [edge.fromNodeId, edge.toNodeId].sort().join('||');
+              if (seenEdgeKeys.has(edgeKey)) return;
+              seenEdgeKeys.add(edgeKey);
+
+              const points = [
+                new THREE.Vector3(p1.x, 0.15, p1.z),
+                new THREE.Vector3(p2.x, 0.15, p2.z)
+              ];
+              const edgeGeo = new THREE.BufferGeometry().setFromPoints(points);
+              const edgeLine = new THREE.Line(edgeGeo, edgeMaterial);
+              nodesGroup.add(edgeLine);
+            });
+          }
         }
       } catch (e) {
-        console.error("Lỗi vẽ nodes:", e);
+        console.error("Lỗi vẽ nodes & edges:", e);
       }
 
       // 4. Placed Features (Reception desks from mapData / DB)
@@ -837,7 +879,20 @@ export function get3DMapHtml(buildingData: any): string {
       } catch (e) {
         console.error("Lỗi vẽ features:", e);
       }
+
+      // 5. Walkable Zone Overlay
+      try {
+        walkableMesh = buildWalkableZoneMesh(activeFloor);
+        if (walkableMesh) {
+          mapGroup.add(walkableMesh);
+        }
+      } catch (e) {
+        console.error("Lỗi khởi tạo Walkable Zone mesh:", e);
+      }
     }
+
+    // Initialize Walkable Zone Toggle UI
+    initWalkableZoneUI();
 
     // --- HTML overlay text labels ---
     const labelContainer = document.getElementById('label-container');
@@ -1137,6 +1192,30 @@ export function get3DMapHtml(buildingData: any): string {
       selectTarget.value = '';
       routeInfoBox.style.display = 'none';
       clear3DPath();
+    }
+
+    // Toggle Nodes visibility
+    const btnToggleNodes = document.getElementById('btn-toggle-nodes');
+    let isNodesVisible = true;
+    if (btnToggleNodes) {
+      btnToggleNodes.addEventListener('click', () => {
+        isNodesVisible = !isNodesVisible;
+        nodesGroup.visible = isNodesVisible;
+        
+        if (isNodesVisible) {
+          btnToggleNodes.classList.add('active');
+          btnToggleNodes.style.background = '#6366f1';
+          btnToggleNodes.style.color = '#ffffff';
+          btnToggleNodes.style.borderColor = '#4f46e5';
+          btnToggleNodes.textContent = '📍 Nodes: Hiện';
+        } else {
+          btnToggleNodes.classList.remove('active');
+          btnToggleNodes.style.background = '';
+          btnToggleNodes.style.color = '';
+          btnToggleNodes.style.borderColor = '';
+          btnToggleNodes.textContent = '📍 Nodes: Ẩn';
+        }
+      });
     }
 
     window.addEventListener('resize', onWindowResize);

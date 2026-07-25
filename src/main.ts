@@ -26,7 +26,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new ExcludeTimestampInterceptor());
+  // app.useGlobalInterceptors(new ExcludeTimestampInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle('Triage Flow OPD BACKEND SYSTEM')
