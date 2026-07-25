@@ -30,7 +30,7 @@ export class DoctorController {
     required: false,
   })
   getPatients(@Req() req: any, @Query('date') date: string) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.doctorService.getPatients(id, date);
   }
 
@@ -38,7 +38,7 @@ export class DoctorController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard("jwt"))
   getPatientByQueueId(@Req() req: any, @Param('id') queueId: string) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.doctorService.getPatientByQueueId(queueId, id);
   }
 

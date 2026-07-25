@@ -74,7 +74,7 @@ export class AuthController {
   @UseGuards(AuthGuard("jwt"))
   getProfile(@Req() req: any) {
     console.log("t", req.user)
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.authService.getProfile(id);
   }
 
@@ -97,7 +97,7 @@ export class AuthController {
     @Req() req: any,
     @Body() updateUserRequestDto: UpdateUserRequestDto,
   ) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.authService.updateProfile(id, updateUserRequestDto);
   }
 }

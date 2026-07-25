@@ -12,19 +12,19 @@ export class NotificationController {
 
   @Get()
   findAll(@Req() req: any) {
-    const { id } = req['user'];
+    const id = req.user.id || req.user.sub;
     return this.notificationService.findAll(id);
   }
 
   @Delete('all')
   removeAll(@Req() req: any) {
-    const { id } = req['user'];
+    const id = req.user.id || req.user.sub;
     return this.notificationService.removeAll(id);
   }
 
   @Delete(':id')
   remove(@Req() req: any, @Param('id') notification_id: string) {
-    const { id } = req['user'];
+    const id = req.user.id || req.user.sub;
     return this.notificationService.remove(id, notification_id);
   }
 }
