@@ -22,6 +22,7 @@ import type { IStaffRepository } from '../../shared/interfaces/i-staff.repositor
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { JwtService } from '@nestjs/jwt';
 import { Patient } from '@prisma/client';
+import { error } from 'node:console';
 @Injectable()
 export class AuthService {
   constructor(
@@ -33,7 +34,7 @@ export class AuthService {
     @Inject('IStaffRepository')
     private readonly staffRepository: IStaffRepository,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   private readonly logger = new Logger(AuthService.name);
 
@@ -172,14 +173,45 @@ export class AuthService {
     };
   }
 
+  async SignInWithCitizenId(
+    signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
+  ) {
+    const existedPatient: Patient =
+      await this.patientRepository.findByCitizenId(
+        signInWithCitizenIdRequestDto.citizen_id,
+      );
+
+    if (!existedPatient) {
+      throw AuthErrors.PatientNotFoundByCitizenId(
+        signInWithCitizenIdRequestDto.citizen_id,
+      );
+    }
+
+    const payload = {
+      sub: existedPatient.patient_id,
+      id: existedPatient.patient_id,
+      patient: existedPatient,
+    };
+    const token = await this.jwtService.signAsync(payload);
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đăng nhập thành công',
+      data: {
+        token: token,
+        patient_id: existedPatient.patient_id,
+        citizen_id: existedPatient.citizen_id,
+      },
+    };
+  }
+
   async signInWithOtp(signInWithOtpRequestDto: SignInWithOtpRequestDto) {
     const { email } = signInWithOtpRequestDto;
 
-    const { error } = await this.authProvider.signInWithOtp(email);
-
-    if (error) {
-      throw AuthErrors.SendOtpFailed(error.message);
-    }
+    this.authProvider.signInWithOtp(email).catch((error) => {
+      this.logger.error(`Lỗi gửi OTP ngầm tới email: ${email}`, error);
+    });
 
     return {
       code: 200,
@@ -223,11 +255,11 @@ export class AuthService {
   async forgotPassword(forgotPasswordRequestDto: ForgotPasswordRequestDto) {
     const { email } = forgotPasswordRequestDto;
 
-    const { error } = await this.authProvider.resetPasswordForEmail(email);
+    this.authProvider.resetPasswordForEmail(email).catch((error) => 
+      this.logger.error("Đã xảy ra lỗi khi gửi reset password email", error)
+    );
 
-    if (error) {
-      throw AuthErrors.SendResetPasswordOtpFailed(error.message);
-    }
+
 
     return {
       code: 200,

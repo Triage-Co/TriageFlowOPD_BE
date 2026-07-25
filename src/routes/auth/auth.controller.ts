@@ -42,6 +42,13 @@ export class AuthController {
   }
 
 
+  @Post('/login/citizen-id')
+  signInWithCitizenId(
+    @Body() signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
+  ) {
+    return this.authService.SignInWithCitizenId(signInWithCitizenIdRequestDto);
+  }
+
   @Post('/otp/send')
   signInWithOtp(@Body() signInWithOtpRequestDto: SignInWithOtpRequestDto) {
     return this.authService.signInWithOtp(signInWithOtpRequestDto);
@@ -73,8 +80,7 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard("jwt"))
   getProfile(@Req() req: any) {
-    console.log("t", req.user)
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.authService.getProfile(id);
   }
 
@@ -92,12 +98,12 @@ export class AuthController {
 
   @Patch('/update')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard)
+  @UseGuards(AuthGuard("jwt"))
   updateUser(
     @Req() req: any,
     @Body() updateUserRequestDto: UpdateUserRequestDto,
   ) {
-    const { id } = req.user;
+    const id = req.user.id || req.user.sub;
     return this.authService.updateProfile(id, updateUserRequestDto);
   }
 }

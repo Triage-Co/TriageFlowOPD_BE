@@ -1,4 +1,8 @@
 {
   "workbench.preferredHighContrastLightColorTheme": "Dracula Theme Soft",
-  "workbench.preferredLightColorTheme": "Dark+"
+  "workbench.preferredLightColorTheme": "Dark+",
+  "appService.zipIgnorePattern": [
+    "node_modules{,/**}",
+    ".vscode{,/**}"
+  ]
 }
