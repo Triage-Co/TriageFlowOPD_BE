@@ -26,7 +26,7 @@ jobs:
       - name: npm install, build, and package
         run: |
           # 1. Cài đặt toàn bộ thư viện để có công cụ build NestJS
-          npm ci
+          npm i
           
           # 2. Build code (tạo ra thư mục dist/)
           npm run build
@@ -35,7 +35,7 @@ jobs:
           rm -rf node_modules
           
           # 4. Cài đặt lại node_modules nhưng CHỈ LẤY các thư viện dành cho Production
-          npm ci --omit=dev
+          npm i --omit=dev
           
           # 5. Sinh Prisma Client thẳng vào thư mục node_modules sạch vừa tạo
           npx prisma generate
