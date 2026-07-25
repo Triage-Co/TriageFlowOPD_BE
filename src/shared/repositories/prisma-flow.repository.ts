@@ -147,8 +147,9 @@ export class PrismaFlowRepository implements IFlowRepository {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
+      create_at: rawFlow.created_at,
       current_processing_steps: currentProcessingSteps,
-      steps: rootSteps, // Chỉ chứa các bước gốc, các bước con tự động lồng bên trong
+      steps: rootSteps, 
     };
   }
 
@@ -216,6 +217,7 @@ export class PrismaFlowRepository implements IFlowRepository {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
+      create_at: rawFlow.created_at,
       current_processing_steps: currentProcessingSteps,
       steps: rootSteps,
     };
