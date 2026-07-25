@@ -5,7 +5,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @ApiBearerAuth()
-@UseGuards(AuthGuard("jwt"))
+@UseGuards(IsAuthGuard)
 @Controller('notification')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) { }

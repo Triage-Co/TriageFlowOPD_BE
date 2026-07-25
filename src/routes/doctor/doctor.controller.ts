@@ -23,7 +23,7 @@ export class DoctorController {
 
   @Get('patients')
   @ApiBearerAuth()
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(IsAuthGuard)
   @ApiQuery({
     name: 'date',
     example: '2026-07-04',
@@ -36,7 +36,7 @@ export class DoctorController {
 
   @Get('patients/queue/:id')
   @ApiBearerAuth()
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(IsAuthGuard)
   getPatientByQueueId(@Req() req: any, @Param('id') queueId: string) {
     const id = req.user.id || req.user.sub;
     return this.doctorService.getPatientByQueueId(queueId, id);

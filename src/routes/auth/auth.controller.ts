@@ -71,9 +71,8 @@ export class AuthController {
 
   @Get('/profile')
   @ApiBearerAuth()
-  @UseGuards(AuthGuard("jwt"))
+  @UseGuards(IsAuthGuard)
   getProfile(@Req() req: any) {
-    console.log("t", req.user)
     const id = req.user.id || req.user.sub;
     return this.authService.getProfile(id);
   }
@@ -97,7 +96,7 @@ export class AuthController {
     @Req() req: any,
     @Body() updateUserRequestDto: UpdateUserRequestDto,
   ) {
-    const id = req.user.id || req.user.sub;
+    const { id } = req.user;
     return this.authService.updateProfile(id, updateUserRequestDto);
   }
 }

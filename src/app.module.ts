@@ -44,7 +44,7 @@ import { CronModule } from './routes/cron/cron.module';
           return {
             store,
           };
-        } catch (error) {
+        } catch (error: any) {
           console.warn('Redis connection failed, falling back to in-memory cache:', error.message);
           return {
             store: 'memory',
@@ -91,4 +91,4 @@ import { CronModule } from './routes/cron/cron.module';
     CronModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
