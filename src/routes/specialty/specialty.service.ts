@@ -1,17 +1,15 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../shared/config/prisma.service';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ISpecialtyRepository } from '../../shared/interfaces/i-specialty.repository';
 
 @Injectable()
 export class SpecialtyService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    @Inject('ISpecialtyRepository')
+    private readonly specialtyRepository: ISpecialtyRepository,
+  ) {}
 
-  async findAll() {
-    const data = await this.prismaService.specialty.findMany({
-      omit: {
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+  async findAll(page?: number, limit?: number) {
+    const data = await this.specialtyRepository.findAll(page, limit);
     return {
       code: 200,
       message: 'Lấy thông tin thành công',

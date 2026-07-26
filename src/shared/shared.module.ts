@@ -23,6 +23,7 @@ import { PrismaSlotRepository } from './repositories/prisma-slot.repository';
 import { QueueService } from '../routes/queue/queue.service';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './guards/jwt.strategy';
+import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repository';
 
 @Global()
 @Module({
@@ -98,6 +99,10 @@ import { JwtStrategy } from './guards/jwt.strategy';
       provide: 'ISlotRepository',
       useClass: PrismaSlotRepository,
     },
+    {
+      provide: 'ISpecialtyRepository',
+      useClass: PrismaSpecialtyRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -120,6 +125,7 @@ import { JwtStrategy } from './guards/jwt.strategy';
     'IShiftRepository',
     'ITriageInformationRepository',
     'ISlotRepository',
+    'ISpecialtyRepository',
     PassportModule,
   ],
 })
