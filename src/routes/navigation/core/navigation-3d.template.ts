@@ -352,6 +352,28 @@ export function get3DMapHtml(buildingData: any): string {
         <div id="route-info" class="route-info-box"></div>
       </div>
 
+      <!-- Debug Navigation Algorithm Section -->
+      <div class="nav-section">
+        <div class="nav-section-title">🛠️ DEBUG THUẬT TOÁN</div>
+        <div class="nav-button-group" style="flex-direction: column; gap: 6px;">
+          <button id="btn-debug-clear" class="btn-secondary" style="background: #fee2e2; color: #ef4444; border-color: #f87171;">Xóa Tất Cả Node</button>
+          <button id="btn-debug-doors" class="btn-secondary">🚪 Sinh Node Cửa</button>
+          <button id="btn-debug-corridors" class="btn-secondary">🛣️ Sinh Node Hành Lang</button>
+          <button id="btn-debug-edges" class="btn-primary">🔗 Sinh Cạnh & Liên Kết</button>
+        </div>
+      </div>
+
+      <!-- Step-by-step Geometry Visual Proof Section -->
+      <div class="nav-section">
+        <div class="nav-section-title">🔍 BẰNG CHỨNG HÌNH HỌC (MPRSS)</div>
+        <div class="nav-button-group" style="flex-direction: column; gap: 6px;">
+          <button id="btn-step1-pb" class="btn-secondary">🔴 Step 1: P_b (Đỉnh tường)</button>
+          <button id="btn-step2-tin" class="btn-secondary">📐 Step 2: Delaunay TIN</button>
+          <button id="btn-step3-zigzag" class="btn-secondary">⚡ Step 3: E_zigzag (Cạnh chéo)</button>
+          <button id="btn-step4-pmid" class="btn-secondary">📍 Step 4: P_Mid (Trung điểm)</button>
+        </div>
+      </div>
+
       <div class="detail-card" id="detail-card">
         <h3 id="detail-title">Tên phòng</h3>
         <p id="detail-code">Mã phòng</p>
@@ -416,7 +438,7 @@ export function get3DMapHtml(buildingData: any): string {
     const NODE_COLORS = {
       'ROOM_ENTRANCE': 0xf59e0b,
       'CORRIDOR': 0x6366f1,
-      'JUNCTION': 0x8b5cf6,
+      'JUNCTION': 0x6366f1,
       'ELEVATOR': 0x10b981,
       'STAIRS': 0x14b8a6,
       'ESCALATOR': 0x06b6d4,
@@ -1139,6 +1161,210 @@ export function get3DMapHtml(buildingData: any): string {
       clear3DPath();
     }
 
+<<<<<<< Updated upstream
+=======
+    // Toggle Nodes visibility
+    const btnToggleNodes = document.getElementById('btn-toggle-nodes');
+    let isNodesVisible = true;
+    if (btnToggleNodes) {
+      btnToggleNodes.addEventListener('click', () => {
+        isNodesVisible = !isNodesVisible;
+        nodesGroup.visible = isNodesVisible;
+        
+        if (isNodesVisible) {
+          btnToggleNodes.classList.add('active');
+          btnToggleNodes.style.background = '#6366f1';
+          btnToggleNodes.style.color = '#ffffff';
+          btnToggleNodes.style.borderColor = '#4f46e5';
+          btnToggleNodes.textContent = '📍 Nodes: Hiện';
+        } else {
+          btnToggleNodes.classList.remove('active');
+          btnToggleNodes.style.background = '';
+          btnToggleNodes.style.color = '';
+          btnToggleNodes.style.borderColor = '';
+          btnToggleNodes.textContent = '📍 Nodes: Ẩn';
+        }
+      });
+    }
+
+    // --- Debug Algorithm Triggers ---
+    async function triggerGraphAlgorithm(endpoint, buttonId, loadingText) {
+      const btn = document.getElementById(buttonId);
+      if (!btn) return;
+      const originalText = btn.textContent;
+      const originalBg = btn.style.background;
+      btn.textContent = loadingText || 'Đang xử lý...';
+      btn.disabled = true;
+      btn.style.background = '#94a3b8';
+      btn.style.color = '#ffffff';
+
+      try {
+        const res = await fetch(\`/api/graph/\${activeFloor.id}/\${endpoint}\`, { method: endpoint === 'nodes' ? 'DELETE' : 'POST' });
+        const payload = await res.json();
+        if (payload.status === 'success') {
+          btn.textContent = 'Thành công! Đang tải lại...';
+          btn.style.background = '#10b981';
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          alert('Lỗi: ' + (payload.message || 'Không xác định'));
+          btn.textContent = originalText;
+          btn.style.background = originalBg;
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('Lỗi kết nối API!');
+        console.error(err);
+        btn.textContent = originalText;
+        btn.style.background = originalBg;
+        btn.disabled = false;
+      }
+    }
+
+    const btnDebugClear = document.getElementById('btn-debug-clear');
+    if (btnDebugClear) {
+      btnDebugClear.addEventListener('click', () => {
+        if(confirm('Bạn có chắc chắn muốn xóa TẤT CẢ node và cạnh trên tầng này?')) {
+          triggerGraphAlgorithm('nodes', 'btn-debug-clear', 'Đang xóa...');
+        }
+      });
+    }
+    const btnDebugDoors = document.getElementById('btn-debug-doors');
+    if (btnDebugDoors) btnDebugDoors.addEventListener('click', () => triggerGraphAlgorithm('generate/doors', 'btn-debug-doors'));
+    const btnDebugCorridors = document.getElementById('btn-debug-corridors');
+    if (btnDebugCorridors) btnDebugCorridors.addEventListener('click', () => triggerGraphAlgorithm('generate/corridors', 'btn-debug-corridors'));
+    const btnDebugEdges = document.getElementById('btn-debug-edges');
+    if (btnDebugEdges) btnDebugEdges.addEventListener('click', () => triggerGraphAlgorithm('generate/edges', 'btn-debug-edges', 'Đang tạo Graph...'));
+
+    // --- Step-by-Step Geometry Debug Layers (MPRSS) ---
+    const debugPbGroup = new THREE.Group();
+    const debugTinGroup = new THREE.Group();
+    const debugZigzagGroup = new THREE.Group();
+    const debugPmidGroup = new THREE.Group();
+
+    debugPbGroup.visible = false;
+    debugTinGroup.visible = false;
+    debugZigzagGroup.visible = false;
+    debugPmidGroup.visible = false;
+
+    mapGroup.add(debugPbGroup);
+    mapGroup.add(debugTinGroup);
+    mapGroup.add(debugZigzagGroup);
+    mapGroup.add(debugPmidGroup);
+
+    let isDebugStepsLoaded = false;
+    let debugStepsData = null;
+
+    async function loadDebugStepsData() {
+      if (isDebugStepsLoaded) return true;
+      try {
+        const res = await fetch(\`/api/graph/\${activeFloor.id}/debug-steps\`);
+        const payload = await res.json();
+        if (payload.status === 'success' && payload.data) {
+          debugStepsData = payload.data;
+          renderDebugStepLayers();
+          isDebugStepsLoaded = true;
+          return true;
+        }
+      } catch (err) {
+        console.error('Lỗi tải dữ liệu debug steps:', err);
+      }
+      return false;
+    }
+
+    function renderDebugStepLayers() {
+      if (!debugStepsData) return;
+
+      // 1. Step 1: P_b (Red Dots at wall corners)
+      if (debugStepsData.pbPoints) {
+        const dotGeo = new THREE.SphereGeometry(0.25, 12, 12);
+        const dotMat = new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 0.5 });
+        debugStepsData.pbPoints.forEach(coord => {
+          const pt = convertCoords(coord[0], coord[1]);
+          const mesh = new THREE.Mesh(dotGeo, dotMat);
+          mesh.position.set(pt.x, 0.15, pt.z);
+          debugPbGroup.add(mesh);
+        });
+      }
+
+      // 2. Step 2: Delaunay TIN (Thin Gray Lines)
+      if (debugStepsData.tinEdges) {
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.5 });
+        debugStepsData.tinEdges.forEach(([p1, p2]) => {
+          const pt1 = convertCoords(p1[0], p1[1]);
+          const pt2 = convertCoords(p2[0], p2[1]);
+          const geometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(pt1.x, 0.12, pt1.z),
+            new THREE.Vector3(pt2.x, 0.12, pt2.z)
+          ]);
+          const line = new THREE.Line(geometry, lineMat);
+          debugTinGroup.add(line);
+        });
+      }
+
+      // 3. Step 3: E_zigzag (Glowing Cyan Lines)
+      if (debugStepsData.zigzagEdges) {
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x06b6d4, linewidth: 2 });
+        debugStepsData.zigzagEdges.forEach(([p1, p2]) => {
+          const pt1 = convertCoords(p1[0], p1[1]);
+          const pt2 = convertCoords(p2[0], p2[1]);
+          const geometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(pt1.x, 0.2, pt1.z),
+            new THREE.Vector3(pt2.x, 0.2, pt2.z)
+          ]);
+          const line = new THREE.Line(geometry, lineMat);
+          debugZigzagGroup.add(line);
+        });
+      }
+
+      // 4. Step 4: P_Mid (Orange Spheres)
+      if (debugStepsData.pmidPoints) {
+        const dotGeo = new THREE.SphereGeometry(0.35, 16, 16);
+        const dotMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.6 });
+        debugStepsData.pmidPoints.forEach(coord => {
+          const pt = convertCoords(coord[0], coord[1]);
+          const mesh = new THREE.Mesh(dotGeo, dotMat);
+          mesh.position.set(pt.x, 0.25, pt.z);
+          debugPmidGroup.add(mesh);
+        });
+      }
+    }
+
+    function setupStepToggle(btnId, group, activeColor, textLabel) {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      let active = false;
+      btn.addEventListener('click', async () => {
+        if (!isDebugStepsLoaded) {
+          btn.textContent = 'Đang tải dữ liệu...';
+          const ok = await loadDebugStepsData();
+          if (!ok) {
+            alert('Không thể tải dữ liệu hình học debug!');
+            btn.textContent = textLabel;
+            return;
+          }
+        }
+        active = !active;
+        group.visible = active;
+        if (active) {
+          btn.style.background = activeColor;
+          btn.style.color = '#ffffff';
+          btn.style.borderColor = activeColor;
+          btn.textContent = textLabel + ' (Hiện)';
+        } else {
+          btn.style.background = '';
+          btn.style.color = '';
+          btn.style.borderColor = '';
+          btn.textContent = textLabel;
+        }
+      });
+    }
+
+    setupStepToggle('btn-step1-pb', debugPbGroup, '#ef4444', '🔴 Step 1: P_b (Đỉnh tường)');
+    setupStepToggle('btn-step2-tin', debugTinGroup, '#64748b', '📐 Step 2: Delaunay TIN');
+    setupStepToggle('btn-step3-zigzag', debugZigzagGroup, '#06b6d4', '⚡ Step 3: E_zigzag (Cạnh chéo)');
+    setupStepToggle('btn-step4-pmid', debugPmidGroup, '#f59e0b', '📍 Step 4: P_Mid (Trung điểm)');
+
+>>>>>>> Stashed changes
     window.addEventListener('resize', onWindowResize);
 
     function onWindowResize() {

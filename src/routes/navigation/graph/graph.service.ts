@@ -6,7 +6,10 @@ import { GeoService } from '../../../shared/geo/geo.service';
 import * as turf from '@turf/turf';
 import { NodeType, ConnectorType } from '@prisma/client';
 import { Polygon, MultiPolygon } from 'geojson';
-
+import { generateDoorNodes } from '../core/graph-generation/doors';
+import { generateCorridorNodes } from '../core/graph-generation/corridors';
+import { generateGraphEdges } from '../core/graph-generation/edges';
+import { readGeom } from '../core/graph-generation/utils';
 @Injectable()
 export class GraphGenerationService {
   constructor(
@@ -97,375 +100,90 @@ export class GraphGenerationService {
     return { nodeId: node.id, connectedTo: nearestNodeId, distance: minDistance };
   }
 
+  async clearAllNodes(floorId: string) {
+    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
+    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+
+    await this.prisma.$executeRawUnsafe(`
+      SET statement_timeout = 120000;
+      DELETE FROM "node" WHERE "floorId" = '${floorId}';
+    `);
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    return { cleared: true };
+  }
+
+  async generateDoorsPhase(floorId: string) {
+    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
+    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+
+    await this.clearAllNodes(floorId);
+    
+    // Explicitly cast this.prisma to any to bypass strict type checking when passing to external script
+    const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma as any, floorId);
+    
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    return { doorsGenerated: doorNodeCoordsMap.size };
+  }
+
+  async generateCorridorsPhase(floorId: string) {
+    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
+    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+
+    await this.clearAllNodes(floorId);
+    await generateDoorNodes(this.prisma as any, floorId);
+
+    const floorOutlineGeoJSON = await readGeom(this.prisma as any, 'floor', floorId, 'outlineGeom');
+    if (!floorOutlineGeoJSON) throw new BadRequestException('Floor has no outline geometry defined');
+
+    const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
+    
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    return { corridorsGenerated: corridorData.nodeMap.size };
+  }
+
+  async getCorridorDebugSteps(floorId: string) {
+    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
+    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+
+    const floorOutlineGeoJSON = await readGeom(this.prisma as any, 'floor', floorId, 'outlineGeom');
+    if (!floorOutlineGeoJSON) throw new BadRequestException('Floor has no outline geometry defined');
+
+    const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
+
+    const pbPoints = (corridorData.uniquePoints || []).map((feat: any) => feat.geometry.coordinates);
+    const tinEdges = corridorData.tinEdges || [];
+    const zigzagEdges = corridorData.candidateEdges || [];
+    const pmidPoints = corridorData.finalNodeCoords || [];
+
+    return {
+      pbPoints,
+      tinEdges,
+      zigzagEdges,
+      pmidPoints,
+    };
+  }
+
+  async generateEdgesPhase(floorId: string) {
+    return await this.generateGraph(floorId);
+  }
+
   /**
    * Deterministically generate the navigation graph for a given floor.
+   * This is equivalent to running the full algorithm (doors -> corridors -> edges).
    */
   async generateGraph(floorId: string) {
     const startTime = Date.now();
 
-    const floor = await this.prisma.floor.findUnique({
-      where: { id: floorId },
-    });
-    if (!floor) {
-      throw new NotFoundException(`Floor with ID ${floorId} not found`);
-    }
+    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
+    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
-    const floorOutlineGeoJSON = (await this.geoService.readGeom(
-      'floor',
-      floorId,
-      'outlineGeom',
-    )) as any;
-
-    if (!floorOutlineGeoJSON) {
-      throw new BadRequestException('Floor has no outline geometry defined');
-    }
-
-    await this.prisma.node.deleteMany({
-      where: { floorId },
-    });
-
-    const roomFeatures = await this.geoService.readAllGeoms(
-      'physical_room',
-      floorId,
-      'outlineGeom',
-    );
-
-    const roomNodeMap = new Map<string, string>();
-    const roomCoordsMap = new Map<string, [number, number]>();
-
-    for (const roomFeature of roomFeatures) {
-      const poly = roomFeature.geometry;
-      if (!poly || (poly.type !== 'Polygon' && poly.type !== 'MultiPolygon')) {
-        continue;
-      }
-
-      const centroid = turf.centroid(poly);
-      let coords = centroid.geometry.coordinates as [number, number];
-
-      if (poly.type === 'Polygon') {
-        const isInside = turf.booleanPointInPolygon(centroid, poly);
-        if (!isInside) {
-          const pointOnFeature = turf.pointOnFeature(poly);
-          coords = pointOnFeature.geometry.coordinates as [number, number];
-        }
-      }
-
-      const roomId = roomFeature.properties.id;
-      const node = await this.createNode(
-        floorId,
-        NodeType.ROOM_ENTRANCE,
-        coords,
-        { roomId },
-      );
-
-      roomNodeMap.set(roomId, node.id);
-      roomCoordsMap.set(roomId, coords);
-    }
-
-    const doorFeatures = await this.geoService.readAllGeoms(
-      'door',
-      floorId,
-      'positionGeom',
-    );
-    const activeDoorFeatures = doorFeatures.filter(
-      (df) => df.properties.active !== false,
-    );
-
-    const doorNodeCoordsMap = new Map<string, [number, number]>();
-    for (const doorFeature of activeDoorFeatures) {
-      const geo = doorFeature.geometry;
-      let coords: [number, number] | null = null;
-
-      if (geo && geo.type === 'Point') {
-        coords = geo.coordinates as [number, number];
-      } else {
-        const roomAId = doorFeature.properties.roomAId;
-        const roomBId = doorFeature.properties.roomBId;
-        if (roomAId && roomBId) {
-          const coordsA = roomCoordsMap.get(roomAId);
-          const coordsB = roomCoordsMap.get(roomBId);
-          if (coordsA && coordsB) {
-            const mid = turf.midpoint(turf.point(coordsA), turf.point(coordsB));
-            coords = mid.geometry.coordinates as [number, number];
-          }
-        }
-        if (!coords && roomAId) {
-          coords = roomCoordsMap.get(roomAId) || null;
-        }
-        if (!coords && roomBId) {
-          coords = roomCoordsMap.get(roomBId) || null;
-        }
-      }
-
-      if (!coords) {
-        const fallback = turf.centroid(floorOutlineGeoJSON);
-        coords = fallback.geometry.coordinates as [number, number];
-      }
-
-      const doorId = doorFeature.properties.id;
-      const node = await this.createNode(
-        floorId,
-        NodeType.ROOM_ENTRANCE,
-        coords,
-        { doorId },
-      );
-
-      await this.prisma.door.update({
-        where: { id: doorId },
-        data: { nodeId: node.id },
-      });
-
-      doorNodeCoordsMap.set(node.id, coords);
-    }
-
-    const roomPolygons = roomFeatures
-      .map((rf) => rf.geometry)
-      .filter((g) => g && (g.type === 'Polygon' || g.type === 'MultiPolygon'))
-      .map((g) => turf.feature(g as Polygon | MultiPolygon));
-
-    let roomUnion: any = null;
-    let walkable: any = floorOutlineGeoJSON;
-
-    if (roomPolygons.length > 0) {
-      roomUnion = roomPolygons[0];
-      if (roomPolygons.length > 1) {
-        roomUnion = turf.union(turf.featureCollection(roomPolygons));
-      }
-
-      // Tight bounding box around all rooms, padded by 3.5 meters for outer corridor
-      const rBbox = turf.bbox(roomUnion);
-      const paddedBbox: [number, number, number, number] = [
-        rBbox[0] - 3.5,
-        rBbox[1] - 3.5,
-        rBbox[2] + 3.5,
-        rBbox[3] + 3.5,
-      ];
-      const corridorBox = turf.bboxPolygon(paddedBbox);
-
-      const diff = turf.difference(
-        turf.featureCollection([corridorBox as any, roomUnion as any]),
-      );
-      if (diff) {
-        walkable = diff.geometry;
-      }
-    }
-
-    const exploded = turf.explode(walkable);
-    const uniquePointsMap = new Map<string, any>();
-    for (const feature of exploded.features) {
-      const c = feature.geometry.coordinates;
-      const key = `${c[0].toFixed(6)}_${c[1].toFixed(6)}`;
-      uniquePointsMap.set(key, feature);
-    }
-    const uniquePoints = Array.from(uniquePointsMap.values());
-
-    const bbox = turf.bbox(walkable);
-    const voronoiPolygons = turf.voronoi(
-      turf.featureCollection(uniquePoints),
-      { bbox },
-    );
-
-    const voronoiEdges: [[number, number], [number, number]][] = [];
-    const seenEdges = new Set<string>();
-    for (const cell of voronoiPolygons.features) {
-      if (!cell || cell.geometry.type !== 'Polygon') continue;
-      const ring = cell.geometry.coordinates[0];
-      for (let i = 0; i < ring.length - 1; i++) {
-        const p1 = ring[i] as [number, number];
-        const p2 = ring[i + 1] as [number, number];
-        const k1 = `${p1[0].toFixed(6)}_${p1[1].toFixed(6)}`;
-        const k2 = `${p2[0].toFixed(6)}_${p2[1].toFixed(6)}`;
-        if (k1 === k2) continue;
-        const edgeKey = [k1, k2].sort().join('||');
-        if (seenEdges.has(edgeKey)) continue;
-        seenEdges.add(edgeKey);
-        voronoiEdges.push([p1, p2]);
-      }
-    }
-
-    const isInsideWalkable = (coord: [number, number]) => {
-      const pt = turf.point(coord);
-      if (!turf.booleanPointInPolygon(pt, walkable)) return false;
-      for (const roomPoly of roomPolygons) {
-        if (turf.booleanPointInPolygon(pt, roomPoly)) return false;
-      }
-      return true;
-    };
-
-    const hasLineOfSight = (p1: [number, number], p2: [number, number]) => {
-      const dist = turf.distance(turf.point(p1), turf.point(p2), { units: 'meters' });
-      if (dist > 8.0) return false;
-
-      const line = turf.lineString([p1, p2]);
-      for (const roomPoly of roomPolygons) {
-        const intersects = turf.lineIntersect(line, roomPoly);
-        if (intersects.features.length > 0) {
-          return false;
-        }
-        const mid = turf.midpoint(turf.point(p1), turf.point(p2));
-        if (turf.booleanPointInPolygon(mid, roomPoly)) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-    const centerlineEdges: [[number, number], [number, number]][] = [];
-    for (const [p1, p2] of voronoiEdges) {
-      const pt1 = turf.point(p1);
-      const pt2 = turf.point(p2);
-      const midPoint = turf.midpoint(pt1, pt2);
-      const midCoord = midPoint.geometry.coordinates as [number, number];
-
-      if (!isInsideWalkable(p1) || !isInsideWalkable(p2) || !isInsideWalkable(midCoord)) {
-        continue;
-      }
-
-      if (!hasLineOfSight(p1, p2)) {
-        continue;
-      }
-
-      let tooClose = false;
-      for (const boundaryPt of uniquePoints) {
-        const dist1 = turf.distance(pt1, boundaryPt, { units: 'meters' });
-        const dist2 = turf.distance(pt2, boundaryPt, { units: 'meters' });
-        if (dist1 < 0.4 || dist2 < 0.4) {
-          tooClose = true;
-          break;
-        }
-      }
-      if (!tooClose) {
-        centerlineEdges.push([p1, p2]);
-      }
-    }
-
-    const vertexAdjacency = new Map<string, Set<string>>();
-    const keyToCoords = new Map<string, [number, number]>();
-    const getVertexKey = (p: [number, number]) =>
-      `${p[0].toFixed(6)}_${p[1].toFixed(6)}`;
-
-    for (const [p1, p2] of centerlineEdges) {
-      const k1 = getVertexKey(p1);
-      const k2 = getVertexKey(p2);
-      keyToCoords.set(k1, p1);
-      keyToCoords.set(k2, p2);
-      if (!vertexAdjacency.has(k1)) vertexAdjacency.set(k1, new Set());
-      if (!vertexAdjacency.has(k2)) vertexAdjacency.set(k2, new Set());
-      vertexAdjacency.get(k1)!.add(k2);
-      vertexAdjacency.get(k2)!.add(k1);
-    }
-
-    const junctionKeys = new Set<string>();
-    for (const [key, neighbors] of vertexAdjacency) {
-      if (neighbors.size >= 3) {
-        junctionKeys.add(key);
-      }
-    }
-
-    const nodeMap = new Map<string, string>();
-    const nodeCoordsMap = new Map<string, [number, number]>();
-    const createdNodeTypesMap = new Map<string, NodeType>();
-
-    for (const [key, coords] of keyToCoords.entries()) {
-      const type = junctionKeys.has(key) ? NodeType.JUNCTION : NodeType.CORRIDOR;
-      const node = await this.createNode(floorId, type, coords);
-      nodeMap.set(key, node.id);
-      nodeCoordsMap.set(node.id, coords);
-      createdNodeTypesMap.set(node.id, type);
-    }
-
-    const corridorConnections: [string, string][] = [];
-    for (const [p1, p2] of centerlineEdges) {
-      const k1 = getVertexKey(p1);
-      const k2 = getVertexKey(p2);
-      const startNodeId = nodeMap.get(k1)!;
-      const endNodeId = nodeMap.get(k2)!;
-      const line = turf.lineString([p1, p2]);
-      const length = turf.length(line, { units: 'meters' });
-      let previousNodeId = startNodeId;
-      const stepCount = Math.floor(length / 3.0);
-      for (let step = 1; step <= stepCount; step++) {
-        const distanceAlong = step * 3.0;
-        if (distanceAlong < length - 0.5) {
-          const sample = turf.along(line, distanceAlong, { units: 'meters' });
-          const sampleCoords = sample.geometry.coordinates as [number, number];
-          const sampleKey = getVertexKey(sampleCoords);
-          let sampleNodeId = nodeMap.get(sampleKey);
-          if (!sampleNodeId) {
-            const sampleNode = await this.createNode(floorId, NodeType.CORRIDOR, sampleCoords);
-            sampleNodeId = sampleNode.id;
-            nodeMap.set(sampleKey, sampleNodeId);
-            nodeCoordsMap.set(sampleNodeId, sampleCoords);
-            createdNodeTypesMap.set(sampleNodeId, NodeType.CORRIDOR);
-          }
-          corridorConnections.push([previousNodeId, sampleNodeId]);
-          previousNodeId = sampleNodeId;
-        }
-      }
-      corridorConnections.push([previousNodeId, endNodeId]);
-    }
-
-    const edgesToCreate: { fromNodeId: string; toNodeId: string; distance: number }[] = [];
-    const uniqueEdges = new Set<string>();
-
-    for (const [fromNodeId, toNodeId] of corridorConnections) {
-      const edgeKey = [fromNodeId, toNodeId].sort().join('||');
-      if (uniqueEdges.has(edgeKey)) continue;
-      uniqueEdges.add(edgeKey);
-      const coordsA = nodeCoordsMap.get(fromNodeId)!;
-      const coordsB = nodeCoordsMap.get(toNodeId)!;
-      const distance = turf.distance(turf.point(coordsA), turf.point(coordsB), { units: 'meters' });
-      edgesToCreate.push(
-        { fromNodeId, toNodeId, distance },
-        { fromNodeId: toNodeId, toNodeId: fromNodeId, distance },
-      );
-    }
-
-    const doors = await this.prisma.door.findMany({
-      where: { floorId, active: true },
-    });
-
-    for (const door of doors) {
-      const doorNodeId = door.nodeId;
-      if (!doorNodeId) continue;
-      const doorCoords = doorNodeCoordsMap.get(doorNodeId);
-      if (!doorCoords) continue;
-
-      let nearestCorridorId: string | null = null;
-      let minDistance = Infinity;
-      for (const [cNodeId, cCoords] of nodeCoordsMap.entries()) {
-        const type = createdNodeTypesMap.get(cNodeId);
-        if (type !== NodeType.CORRIDOR && type !== NodeType.JUNCTION) continue;
-
-        // Verify straight line of sight to door (no wall intersection)
-        if (!hasLineOfSight(doorCoords, cCoords)) continue;
-
-        const distance = turf.distance(turf.point(doorCoords), turf.point(cCoords), { units: 'meters' });
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestCorridorId = cNodeId;
-        }
-      }
-
-      if (nearestCorridorId) {
-        edgesToCreate.push(
-          { fromNodeId: doorNodeId, toNodeId: nearestCorridorId, distance: minDistance },
-          { fromNodeId: nearestCorridorId, toNodeId: doorNodeId, distance: minDistance },
-        );
-      }
-    }
-
-    if (edgesToCreate.length > 0) {
-      await this.prisma.edge.createMany({
-        data: edgesToCreate,
-        skipDuplicates: true,
-      });
-    }
+    const floorOutlineGeoJSON = await readGeom(this.prisma as any, 'floor', floorId, 'outlineGeom');
+    const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma as any, floorId);
+    const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
+    await generateGraphEdges(this.prisma as any, floorId, doorNodeCoordsMap, corridorData);
 
     const totalNodes = await this.prisma.node.count({ where: { floorId } });
-    const totalEdges = await this.prisma.edge.count({
-      where: { fromNode: { floorId } },
-    });
+    const totalEdges = await this.prisma.edge.count({ where: { fromNode: { floorId } } });
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
 
