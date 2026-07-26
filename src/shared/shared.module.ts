@@ -24,12 +24,13 @@ import { QueueService } from '../routes/queue/queue.service';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './guards/jwt.strategy';
 import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repository';
+import { PrismaServiceOrderDetailRepository } from './repositories/prisma-service-order-detail.repository';
+import { PrismaServiceOrderRepository } from './repositories/prisma-service-order.repository';
+import { PrismaServiceRepository } from './repositories/prisma-service-order.repository copy';
 
 @Global()
 @Module({
-  imports: [
-    PassportModule.register({ defaultStrategy: "jwt" })
-  ],
+  imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
   providers: [
     JwtStrategy,
     ConfigService,
@@ -103,6 +104,18 @@ import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repos
       provide: 'ISpecialtyRepository',
       useClass: PrismaSpecialtyRepository,
     },
+    {
+      provide: 'IServiceOrderDetailRepository',
+      useClass: PrismaServiceOrderDetailRepository,
+    },
+    {
+      provide: 'IServiceOrderRepository',
+      useClass: PrismaServiceOrderRepository,
+    },
+    {
+      provide: 'IServiceRepository',
+      useClass: PrismaServiceRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -126,7 +139,9 @@ import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repos
     'ITriageInformationRepository',
     'ISlotRepository',
     'ISpecialtyRepository',
+    'IServiceOrderRepository',
+    'IServiceOrderDetailRepository',
     PassportModule,
   ],
 })
-export class SharedModule { }
+export class SharedModule {}

@@ -31,6 +31,7 @@ export class DoctorController {
   })
   getPatients(@Req() req: any, @Query('date') date: string) {
     const id = req.user.id || req.user.sub;
+    console.log(id, date);
     return this.doctorService.getPatients(id, date);
   }
 

@@ -168,6 +168,7 @@ export class AuthService {
       data: {
         token: data.session.access_token,
         refresh_token: data.session.refresh_token,
+        id: data.user.id,
         ...data.user.user_metadata,
       },
     };
