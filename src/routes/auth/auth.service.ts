@@ -22,6 +22,7 @@ import type { IStaffRepository } from '../../shared/interfaces/i-staff.repositor
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { JwtService } from '@nestjs/jwt';
 import { Patient } from '@prisma/client';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -172,8 +173,7 @@ export class AuthService {
     };
   }
 
-
-    async SignInWithCitizenId(
+  async SignInWithCitizenId(
     signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
   ) {
     const existedPatient: Patient =
@@ -204,14 +204,13 @@ export class AuthService {
       },
     };
   }
+
   async signInWithOtp(signInWithOtpRequestDto: SignInWithOtpRequestDto) {
     const { email } = signInWithOtpRequestDto;
 
-    const { error } = await this.authProvider.signInWithOtp(email);
-
-    if (error) {
-      throw AuthErrors.SendOtpFailed(error.message);
-    }
+    this.authProvider.signInWithOtp(email).catch((error) => {
+      this.logger.error(`Gửi OTP thất bại cho email: ${email}`, error.message);
+    });
 
     return {
       code: 200,
@@ -255,11 +254,9 @@ export class AuthService {
   async forgotPassword(forgotPasswordRequestDto: ForgotPasswordRequestDto) {
     const { email } = forgotPasswordRequestDto;
 
-    const { error } = await this.authProvider.resetPasswordForEmail(email);
-
-    if (error) {
-      throw AuthErrors.SendResetPasswordOtpFailed(error.message);
-    }
+    this.authProvider.resetPasswordForEmail(email).catch((error) => {
+      this.logger.error(`Gửi OTP thất bại cho email: ${email}`, error.message);
+    });
 
     return {
       code: 200,
@@ -354,7 +351,7 @@ export class AuthService {
   }
 
   async getProfile(id: string) {
-    console.log(id)
+    console.log(id);
     const existedAccount = await this.accountRepository.findById(id);
 
     if (!existedAccount) {
