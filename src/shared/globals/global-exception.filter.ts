@@ -1,18 +1,24 @@
 import { Response } from 'express';
 import {
-  ArgumentsHost,
+  type ArgumentsHost,
   Catch,
   ExceptionFilter,
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { SentryExceptionCaptured } from '@sentry/nestjs';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  @SentryExceptionCaptured()
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+
+    if (response.headersSent) {
+      return;
+    }
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Đã có lỗi hệ thống xảy ra. Vui lòng thử lại sau.';

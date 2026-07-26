@@ -117,10 +117,10 @@ export class GraphGenerationService {
     if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
     await this.clearAllNodes(floorId);
-    
+
     // Explicitly cast this.prisma to any to bypass strict type checking when passing to external script
     const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma as any, floorId);
-    
+
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
     return { doorsGenerated: doorNodeCoordsMap.size };
   }
@@ -136,7 +136,7 @@ export class GraphGenerationService {
     if (!floorOutlineGeoJSON) throw new BadRequestException('Floor has no outline geometry defined');
 
     const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
-    
+
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
     return { corridorsGenerated: corridorData.nodeMap.size };
   }
@@ -170,6 +170,10 @@ export class GraphGenerationService {
   /**
    * Deterministically generate the navigation graph for a given floor.
    * This is equivalent to running the full algorithm (doors -> corridors -> edges).
+   */
+  /**
+   * Deterministically generate the navigation graph for a given floor using MPRSSEM (v3).
+   * Middle-Point Relation Structure Segment Entrance Modification.
    */
   async generateGraph(floorId: string) {
     const startTime = Date.now();

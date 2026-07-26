@@ -1,12 +1,17 @@
+import './shared/config/sentry.config';
+import './shared/config/env.config';
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
-import './shared/config/env.config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { GlobalExceptionFilter } from './shared/globals/global-exception.filter';
-import { ExcludeTimestampInterceptor } from './shared/globals/exclude-timestamps.interceptor';
+// import { ExcludeTimestampInterceptor } from './shared/globals/exclude-timestamps.interceptor';
 
+import dns from 'node:dns';
 async function bootstrap() {
+  dns.setDefaultResultOrder('ipv4first');
+
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
@@ -23,7 +28,7 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new ExcludeTimestampInterceptor());
+  // app.useGlobalInterceptors(new ExcludeTimestampInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle('Triage Flow OPD BACKEND SYSTEM')

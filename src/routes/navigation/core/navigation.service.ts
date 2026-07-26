@@ -19,25 +19,35 @@ export class NavigationService {
    * Get the complete map layout of a building, with caching.
    */
   async getBuildingMap(buildingId: string) {
-    const cacheKey = `building_map:${buildingId}`;
+    // 1. Query building details (with fallback if buildingId is actually a floorId)
+    let building = await this.prisma.building.findUnique({
+      where: { id: buildingId },
+    });
+    if (!building) {
+      const floor = await this.prisma.floor.findUnique({
+        where: { id: buildingId },
+        include: { building: true },
+      });
+      if (floor) {
+        building = floor.building;
+      }
+    }
 
-    // 1. Check cache first
+    if (!building) {
+      throw new NotFoundException(`Không tìm thấy tòa nhà hoặc tầng với ID ${buildingId}`);
+    }
+
+    const cacheKey = `building_map:${building.id}`;
+
+    // 2. Check cache using resolved building ID
     const cachedMap = await this.cacheManager.get(cacheKey);
     if (cachedMap) {
       return cachedMap;
     }
 
-    // 2. Query building details
-    const building = await this.prisma.building.findUnique({
-      where: { id: buildingId },
-    });
-    if (!building) {
-      throw new NotFoundException(`Không tìm thấy tòa nhà với ID ${buildingId}`);
-    }
-
     // 3. Query all Floors for this building
     const floors = await this.prisma.floor.findMany({
-      where: { buildingId },
+      where: { buildingId: building.id },
       orderBy: { floorNumber: 'asc' },
     });
 
@@ -172,6 +182,16 @@ export class NavigationService {
             coordsGeom: feature.geometry,
           }));
 
+        // Query active edges connecting nodes on this floor
+        const nodeIds = nodeMaps.map((n) => n.id);
+        const edges = await this.prisma.edge.findMany({
+          where: {
+            fromNodeId: { in: nodeIds },
+            toNodeId: { in: nodeIds },
+            active: true,
+          },
+        });
+
         return {
           ...floor,
           outlineGeom,
@@ -180,6 +200,7 @@ export class NavigationService {
           areas: areaMaps,
           standaloneBoundaries: standaloneBoundaryMaps,
           nodes: nodeMaps,
+          edges,
         };
       }),
     );

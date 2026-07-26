@@ -2,27 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IFlowRepository } from '../interfaces/i-flow.repository';
 import { Flow, Prisma } from '@prisma/client';
+import { formatInTimeZone } from 'date-fns-tz';
 
-const flowIncludeQuery = {
-  steps: {
-    include: {
-      dependencies: true,
-      room: true,
-      sub_step: {
-        include: {
-          room: true,
-          dependencies: true,
-        },
-      },
-      parent_step: {
-        include: {
-          room: true,
-          dependencies: true,
-        },
-      },
-    },
-  },
-};
+
 
 const findQuery = {
   steps: {
@@ -162,12 +144,15 @@ export class PrismaFlowRepository implements IFlowRepository {
       .filter((s: any) => s.step_status === 'IN_PROGRESS')
       .map((s: any) => s.step_id);
 
+   const timeZone = "Asia/Ho_Chi_Minh";
+  const createAt = formatInTimeZone(rawFlow.created_at, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
     return {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
+      create_at: createAt,
       current_processing_steps: currentProcessingSteps,
-      steps: rootSteps, // Chỉ chứa các bước gốc, các bước con tự động lồng bên trong
+      steps: rootSteps, 
     };
   }
 
@@ -231,10 +216,14 @@ export class PrismaFlowRepository implements IFlowRepository {
       .filter((s: any) => s.step_status === 'IN_PROGRESS')
       .map((s: any) => s.step_id);
 
+      const timeZone = "Asia/Ho_Chi_Minh";
+const createAt = formatInTimeZone(rawFlow.created_at, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
+
     return {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
+      create_at: createAt,
       current_processing_steps: currentProcessingSteps,
       steps: rootSteps,
     };

@@ -22,6 +22,7 @@ import type { IStaffRepository } from '../../shared/interfaces/i-staff.repositor
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { JwtService } from '@nestjs/jwt';
 import { Patient } from '@prisma/client';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -39,11 +40,7 @@ export class AuthService {
 
   async signUp(signUpRequestDto: SignUpReqDto) {
     const { user_name, gender, email, password, phone } = signUpRequestDto;
-
-    if (await this.accountRepository.findByEmail(email)) {
-      throw AuthErrors.EmailExists(email);
-    }
-
+    console.time('1');
     const { data, error } = await this.authProvider.signUp(email, password, {
       user_name,
       gender,
@@ -67,6 +64,7 @@ export class AuthService {
         }
       }
     }
+    console.timeEnd('1');
 
     if (!data?.user?.id) {
       throw AuthErrors.ProviderError(
@@ -79,6 +77,8 @@ export class AuthService {
     let isLocalAccountCreated = false;
 
     try {
+      console.time('2');
+
       const newAccount = await this.accountRepository.create({
         account_id: account_id,
         email: email,
@@ -89,6 +89,7 @@ export class AuthService {
       });
 
       isLocalAccountCreated = true;
+      console.timeEnd('2');
 
       return {
         code: 200,
@@ -129,10 +130,6 @@ export class AuthService {
   async signInWithEmail(signInWithEmailRequestDto: SignInWithEmailRequestDto) {
     const { email, password } = signInWithEmailRequestDto;
 
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
-
     const { data, error } = await this.authProvider.signInWithPassword(
       email,
       password,
@@ -171,28 +168,9 @@ export class AuthService {
       data: {
         token: data.session.access_token,
         refresh_token: data.session.refresh_token,
+        id: data.user.id,
         ...data.user.user_metadata,
       },
-    };
-  }
-
-  async signInWithOtp(signInWithOtpRequestDto: SignInWithOtpRequestDto) {
-    const { email } = signInWithOtpRequestDto;
-
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
-
-    const { error } = await this.authProvider.signInWithOtp(email);
-
-    if (error) {
-      throw AuthErrors.SendOtpFailed(error.message);
-    }
-
-    return {
-      code: 200,
-      status: 'success',
-      message: 'gửi OTP thành công',
     };
   }
 
@@ -228,12 +206,22 @@ export class AuthService {
     };
   }
 
+  async signInWithOtp(signInWithOtpRequestDto: SignInWithOtpRequestDto) {
+    const { email } = signInWithOtpRequestDto;
+
+    this.authProvider.signInWithOtp(email).catch((error) => {
+      this.logger.error(`Gửi OTP thất bại cho email: ${email}`, error.message);
+    });
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'gửi OTP thành công',
+    };
+  }
+
   async verifyOtpSignIn(verifyOtpSignInRequestDto: VerifyOtpSignInRequestDto) {
     const { email, otp } = verifyOtpSignInRequestDto;
-
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
 
     const { data, error } = await this.authProvider.verifyOtp(
       email,
@@ -267,15 +255,9 @@ export class AuthService {
   async forgotPassword(forgotPasswordRequestDto: ForgotPasswordRequestDto) {
     const { email } = forgotPasswordRequestDto;
 
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
-
-    const { error } = await this.authProvider.resetPasswordForEmail(email);
-
-    if (error) {
-      throw AuthErrors.SendResetPasswordOtpFailed(error.message);
-    }
+    this.authProvider.resetPasswordForEmail(email).catch((error) => {
+      this.logger.error(`Gửi OTP thất bại cho email: ${email}`, error.message);
+    });
 
     return {
       code: 200,
@@ -288,10 +270,6 @@ export class AuthService {
     verifyAndResetPasswordRequestDto: VerifyAndResetPasswordRequestDto,
   ) {
     const { email, otp, new_password } = verifyAndResetPasswordRequestDto;
-
-    if (!(await this.accountRepository.findByEmail(email))) {
-      throw AuthErrors.UserNotFoundByEmail(email);
-    }
 
     const { data, error } = await this.authProvider.verifyOtp(
       email,
@@ -374,9 +352,10 @@ export class AuthService {
   }
 
   async getProfile(id: string) {
-    const existedAccout = await this.accountRepository.findById(id);
+    console.log(id);
+    const existedAccount = await this.accountRepository.findById(id);
 
-    if (!existedAccout) {
+    if (!existedAccount) {
       throw AuthErrors.UserNotFoundById(id);
     }
 
@@ -384,7 +363,7 @@ export class AuthService {
       code: 200,
       message: 'Lấy thông tin người dùng thành công',
       status: 'success',
-      data: existedAccout,
+      data: existedAccount,
     };
   }
 

@@ -31,6 +31,7 @@ import { TemplateModule } from './routes/template/template.module';
 import { JwtModule } from '@nestjs/jwt';
 import { QueueModule } from './routes/queue/queue.module';
 import { CronModule } from './routes/cron/cron.module';
+import { SentryModule } from '@sentry/nestjs/setup';
 
 @Module({
   imports: [
@@ -44,8 +45,11 @@ import { CronModule } from './routes/cron/cron.module';
           return {
             store,
           };
-        } catch (error) {
-          console.warn('Redis connection failed, falling back to in-memory cache:', error.message);
+        } catch (error: any) {
+          console.warn(
+            'Redis connection failed, falling back to in-memory cache:',
+            error.message,
+          );
           return {
             store: 'memory',
             ttl: 300,
@@ -53,6 +57,7 @@ import { CronModule } from './routes/cron/cron.module';
         }
       },
     }),
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -89,6 +94,6 @@ import { CronModule } from './routes/cron/cron.module';
     VisitSessionModule,
     ClinicalDocumentModule,
     CronModule,
-  ],
+  ]
 })
 export class AppModule {}

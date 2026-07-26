@@ -2,7 +2,9 @@ import { Prisma, Booking, Shift } from '@prisma/client';
 import { IBookingRepository } from '../interfaces/i-booking.repository';
 import { PrismaService } from '../config/prisma.service';
 import { IShiftRepository } from '../interfaces/i-shift.repository';
+import { Injectable } from '@nestjs/common';
 
+@Injectable()
 export class PrismaShiftRepository implements IShiftRepository {
   constructor(private readonly prismaService: PrismaService) {}
   create(
