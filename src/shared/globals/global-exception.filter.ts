@@ -82,11 +82,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
     }
 
-    response.status(status).json({
-      code: status,
-      status: 'error',
-      message: Array.isArray(message) ? message[0] : message,
-      detail: detail,
-    });
+    if (!response.headersSent) {
+      response.status(status).json({
+        code: status,
+        status: 'error',
+        message: Array.isArray(message) ? message[0] : message,
+        detail: detail,
+      });
+    }
   }
 }

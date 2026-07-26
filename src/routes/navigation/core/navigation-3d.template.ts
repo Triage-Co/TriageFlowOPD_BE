@@ -42,7 +42,6 @@ export function get3DMapHtml(buildingData: any): string {
       pointer-events: none;
       z-index: 10;
       display: flex;
-      flex-direction: column;
       justify-content: space-between;
       padding: 24px;
     }
@@ -74,6 +73,23 @@ export function get3DMapHtml(buildingData: any): string {
     .sidebar::-webkit-scrollbar-thumb {
       background: rgba(0, 0, 0, 0.1);
       border-radius: 10px;
+    }
+
+    /* Sidebar Right */
+    .sidebar-right {
+      width: 300px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+      color: #0f172a;
     }
 
     .brand {
@@ -126,6 +142,8 @@ export function get3DMapHtml(buildingData: any): string {
       padding: 16px;
       border-radius: 12px;
       display: none;
+      height: fit-content;
+      min-height: auto;
     }
     .detail-card h3 {
       font-size: 14px;
@@ -355,11 +373,14 @@ export function get3DMapHtml(buildingData: any): string {
       <!-- Debug Navigation Algorithm Section -->
       <div class="nav-section">
         <div class="nav-section-title">🛠️ DEBUG THUẬT TOÁN</div>
-        <div class="nav-button-group" style="flex-direction: column; gap: 6px;">
-          <button id="btn-debug-clear" class="btn-secondary" style="background: #fee2e2; color: #ef4444; border-color: #f87171;">Xóa Tất Cả Node</button>
-          <button id="btn-debug-doors" class="btn-secondary">🚪 Sinh Node Cửa</button>
-          <button id="btn-debug-corridors" class="btn-secondary">🛣️ Sinh Node Hành Lang</button>
-          <button id="btn-debug-edges" class="btn-primary">🔗 Sinh Cạnh & Liên Kết</button>
+        <div class="nav-button-group" style="flex-direction: column; gap: 4px;">
+          <button id="btn-toggle-nodes" class="btn-secondary" style="font-size: 11px; padding: 6px 10px;">📍 Nodes: Hiện</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+            <button id="btn-debug-clear" class="btn-secondary" style="background: #fee2e2; color: #ef4444; border-color: #f87171; font-size: 10px; padding: 6px 8px;">Xóa Node</button>
+            <button id="btn-debug-doors" class="btn-secondary" style="font-size: 10px; padding: 6px 8px;">🚪 Cửa</button>
+            <button id="btn-debug-corridors" class="btn-secondary" style="font-size: 10px; padding: 6px 8px;">🛣️ Hành Lang</button>
+            <button id="btn-debug-edges" class="btn-primary" style="font-size: 10px; padding: 6px 8px;">🔗 Cạnh</button>
+          </div>
         </div>
       </div>
 
@@ -373,8 +394,11 @@ export function get3DMapHtml(buildingData: any): string {
           <button id="btn-step4-pmid" class="btn-secondary">📍 Step 4: P_Mid (Trung điểm)</button>
         </div>
       </div>
+    </div>
 
-      <div class="detail-card" id="detail-card">
+    <!-- Sidebar Right - Room Details -->
+    <div class="sidebar-right interactive" id="detail-sidebar" style="display: none;">
+      <div class="detail-card" id="detail-card" style="display: block;">
         <h3 id="detail-title">Tên phòng</h3>
         <p id="detail-code">Mã phòng</p>
         <p id="detail-desc">Mô tả chi tiết phòng khám</p>
@@ -513,6 +537,10 @@ export function get3DMapHtml(buildingData: any): string {
     // --- Build 3D Elements from data ---
     const mapGroup = new THREE.Group();
     scene.add(mapGroup);
+
+    // Create nodes group early so it can be toggled
+    const nodesGroup = new THREE.Group();
+    mapGroup.add(nodesGroup);
 
     const activeFloor = MAP_DATA.floors[0];
     
@@ -821,8 +849,8 @@ export function get3DMapHtml(buildingData: any): string {
             };
             dotMesh.userData = nodeMesh.userData;
 
-            mapGroup.add(dotMesh);
-            mapGroup.add(nodeMesh);
+            nodesGroup.add(dotMesh);
+            nodesGroup.add(nodeMesh);
           });
         }
       } catch (e) {
@@ -955,6 +983,7 @@ export function get3DMapHtml(buildingData: any): string {
     }
 
     let selectedRoomIdForActions = null; // Track selected room for Action buttons
+    const detailSidebar = document.getElementById('detail-sidebar');
 
     function selectRoom(mesh) {
       if (selectedMesh) {
@@ -963,7 +992,7 @@ export function get3DMapHtml(buildingData: any): string {
       selectedMesh = mesh;
       selectedMesh.material.opacity = 0.3;
       selectedRoomIdForActions = mesh.userData.id;
-      
+
       detailTitle.textContent = mesh.userData.label;
       detailCode.textContent = 'Mã phòng: ' + mesh.userData.code;
       detailDesc.textContent = 'Phòng khám thuộc ' + mesh.userData.areaLabel + '.';
@@ -971,18 +1000,18 @@ export function get3DMapHtml(buildingData: any): string {
       const colorHex = '#' + mesh.userData.areaColor.toString(16).padStart(6, '0');
       detailZone.style.backgroundColor = colorHex;
       detailZone.style.color = '#ffffff';
-      detailCard.style.display = 'block';
+      detailSidebar.style.display = 'flex';
 
       // Animate camera target towards room center
       const box = new THREE.Box3().setFromObject(mesh);
       const center = new THREE.Vector3();
       box.getCenter(center);
-      
+
       const startTarget = controls.target.clone();
       const endTarget = center.clone();
       const startCamPos = camera.position.clone();
       const offset = camera.position.clone().sub(startTarget);
-      
+
       let progress = 0;
       function animateZoom() {
         progress += 0.05;
@@ -1001,7 +1030,7 @@ export function get3DMapHtml(buildingData: any): string {
         selectedMesh = null;
       }
       selectedRoomIdForActions = null;
-      detailCard.style.display = 'none';
+      detailSidebar.style.display = 'none';
     }
 
     // --- Pathfinding Integration ---
@@ -1161,31 +1190,45 @@ export function get3DMapHtml(buildingData: any): string {
       clear3DPath();
     }
 
-<<<<<<< Updated upstream
-=======
     // Toggle Nodes visibility
     const btnToggleNodes = document.getElementById('btn-toggle-nodes');
     let isNodesVisible = true;
+    
+    function updateNodeButtonState() {
+      if (!btnToggleNodes) return;
+      
+      if (isNodesVisible) {
+        btnToggleNodes.classList.add('active');
+        btnToggleNodes.style.background = '#6366f1';
+        btnToggleNodes.style.color = '#ffffff';
+        btnToggleNodes.style.borderColor = '#4f46e5';
+        btnToggleNodes.textContent = '📍 Nodes: Hiện';
+      } else {
+        btnToggleNodes.classList.remove('active');
+        btnToggleNodes.style.background = '#f1f5f9';  // Reset to default color
+        btnToggleNodes.style.color = '#475569';      // Reset to default text color
+        btnToggleNodes.style.borderColor = 'rgba(15, 23, 42, 0.08)';  // Reset to default border
+        btnToggleNodes.textContent = '📍 Nodes: Ẩn';
+      }
+    }
+    
     if (btnToggleNodes) {
+      // Initialize button state on load
+      updateNodeButtonState();
+      
       btnToggleNodes.addEventListener('click', () => {
+        console.log('Toggle nodes clicked. Current state:', isNodesVisible);
         isNodesVisible = !isNodesVisible;
         nodesGroup.visible = isNodesVisible;
-        
-        if (isNodesVisible) {
-          btnToggleNodes.classList.add('active');
-          btnToggleNodes.style.background = '#6366f1';
-          btnToggleNodes.style.color = '#ffffff';
-          btnToggleNodes.style.borderColor = '#4f46e5';
-          btnToggleNodes.textContent = '📍 Nodes: Hiện';
-        } else {
-          btnToggleNodes.classList.remove('active');
-          btnToggleNodes.style.background = '';
-          btnToggleNodes.style.color = '';
-          btnToggleNodes.style.borderColor = '';
-          btnToggleNodes.textContent = '📍 Nodes: Ẩn';
-        }
+        console.log('Nodes toggled to:', isNodesVisible, 'Total nodes in group:', nodesGroup.children.length);
+        updateNodeButtonState();
       });
+    } else {
+      console.warn('btn-toggle-nodes element not found');
     }
+    
+    // Debug: Log nodes count after rendering
+    console.log('Nodes rendered:', nodesGroup.children.length, 'Nodes from data:', activeFloor?.nodes?.length || 0);
 
     // --- Debug Algorithm Triggers ---
     async function triggerGraphAlgorithm(endpoint, buttonId, loadingText) {
@@ -1364,7 +1407,6 @@ export function get3DMapHtml(buildingData: any): string {
     setupStepToggle('btn-step3-zigzag', debugZigzagGroup, '#06b6d4', '⚡ Step 3: E_zigzag (Cạnh chéo)');
     setupStepToggle('btn-step4-pmid', debugPmidGroup, '#f59e0b', '📍 Step 4: P_Mid (Trung điểm)');
 
->>>>>>> Stashed changes
     window.addEventListener('resize', onWindowResize);
 
     function onWindowResize() {
