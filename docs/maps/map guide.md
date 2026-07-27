@@ -44,11 +44,11 @@ Gửi yêu cầu HTTP POST bằng Postman hoặc curl (yêu cầu quyền Admin)
     - `Authorization: Bearer <ADMIN_JWT_TOKEN>`
 
 ### Cách 2: Chạy script CLI tạm thời
-Tạo file `src/run-graph-gen.ts` với nội dung khởi tạo NestJS context, sau đó thực thi qua command line:
+Thực thi qua command line:
 ```bash
-npx ts-node -r tsconfig-paths/register src/run-graph-gen.ts
+npx ts-node src/routes/navigation/core/graph-generation/generate-graph.ts
 ```
-*(Hệ thống sẽ sinh ra **222 nodes** và **422 edges** kết nối an toàn cách tường $\ge 0.55m$)*.
+
 
 ---
 

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ClinicalRoomType, RoomType } from '@prisma/client';
+import { ClinicalRoomType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,

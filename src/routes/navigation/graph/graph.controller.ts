@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -64,6 +65,45 @@ export class GraphController {
       status: 'success',
       data,
     };
+  }
+
+  @Delete(':floorId/nodes')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Clear all nodes for a floor (Debug)' })
+  async clearNodes(@Param('floorId') floorId: string) {
+    const data = await this.graphService.clearAllNodes(floorId);
+    return { code: 200, message: 'Cleared all nodes', status: 'success', data };
+  }
+
+  @Post(':floorId/generate/doors')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate door nodes only (Debug)' })
+  async generateDoors(@Param('floorId') floorId: string) {
+    const data = await this.graphService.generateDoorsPhase(floorId);
+    return { code: 200, message: 'Generated door nodes', status: 'success', data };
+  }
+
+  @Post(':floorId/generate/corridors')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate corridor nodes only (Debug)' })
+  async generateCorridors(@Param('floorId') floorId: string) {
+    const data = await this.graphService.generateCorridorsPhase(floorId);
+    return { code: 200, message: 'Generated corridor nodes', status: 'success', data };
+  }
+
+  @Post(':floorId/generate/edges')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate graph edges (Debug)' })
+  async generateEdges(@Param('floorId') floorId: string) {
+    const data = await this.graphService.generateEdgesPhase(floorId);
+    return { code: 200, message: 'Generated edges', status: 'success', data };
+  }
+
+  @Get(':floorId/debug-steps')
+  @ApiOperation({ summary: 'Get MPRSS algorithm debug steps geometry layers (Debug)' })
+  async getDebugSteps(@Param('floorId') floorId: string) {
+    const data = await this.graphService.getCorridorDebugSteps(floorId);
+    return { code: 200, message: 'Retrieved debug steps successfully', status: 'success', data };
   }
 
   @Post(':floorId/generate')

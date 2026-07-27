@@ -95,14 +95,16 @@ enum StepStatusEnum {
 
 enum ClinicalRoomType {
   RECEPTION
-  TRIAGE
-  CONSULTATION
-  TREATMENT
-  LAB
-  IMAGING
+  TRIAGE_AREA
+  CLINICAL_ROOM
+  PROCEDURE_ROOM
+  LABORATORY
+  IMAGING_ROOM
+  FUNCTIONAL_EXPLORATION
   PHARMACY
   CASHIER
-  ADMIN
+  EMPTY
+  OTHER
 }
 
 model Account {
@@ -274,7 +276,7 @@ model Flow {
 model Room {
   room_id          String           @id @default(uuid()) @db.Uuid
   room_name        String
-  room_type        ClinicalRoomType @default(CONSULTATION)
+  room_type        ClinicalRoomType @default(CLINICAL_ROOM)
   physical_room_id String?          @db.Uuid
   specialty_id     String?          @db.Uuid
   shifts           Shift[]
@@ -633,17 +635,6 @@ model Notification {
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
-enum RoomType {
-  CONSULTATION
-  EXAMINATION
-  WAITING
-  PHARMACY
-  LAB
-  IMAGING
-  ADMIN
-  OTHER
-}
-
 enum BoundaryType {
   WALL
   DOOR
@@ -724,7 +715,6 @@ model PhysicalRoom {
   floorId      String                                  @db.Uuid
   roomCode     String
   roomLabel    String
-  type         RoomType
   heightMeters Float?
   // PostGIS geometry: Point for centroid, Polygon for room outline
   centerGeom   Unsupported("geometry(Point, 4326)")?
