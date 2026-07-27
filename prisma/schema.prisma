@@ -410,6 +410,12 @@ model Medicine {
   @@map("medicine")
 }
 
+enum InvoiceStatusEnum {
+  PENDING
+  PAID
+  CANCELLED
+}
+
 enum ServiceOrderStatusEnum {
   PENDING
   PAID
@@ -467,8 +473,42 @@ model Service_Order {
   serviceOrderDetails Service_Order_Detail[]
   bookings            Booking[]
   steps               Step[]
+  transactions        Transaction[]
+  invoice             Invoice?
 
   @@map("service_order")
+}
+
+model Invoice {
+  invoice_id       String            @id @default(uuid()) @db.Uuid
+  service_order_id String            @unique @db.Uuid
+  total_amount     Int               @default(0)
+  status           InvoiceStatusEnum @default(PENDING)
+  payment_method   String?
+  payment_date     DateTime?         @db.Timestamptz()
+  created_at       DateTime          @default(now()) @db.Timestamptz()
+  updated_at       DateTime          @default(now()) @updatedAt @db.Timestamptz()
+
+  service_order   Service_Order    @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
+  invoice_details Invoice_Detail[]
+
+  @@map("invoice")
+}
+
+model Invoice_Detail {
+  invoice_detail_id String   @id @default(uuid()) @db.Uuid
+  invoice_id        String   @db.Uuid
+  item_name         String
+  quantity          Int      @default(1)
+  unit_price        Int      @default(0)
+  sub_total         Int      @default(0)
+  created_at        DateTime @default(now()) @db.Timestamptz()
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  invoice Invoice @relation(fields: [invoice_id], references: [invoice_id], onDelete: Cascade)
+
+  @@index([invoice_id])
+  @@map("invoice_detail")
 }
 
 model Patient_Answer {
@@ -562,15 +602,18 @@ model Flow_Rules_Config {
 }
 
 model Transaction {
-  id         String          @id @default(uuid()) @db.Uuid
-  amount     Int
-  transDate  DateTime        @default(now()) @db.Timestamptz()
-  transType  TransTypeEnum
-  docNo      Int             @unique
-  buyerId    String          @db.Uuid
-  status     TransStatusEnum @default(PENDING)
-  created_at DateTime        @default(now()) @db.Timestamptz()
-  updated_at DateTime        @default(now()) @updatedAt @db.Timestamptz()
+  id               String          @id @default(uuid()) @db.Uuid
+  amount           Int
+  transDate        DateTime        @default(now()) @db.Timestamptz()
+  transType        TransTypeEnum
+  docNo            Int             @unique
+  buyerId          String          @db.Uuid
+  status           TransStatusEnum @default(PENDING)
+  service_order_id String?         @db.Uuid
+  created_at       DateTime        @default(now()) @db.Timestamptz()
+  updated_at       DateTime        @default(now()) @updatedAt @db.Timestamptz()
+
+  serviceOrder Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
 
   @@index([docNo, status])
   @@index([transDate, transType])

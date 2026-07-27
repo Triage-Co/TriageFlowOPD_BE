@@ -64,6 +64,20 @@ export class ServiceOrderController {
     return this.serviceOrderService.findAll(query);
   }
 
+  @Get('/pending/:patientId')
+  @ApiOperation({
+    summary: 'Lấy danh sách Service Order chờ thanh toán theo bệnh nhân',
+  })
+  @ApiOkResponse({
+    description: 'Lấy danh sách thành công.',
+  })
+  findPending(
+    @Param('patientId')
+    patientId: string,
+  ) {
+    return this.serviceOrderService.findPendingByPatientId(patientId);
+  }
+
   @Get(':id')
   @ApiOperation({
     summary: 'Lấy chi tiết Service Order',

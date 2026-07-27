@@ -108,6 +108,51 @@ export class FlowService {
 
     return this.prismaService.$transaction(
       async (tx) => {
+        const extractPaidServiceCodes = (steps: TemplateStepDto[]): string[] => {
+          let codes: string[] = [];
+          for (const step of steps) {
+            if (step.requires_payment && step.service_code) {
+              codes.push(step.service_code);
+            }
+            if (step.sub_steps && step.sub_steps.length > 0) {
+              codes.push(...extractPaidServiceCodes(step.sub_steps));
+            }
+          }
+          return codes;
+        };
+
+        const paidServiceCodes = extractPaidServiceCodes(templateSteps);
+        
+        let serviceOrder: any = null;
+        let createdInvoice: any = null;
+        let servicesMap = new Map<string, any>();
+        
+        if (paidServiceCodes.length > 0) {
+          const services = await tx.service.findMany({
+            where: { service_code: { in: paidServiceCodes } },
+          });
+          for (const svc of services) {
+            if (svc.service_code) {
+              servicesMap.set(svc.service_code, svc);
+            }
+          }
+
+          serviceOrder = await tx.service_Order.create({
+            data: {
+              booking_id: existingFlow.booking_id,
+              status: 'PENDING',
+            },
+          });
+
+          createdInvoice = await tx.invoice.create({
+            data: {
+              service_order_id: serviceOrder.service_order_id,
+              status: 'PENDING',
+              total_amount: 0,
+            }
+          });
+        }
+
         const saveStepsRecursively = async (
           steps: TemplateStepDto[],
           parentStepId: string | null = null,
@@ -172,16 +217,48 @@ export class FlowService {
               availableRooms[currentIndex % availableRooms.length];
 
             this.roundRobinTracker.set(step.room_type, currentIndex + 1);
+
+            let currentServiceOrderId = null;
+            if (step.requires_payment && step.service_code && serviceOrder) {
+              currentServiceOrderId = serviceOrder.service_order_id;
+              const svc = servicesMap.get(step.service_code);
+              
+              if (svc) {
+                 await tx.service_Order_Detail.create({
+                   data: {
+                     service_order_id: serviceOrder.service_order_id,
+                     service_id: svc.service_id,
+                     price_at_order: svc.price,
+                     quantity: 1,
+                     status: 'PENDING'
+                   }
+                 });
+
+                 await tx.invoice_Detail.create({
+                   data: {
+                     invoice_id: createdInvoice.invoice_id,
+                     item_name: svc.service_name || 'Dịch vụ y tế',
+                     quantity: 1,
+                     unit_price: svc.price,
+                     sub_total: svc.price
+                   }
+                 });
+              } else {
+                 throw new Error(`Không tìm thấy dịch vụ với mã: ${step.service_code}`);
+              }
+            }
+
             const createdStep = await tx.step.create({
               data: {
                 flow_id: flowId,
                 step_status: 'PENDING',
-                step_name: template.template_name,
+                step_name: step.step_name || template.template_name,
                 room_id: selectedRoom.room_id,
                 staff_id: selectedRoom.shifts[0].staff_id,
                 parent_step_id: parentStepId,
                 payment_status: step.requires_payment ? 'PENDING' : null,
-                service_code: step.service_code
+                service_code: step.service_code,
+                service_order_id: currentServiceOrderId
               },
             });
 
@@ -194,6 +271,17 @@ export class FlowService {
           }
         };
         await saveStepsRecursively(templateSteps);
+
+        if (serviceOrder) {
+          const invoiceDetails = await tx.invoice_Detail.findMany({
+            where: { invoice: { service_order_id: serviceOrder.service_order_id } }
+          });
+          const totalAmount = invoiceDetails.reduce((sum, item) => sum + item.sub_total, 0);
+          await tx.invoice.update({
+            where: { service_order_id: serviceOrder.service_order_id },
+            data: { total_amount: totalAmount }
+          });
+        }
 
         const saveDependenciesRecursively = async (
           steps: TemplateStepDto[],

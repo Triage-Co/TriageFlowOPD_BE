@@ -133,23 +133,6 @@ export class BookingService {
       const service =
         await this.serviceRepository.findByServiceCode('KHAM_CHUYEN_KHOA');
 
-      const createPaymentData = await this.transactionService.create({
-        amount: service?.price || 2000,
-        cancelUrl:
-          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
-        returnUrl:
-          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
-        clientId: existedPatient.account_id,
-        transType: 'APPOINTMENT_PAYMENT',
-      });
-
-      if (!createPaymentData || !('data' in createPaymentData)) {
-        throw new BadRequestException(
-          (createPaymentData?.detail as any).error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
-        );
-      }
-
       const rs = await this.prismaService.$transaction(async (tx) => {
         const booking = await this.bookingRepository.create(
           createBookingRequestDto,
@@ -158,7 +141,7 @@ export class BookingService {
 
         const serviceOrderDto = {
           booking_id: booking.booking_id,
-          status: ServiceOrderStatusEnum.IN_PROGRESS,
+          status: ServiceOrderStatusEnum.PENDING,
         };
 
         const serviceOrder = await this.serviceOrderRepository.create(
@@ -167,16 +150,15 @@ export class BookingService {
         );
 
         const serviceOrderDetailDto = {
-          status: ServiceOrderDetailStatusEnum.IN_PROGRESS,
+          status: ServiceOrderDetailStatusEnum.PENDING,
           quantity: 1,
           price_at_order: service?.price,
           service_id: service?.service_id,
           service_order_id: serviceOrder.service_order_id,
-          docNo: createPaymentData.data.orderCode,
         };
 
         await this.serviceOrderDetailRepository.create(
-          serviceOrderDetailDto,
+          serviceOrderDetailDto as any,
           tx,
         );
         const flow = await this.flowRepository.create(
@@ -193,13 +175,9 @@ export class BookingService {
         const step = await this.stepRepository.createParentStep(
           {
             flow_id: flow.flow_id,
-            // room_id: shift.room_id,
-            // staff_id: shift.staff_id,
-            docNo: createPaymentData.data.orderCode,
             step_name: 'Đặt khám',
             step_status: StepStatusEnum.PENDING,
             payment_status: PaymentStatusEnum.PENDING,
-            qr_text: createPaymentData.data.qrCode,
             service_order_id: serviceOrder.service_order_id,
             service_code: service?.service_code,
           },
@@ -207,17 +185,44 @@ export class BookingService {
         );
 
         return {
-          step_id: step.step_id,
-          booking_id: booking.booking_id,
-          payment: createPaymentData,
+          step,
+          booking,
+          serviceOrder,
         };
+      });
+
+      const createPaymentData = await this.transactionService.create({
+        amount: service?.price || 2000,
+        cancelUrl:
+          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
+        returnUrl:
+          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
+        clientId: existedPatient.account_id,
+        transType: 'APPOINTMENT_PAYMENT',
+        service_order_id: rs.serviceOrder.service_order_id,
+      });
+
+      if (!createPaymentData || !('data' in createPaymentData)) {
+        throw new BadRequestException(
+          (createPaymentData?.detail as any)?.error?.desc ||
+            'Lỗi tạo giao dịch thanh toán',
+        );
+      }
+
+      await this.STEP.update({
+        where: { step_id: rs.step.step_id },
+        data: { qr_text: createPaymentData.data.qrCode },
       });
 
       return {
         code: 200,
         message: 'tạo lịch thành công',
         status: 'success',
-        data: rs,
+        data: {
+          step_id: rs.step.step_id,
+          booking_id: rs.booking.booking_id,
+          payment: createPaymentData,
+        },
       };
     } catch (error) {
       throw error;
@@ -313,16 +318,6 @@ export class BookingService {
               step_id: step_id,
             },
           });
-
-          // const serviceOrderDeatial = 
-
-          await this.serviceOrderDetailRepository.update(
-            step.service_order?.serviceOrderDetails[0].service_order_detail_id!,
-            {
-              status: ServiceOrderDetailStatusEnum.PAID,
-            },
-            tx,
-          );
 
           const bookingId = step.flow?.booking.booking_id;
           const patientId = step.flow?.booking.patient_id;

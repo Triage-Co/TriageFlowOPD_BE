@@ -90,4 +90,42 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
       },
     });
   }
+
+  async findPendingByPatientId(patientId: string): Promise<any[]> {
+    const patientBookings = await this.prismaService.booking.findMany({
+      where: { patient_id: patientId },
+      select: { booking_id: true },
+    });
+    const bookingIds = patientBookings.map((b) => b.booking_id);
+
+    return await this.prismaService.service_Order.findMany({
+      where: {
+        status: 'PENDING',
+        OR: [
+          {
+            bookings: {
+              some: {
+                patient_id: patientId,
+              },
+            },
+          },
+          {
+            booking_id: {
+              in: bookingIds,
+            },
+          },
+        ],
+      },
+      include: {
+        serviceOrderDetails: {
+          include: {
+            service: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+  }
 }

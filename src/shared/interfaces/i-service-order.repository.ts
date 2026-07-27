@@ -24,4 +24,5 @@ export interface IServiceOrderRepository {
   }>;
   findById(id: string): Promise<Partial<Service_Order> | null>;
   delete(id: string, tx?: Prisma.TransactionClient): Promise<Service_Order>;
+  findPendingByPatientId(patientId: string): Promise<any[]>;
 }

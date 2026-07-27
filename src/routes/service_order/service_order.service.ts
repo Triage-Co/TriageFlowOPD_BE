@@ -72,6 +72,38 @@ export class ServiceOrderService {
     };
   }
 
+  async findPendingByPatientId(patientId: string) {
+    try {
+      const data = await this.serviceOrderRepository.findPendingByPatientId(patientId);
+      
+      // Tính toán tổng tiền cho mỗi Service Order
+      const enrichedData = data.map((order: any) => {
+        const totalPrice = order.serviceOrderDetails.reduce((sum: number, detail: any) => {
+          return sum + (detail.price_at_order || 0) * (detail.quantity || 1);
+        }, 0);
+        return {
+          ...order,
+          total_price: totalPrice
+        };
+      });
+
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Lấy danh sách Service Order chờ thanh toán thành công',
+        data: enrichedData,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Lỗi không xác định';
+
+      throw ServiceOrderErrors.ActionFailed(
+        'Lấy danh sách Service Order chờ thanh toán',
+        errorMessage,
+      );
+    }
+  }
+
   async update(id: string, updateServiceOrderReqDto: UpdateServiceOrderReqDto) {
     const existing = await this.serviceOrderRepository.findById(id);
 
