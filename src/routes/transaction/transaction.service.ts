@@ -40,19 +40,7 @@ export class TransactionService {
     createTransactionRequestDto: CreateTransactionRequestDto,
   ): Promise<ResponseType<any>> {
     try {
-      const data = await this.ACCOUNT.findUnique({
-        where: {
-          account_id: createTransactionRequestDto.clientId,
-        },
-      });
 
-      if (!data) {
-        return {
-          code: 404,
-          message: `không tìm thấy user với id ${createTransactionRequestDto.clientId}`,
-          status: 'error',
-        };
-      }
 
       const orderCode = parseInt(
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
@@ -68,7 +56,7 @@ export class TransactionService {
 
       await this.TRANSACTION.create({
         data: {
-          buyerId: data.account_id,
+          buyerId: createTransactionRequestDto.clientId,
           docNo: paymentLink.orderCode,
           transType: createTransactionRequestDto.transType,
           amount: paymentLink.amount,
@@ -126,7 +114,7 @@ export class TransactionService {
         // Cập nhật Invoice thành PAID
         await this.prismaService.invoice.updateMany({
           where: { service_order_id: transaction.service_order_id },
-          data: { 
+          data: {
             status: 'PAID',
             payment_date: new Date(),
           },
