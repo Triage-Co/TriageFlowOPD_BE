@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { RoomType } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreatePhysicalRoomDto {
   @IsUUID()
@@ -26,15 +25,6 @@ export class CreatePhysicalRoomDto {
     description: 'Tên hiển thị của phòng',
   })
   roomLabel: string;
-
-  @IsEnum(RoomType)
-  @ApiProperty({
-    name: 'type',
-    enum: RoomType,
-    example: RoomType.CONSULTATION,
-    description: 'Loại phòng khám/chức năng',
-  })
-  type: RoomType;
 
   @IsNumber()
   @IsOptional()

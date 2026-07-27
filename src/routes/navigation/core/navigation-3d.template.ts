@@ -378,7 +378,6 @@ export function get3DMapHtml(buildingData: any): string {
       <div class="nav-section">
         <div class="nav-section-title">🛠️ DEBUG THUẬT TOÁN</div>
         <div class="nav-button-group" style="flex-direction: column; gap: 4px;">
-          <button id="btn-toggle-nodes" class="btn-secondary" style="font-size: 11px; padding: 6px 10px;">📍 Nodes: Hiện</button>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
             <button id="btn-debug-clear" class="btn-secondary" style="background: #fee2e2; color: #ef4444; border-color: #f87171; font-size: 10px; padding: 6px 8px;">Xóa Node</button>
             <button id="btn-debug-doors" class="btn-secondary" style="font-size: 10px; padding: 6px 8px;">🚪 Cửa</button>
@@ -544,10 +543,7 @@ export function get3DMapHtml(buildingData: any): string {
     const mapGroup = new THREE.Group();
     scene.add(mapGroup);
 
-<<<<<<< HEAD
     // Create nodes group early so it can be toggled
-=======
->>>>>>> 6cf0454a43e88fe3315d1637780dbf5e1706e91b
     const nodesGroup = new THREE.Group();
     mapGroup.add(nodesGroup);
 
@@ -1457,14 +1453,10 @@ export function get3DMapHtml(buildingData: any): string {
       });
     }
 
-<<<<<<< HEAD
     setupStepToggle('btn-step1-pb', debugPbGroup, '#ef4444', '🔴 Step 1: P_b (Đỉnh tường)');
     setupStepToggle('btn-step2-tin', debugTinGroup, '#64748b', '📐 Step 2: Delaunay TIN');
     setupStepToggle('btn-step3-zigzag', debugZigzagGroup, '#06b6d4', '⚡ Step 3: E_zigzag (Cạnh chéo)');
     setupStepToggle('btn-step4-pmid', debugPmidGroup, '#f59e0b', '📍 Step 4: P_Mid (Trung điểm)');
-
-=======
->>>>>>> 6cf0454a43e88fe3315d1637780dbf5e1706e91b
     window.addEventListener('resize', onWindowResize);
 
     function onWindowResize() {
