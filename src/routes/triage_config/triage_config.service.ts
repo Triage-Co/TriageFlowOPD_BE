@@ -11,7 +11,8 @@ export class TriageConfigService {
       const data = await this.prismaService.triage_Config.create({
         data: {
           rule_key: createTriageConfigDto.rule_key,
-          rule_value: createTriageConfigDto.rule_value
+          rule_value: createTriageConfigDto.rule_value 
+          
         }
       })
 
