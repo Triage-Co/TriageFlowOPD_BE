@@ -11,6 +11,7 @@ const findQuery = {
     include: {
       dependedBy: true, //bước yêu cầu hoàn thành (sub step)
       dependencies: true, //bước cần hoàn thành
+      queues: true,
       room: {
         include: {
           specialty: true,
@@ -119,6 +120,7 @@ export class PrismaFlowRepository implements IFlowRepository {
         physicalRoomId: step.physicalRoomId,
         depends_on: step.dependencies.map((d: any) => d.depends_on_step_id), //bước cần hoàn thành
         sub_steps: [],
+        queues: step.queues || [],
       };
     });
 
@@ -191,6 +193,7 @@ export class PrismaFlowRepository implements IFlowRepository {
         physicalRoomId: step.physicalRoomId,
         depends_on: step.dependencies.map((d: any) => d.depends_on_step_id), //bước cần hoàn thành
         sub_steps: [],
+        queues: step.queues || [],
       };
     });
 
