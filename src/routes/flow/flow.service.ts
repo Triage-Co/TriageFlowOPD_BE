@@ -181,6 +181,7 @@ export class FlowService {
                 staff_id: selectedRoom.shifts[0].staff_id,
                 parent_step_id: parentStepId,
                 payment_status: step.requires_payment ? 'PENDING' : null,
+                service_code: step.service_code
               },
             });
 

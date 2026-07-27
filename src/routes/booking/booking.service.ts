@@ -12,6 +12,8 @@ import { PrismaService } from '../../shared/config/prisma.service';
 import {
   PaymentStatusEnum,
   PrismaClient,
+  ServiceOrderDetailStatusEnum,
+  ServiceOrderStatusEnum,
   StepStatusEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
@@ -24,6 +26,9 @@ import type { IShiftRepository } from '../../shared/interfaces/i-shift.repositor
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import type { ITriageInformationRepository } from '../../shared/interfaces/i-triage-information.repository';
 import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
+import type { IServiceOrderDetailRepository } from '../../shared/interfaces/i-service-order-detail.repository';
+import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
+import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 
 @Injectable()
 export class BookingService {
@@ -56,6 +61,12 @@ export class BookingService {
     private readonly triageInformationRepository: ITriageInformationRepository,
     @Inject('ISlotRepository')
     private readonly SlotRepository: ISlotRepository,
+    @Inject('IServiceOrderDetailRepository')
+    private readonly serviceOrderDetailRepository: IServiceOrderDetailRepository,
+    @Inject('IServiceOrderRepository')
+    private readonly serviceOrderRepository: IServiceOrderRepository,
+    @Inject('IServiceRepository')
+    private readonly serviceRepository: IServiceRepository,
   ) {
     this.BOOKING = this.prismaService.booking;
     this.SHIFT = this.prismaService.shift;
@@ -119,8 +130,11 @@ export class BookingService {
         });
       }
 
+      const service =
+        await this.serviceRepository.findByServiceCode('KHAM_CHUYEN_KHOA');
+
       const createPaymentData = await this.transactionService.create({
-        amount: 2000,
+        amount: service?.price || 2000,
         cancelUrl:
           'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
         returnUrl:
@@ -135,12 +149,36 @@ export class BookingService {
             'Lỗi tạo giao dịch thanh toán',
         );
       }
+
       const rs = await this.prismaService.$transaction(async (tx) => {
         const booking = await this.bookingRepository.create(
           createBookingRequestDto,
           tx,
         );
 
+        const serviceOrderDto = {
+          booking_id: booking.booking_id,
+          status: ServiceOrderStatusEnum.IN_PROGRESS,
+        };
+
+        const serviceOrder = await this.serviceOrderRepository.create(
+          serviceOrderDto,
+          tx,
+        );
+
+        const serviceOrderDetailDto = {
+          status: ServiceOrderDetailStatusEnum.IN_PROGRESS,
+          quantity: 1,
+          price_at_order: service?.price,
+          service_id: service?.service_id,
+          service_order_id: serviceOrder.service_order_id,
+          docNo: createPaymentData.data.orderCode,
+        };
+
+        await this.serviceOrderDetailRepository.create(
+          serviceOrderDetailDto,
+          tx,
+        );
         const flow = await this.flowRepository.create(
           { booking_id: booking.booking_id },
           tx,
@@ -162,6 +200,8 @@ export class BookingService {
             step_status: StepStatusEnum.PENDING,
             payment_status: PaymentStatusEnum.PENDING,
             qr_text: createPaymentData.data.qrCode,
+            service_order_id: serviceOrder.service_order_id,
+            service_code: service?.service_code,
           },
           tx,
         );
@@ -195,6 +235,11 @@ export class BookingService {
             },
           },
           queues: true,
+          service_order: {
+            include: {
+              serviceOrderDetails: true,
+            },
+          },
           flow: {
             include: {
               booking: {
@@ -268,6 +313,16 @@ export class BookingService {
               step_id: step_id,
             },
           });
+
+          // const serviceOrderDeatial = 
+
+          await this.serviceOrderDetailRepository.update(
+            step.service_order?.serviceOrderDetails[0].service_order_detail_id!,
+            {
+              status: ServiceOrderDetailStatusEnum.PAID,
+            },
+            tx,
+          );
 
           const bookingId = step.flow?.booking.booking_id;
           const patientId = step.flow?.booking.patient_id;
@@ -396,6 +451,7 @@ export class BookingService {
         },
       };
     } catch (error) {
+      console.log(error);
       throw error;
     }
   }
