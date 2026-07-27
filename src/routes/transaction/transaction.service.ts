@@ -9,6 +9,7 @@ import { randomInt } from 'crypto';
 import { PayosService } from '../../shared/config/payos.service';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { CreateTransactionRequestDto } from './dto/request-transaction.dto';
+import { QueueService } from '../queue/queue.service';
 import { PayOS } from '@payos/node';
 import { PrismaClient } from '@prisma/client';
 import { ResponseType } from '../../shared/types/response.type';
@@ -25,6 +26,7 @@ export class TransactionService {
   constructor(
     private readonly payosService: PayosService,
     private readonly prismaService: PrismaService,
+    private readonly queueService: QueueService,
     @Inject('IStepRepository')
     private readonly stepRepository: IStepRepository,
   ) {
@@ -129,6 +131,9 @@ export class TransactionService {
             payment_date: new Date(),
           },
         });
+
+        // Generate số thứ tự cho các phòng Cận lâm sàng
+        await this.queueService.generateServiceQueueNumber(transaction.service_order_id);
       }
 
       return {
