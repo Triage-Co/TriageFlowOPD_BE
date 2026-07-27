@@ -32,6 +32,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { QueueModule } from './routes/queue/queue.module';
 import { CronModule } from './routes/cron/cron.module';
 import { SentryModule } from '@sentry/nestjs/setup';
+import { ServiceModule } from './routes/service/service.module';
+import { ServiceOrderModule } from './routes/service_order/service_order.module';
+import { ServiceOrderDetailModule } from './routes/service_order_detail/service_order_detail.module';
+import { InvoiceModule } from './routes/invoice/invoice.module';
+import { InvoiceDetailModule } from './routes/invoice_detail/invoice_detail.module';
 
 @Module({
   imports: [
@@ -94,6 +99,11 @@ import { SentryModule } from '@sentry/nestjs/setup';
     VisitSessionModule,
     ClinicalDocumentModule,
     CronModule,
+    ServiceModule,
+    ServiceOrderModule,
+    ServiceOrderDetailModule,
+    InvoiceModule,
+    InvoiceDetailModule,
   ]
 })
 export class AppModule {}

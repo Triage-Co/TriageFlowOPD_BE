@@ -70,6 +70,7 @@ export class TransactionService {
           docNo: paymentLink.orderCode,
           transType: createTransactionRequestDto.transType,
           amount: paymentLink.amount,
+          service_order_id: createTransactionRequestDto.service_order_id,
         },
       });
 
@@ -92,7 +93,7 @@ export class TransactionService {
   async webhook(payload: any) {
     try {
       const paymentData = payload.data;
-      await this.TRANSACTION.update({
+      const transaction = await this.TRANSACTION.update({
         where: {
           docNo: paymentData.orderCode,
         },
@@ -101,24 +102,31 @@ export class TransactionService {
         },
       });
 
-      console.log('paymentData', paymentData);
-      console.log('orderCode', paymentData.orderCode);
+      if (transaction && transaction.service_order_id) {
+        // Cập nhật Service Order thành PAID
+        await this.prismaService.service_Order.update({
+          where: { service_order_id: transaction.service_order_id },
+          data: { status: 'PAID' },
+        });
 
-      const findStepData = await this.STEP.findFirst({
-        where: {
-          docNo: paymentData.orderCode,
-        },
-      });
+        // Cập nhật Service Order Detail thành PAID
+        await this.prismaService.service_Order_Detail.updateMany({
+          where: { service_order_id: transaction.service_order_id },
+          data: { status: 'PAID' },
+        });
 
-      console.log('step', findStepData);
+        // Cập nhật tất cả Step thuộc Order thành SUCCESSED
+        await this.STEP.updateMany({
+          where: { service_order_id: transaction.service_order_id },
+          data: { payment_status: 'SUCCESSED' },
+        });
 
-      if (findStepData) {
-        await this.STEP.update({
-          where: {
-            step_id: findStepData.step_id,
-          },
-          data: {
-            payment_status: 'SUCCESSED',
+        // Cập nhật Invoice thành PAID
+        await this.prismaService.invoice.updateMany({
+          where: { service_order_id: transaction.service_order_id },
+          data: { 
+            status: 'PAID',
+            payment_date: new Date(),
           },
         });
       }

@@ -21,6 +21,9 @@ export class PrismaSpecialtyRepository implements ISpecialtyRepository {
         createdAt: true,
         updatedAt: true,
       },
+      orderBy: {
+        createdAt: 'desc',
+      },
     });
   }
 }
