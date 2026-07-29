@@ -36,6 +36,16 @@ export class CreatePhysicalRoomDto {
   })
   heightMeters?: number;
 
+  @IsUUID()
+  @IsOptional()
+  @ApiProperty({
+    name: 'areaId',
+    example: 'a6b32cb3-1a22-42da-91ef-f6089bd608d0',
+    description: 'ID khu vực (Area) chứa phòng này',
+    required: false,
+  })
+  areaId?: string;
+
   @IsString()
   @IsOptional()
   @ApiProperty({
