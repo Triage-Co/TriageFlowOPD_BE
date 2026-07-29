@@ -9,6 +9,7 @@ import { CategoryModule } from './category/category.module';
 import { PoiModule } from './poi/poi.module';
 import { FeatureTemplateModule } from './feature-template/feature-template.module';
 import { PlacedFeatureModule } from './placed-feature/placed-feature.module';
+import { MapEditorModule } from './map-editor/map-editor.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PlacedFeatureModule } from './placed-feature/placed-feature.module';
     PoiModule,
     FeatureTemplateModule,
     PlacedFeatureModule,
+    MapEditorModule,
   ],
   exports: [
     BuildingModule,
@@ -34,6 +36,7 @@ import { PlacedFeatureModule } from './placed-feature/placed-feature.module';
     PoiModule,
     FeatureTemplateModule,
     PlacedFeatureModule,
+    MapEditorModule,
   ],
 })
 export class MapModule {}

@@ -23,6 +23,7 @@ export class PhysicalRoomService {
           roomLabel: createPhysicalRoomDto.roomLabel,
           type: createPhysicalRoomDto.type,
           heightMeters: createPhysicalRoomDto.heightMeters,
+          areaId: createPhysicalRoomDto.areaId,
         },
       });
 
@@ -174,6 +175,7 @@ export class PhysicalRoomService {
           roomLabel: updatePhysicalRoomDto.roomLabel,
           type: updatePhysicalRoomDto.type,
           heightMeters: updatePhysicalRoomDto.heightMeters,
+          areaId: updatePhysicalRoomDto.areaId,
         },
       });
 
