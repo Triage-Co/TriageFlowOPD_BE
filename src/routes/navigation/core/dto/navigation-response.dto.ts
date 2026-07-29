@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { RoomType, BoundaryType, NodeType } from '@prisma/client';
+import { BoundaryType, NodeType } from '@prisma/client';
 
 export class GeoJsonGeometryDto {
   @ApiProperty({ example: 'Point', description: 'Loại hình hình học (Point, Polygon, LineString...)' })
@@ -90,9 +90,6 @@ export class MapPhysicalRoomDto {
 
   @ApiProperty({ example: 'Phòng Khám 101' })
   roomLabel: string;
-
-  @ApiProperty({ enum: RoomType, example: RoomType.CONSULTATION })
-  type: RoomType;
 
   @ApiProperty({ example: 3.2, required: false, description: 'Chiều cao phòng (mét)' })
   heightMeters?: number;

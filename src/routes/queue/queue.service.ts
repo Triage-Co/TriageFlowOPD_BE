@@ -105,5 +105,51 @@ export class QueueService {
       timestamp: new Date().toISOString(),
     };
   }
+
+  async generateServiceQueueNumber(serviceOrderId: string) {
+    // Tìm tất cả các Step liên quan tới service_order_id đã thanh toán
+    const steps = await this.prisma.step.findMany({
+      where: {
+        service_order_id: serviceOrderId,
+        payment_status: 'SUCCESSED',
+      },
+      include: {
+        queues: true,
+      },
+    });
+
+    for (const step of steps) {
+      // Nếu Step đã có queue rồi thì bỏ qua
+      if (step.queues && step.queues.length > 0) continue;
+
+      // Nếu Step không gắn với phòng nào thì không xếp hàng
+      if (!step.room_id) continue;
+
+      // Đếm số lượng queue đã tạo trong ngày hôm nay của phòng đó
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const count = await this.prisma.queue.count({
+        where: {
+          step: {
+            room_id: step.room_id,
+          },
+          created_at: {
+            gte: today,
+          },
+        },
+      });
+
+      const nextNumber = count + 1;
+
+      // Tạo queue mới cho Step
+      await this.prisma.queue.create({
+        data: {
+          step_id: step.step_id,
+          queue_number: nextNumber.toString(),
+        },
+      });
+    }
+  }
 }
 

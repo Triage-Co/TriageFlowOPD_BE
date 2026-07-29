@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ClinicalRoomType, RoomType } from '@prisma/client';
+import { ClinicalRoomType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -23,10 +23,22 @@ export class TemplateStepDto {
 
   @IsString()
   @ApiProperty({
+    example: 'KHAM_CHUYEN_KHOA',
+  })
+  service_code: string;
+
+  @IsString()
+  @ApiProperty({
     example: 'Khám chuyên khoa Cơ Xương Khớp',
     description: 'Tên của bước khám',
   })
   step_name: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'THANH_TOAN',
+  })
+  step_type?: String;
 
   @IsEnum(ClinicalRoomType)
   @ApiProperty({

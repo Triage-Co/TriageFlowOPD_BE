@@ -95,14 +95,16 @@ enum StepStatusEnum {
 
 enum ClinicalRoomType {
   RECEPTION
-  TRIAGE
-  CONSULTATION
-  TREATMENT
-  LAB
-  IMAGING
+  TRIAGE_AREA
+  CLINICAL_ROOM
+  PROCEDURE_ROOM
+  LABORATORY
+  IMAGING_ROOM
+  FUNCTIONAL_EXPLORATION
   PHARMACY
   CASHIER
-  ADMIN
+  EMPTY
+  OTHER
 }
 
 model Account {
@@ -237,12 +239,12 @@ model Booking {
   patient_id       String            @db.Uuid
   slot_id          String            @db.Uuid
   status           BookingStatusEnum @default(AVAILABLE)
-  service_order_id String?            @db.Uuid
+  service_order_id String?           @db.Uuid
   created_at       DateTime          @default(now()) @db.Timestamptz()
   updated_at       DateTime          @default(now()) @updatedAt @db.Timestamptz()
 
-  patient       Patient       @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
-  slot          Slot          @relation(fields: [slot_id], references: [slot_id], onDelete: Cascade)
+  patient       Patient        @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  slot          Slot           @relation(fields: [slot_id], references: [slot_id], onDelete: Cascade)
   service_order Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
 
   flows         Flow[]
@@ -274,7 +276,7 @@ model Flow {
 model Room {
   room_id          String           @id @default(uuid()) @db.Uuid
   room_name        String
-  room_type        ClinicalRoomType @default(CONSULTATION)
+  room_type        ClinicalRoomType @default(CLINICAL_ROOM)
   physical_room_id String?          @db.Uuid
   specialty_id     String?          @db.Uuid
   shifts           Shift[]
@@ -292,21 +294,24 @@ model Room {
 }
 
 model Step {
-  step_id        String             @id @default(uuid()) @db.Uuid
-  step_name      String?
-  flow_id        String?            @db.Uuid
-  room_id        String?            @db.Uuid
-  staff_id       String?            @db.Uuid
-  step_status    StepStatusEnum     @default(PENDING)
-  qr_text        String?
-  docNo          Int?
-  payment_status PaymentStatusEnum?
-  created_at     DateTime           @default(now()) @db.Timestamptz()
-  updated_at     DateTime           @default(now()) @updatedAt @db.Timestamptz()
-
-  parent_step_id String? @db.Uuid
-  parent_step    Step?   @relation("StepHierarchy", fields: [parent_step_id], references: [step_id])
-  sub_step       Step[]  @relation("StepHierarchy")
+  step_id          String             @id @default(uuid()) @db.Uuid
+  step_name        String?
+  service_code     String?
+  step_type        String?
+  flow_id          String?            @db.Uuid
+  room_id          String?            @db.Uuid
+  staff_id         String?            @db.Uuid
+  step_status      StepStatusEnum     @default(PENDING)
+  qr_text          String?
+  docNo            Int?
+  payment_status   PaymentStatusEnum?
+  service_order_id String?            @db.Uuid
+  created_at       DateTime           @default(now()) @db.Timestamptz()
+  updated_at       DateTime           @default(now()) @updatedAt @db.Timestamptz()
+  service_order    Service_Order?     @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
+  parent_step_id   String?            @db.Uuid
+  parent_step      Step?              @relation("StepHierarchy", fields: [parent_step_id], references: [step_id])
+  sub_step         Step[]             @relation("StepHierarchy")
 
   flow   Flow?   @relation(fields: [flow_id], references: [flow_id])
   room   Room?   @relation(fields: [room_id], references: [room_id])
@@ -407,6 +412,12 @@ model Medicine {
   @@map("medicine")
 }
 
+enum InvoiceStatusEnum {
+  PENDING
+  PAID
+  CANCELLED
+}
+
 enum ServiceOrderStatusEnum {
   PENDING
   PAID
@@ -428,10 +439,12 @@ model Service {
   service_code        String?
   service_name        String?
   price               Int
+  is_active           Boolean                @default(true)
   serviceOrderDetails Service_Order_Detail[]
   created_at          DateTime               @default(now()) @db.Timestamptz()
   updated_at          DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
+  @@index([service_code])
   @@map("service")
 }
 
@@ -440,6 +453,7 @@ model Service_Order_Detail {
   service_order_id        String?                      @db.Uuid
   service_id              String?                      @db.Uuid
   price_at_order          Int?
+  docNo                   Int?
   quantity                Int?
   status                  ServiceOrderDetailStatusEnum @default(PENDING)
 
@@ -454,16 +468,49 @@ model Service_Order_Detail {
 model Service_Order {
   service_order_id String                 @id @default(uuid()) @db.Uuid
   booking_id       String?                @db.Uuid
-  total_amount     Int?
   status           ServiceOrderStatusEnum @default(PENDING)
-  docNo            String?
   created_at       DateTime               @default(now()) @db.Timestamptz()
   updated_at       DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
   serviceOrderDetails Service_Order_Detail[]
   bookings            Booking[]
+  steps               Step[]
+  transactions        Transaction[]
+  invoice             Invoice?
 
   @@map("service_order")
+}
+
+model Invoice {
+  invoice_id       String            @id @default(uuid()) @db.Uuid
+  service_order_id String            @unique @db.Uuid
+  total_amount     Int               @default(0)
+  status           InvoiceStatusEnum @default(PENDING)
+  payment_method   String?
+  payment_date     DateTime?         @db.Timestamptz()
+  created_at       DateTime          @default(now()) @db.Timestamptz()
+  updated_at       DateTime          @default(now()) @updatedAt @db.Timestamptz()
+
+  service_order   Service_Order    @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
+  invoice_details Invoice_Detail[]
+
+  @@map("invoice")
+}
+
+model Invoice_Detail {
+  invoice_detail_id String   @id @default(uuid()) @db.Uuid
+  invoice_id        String   @db.Uuid
+  item_name         String
+  quantity          Int      @default(1)
+  unit_price        Int      @default(0)
+  sub_total         Int      @default(0)
+  created_at        DateTime @default(now()) @db.Timestamptz()
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  invoice Invoice @relation(fields: [invoice_id], references: [invoice_id], onDelete: Cascade)
+
+  @@index([invoice_id])
+  @@map("invoice_detail")
 }
 
 model Patient_Answer {
@@ -557,15 +604,18 @@ model Flow_Rules_Config {
 }
 
 model Transaction {
-  id         String          @id @default(uuid()) @db.Uuid
-  amount     Int
-  transDate  DateTime        @default(now()) @db.Timestamptz()
-  transType  TransTypeEnum
-  docNo      Int             @unique
-  buyerId    String          @db.Uuid
-  status     TransStatusEnum @default(PENDING)
-  created_at DateTime        @default(now()) @db.Timestamptz()
-  updated_at DateTime        @default(now()) @updatedAt @db.Timestamptz()
+  id               String          @id @default(uuid()) @db.Uuid
+  amount           Int
+  transDate        DateTime        @default(now()) @db.Timestamptz()
+  transType        TransTypeEnum
+  docNo            Int             @unique
+  buyerId          String          @db.Uuid
+  status           TransStatusEnum @default(PENDING)
+  service_order_id String?         @db.Uuid
+  created_at       DateTime        @default(now()) @db.Timestamptz()
+  updated_at       DateTime        @default(now()) @updatedAt @db.Timestamptz()
+
+  serviceOrder Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
 
   @@index([docNo, status])
   @@index([transDate, transType])
@@ -584,17 +634,6 @@ model Notification {
 }
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
-
-enum RoomType {
-  CONSULTATION
-  EXAMINATION
-  WAITING
-  PHARMACY
-  LAB
-  IMAGING
-  ADMIN
-  OTHER
-}
 
 enum BoundaryType {
   WALL
@@ -676,7 +715,6 @@ model PhysicalRoom {
   floorId      String                                  @db.Uuid
   roomCode     String
   roomLabel    String
-  type         RoomType
   heightMeters Float?
   // PostGIS geometry: Point for centroid, Polygon for room outline
   centerGeom   Unsupported("geometry(Point, 4326)")?

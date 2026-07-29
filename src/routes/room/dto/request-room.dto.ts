@@ -12,7 +12,7 @@ export class CreateRoomRequestDto {
 
   @IsEnum(ClinicalRoomType)
   @ApiProperty({
-    example: ClinicalRoomType.CONSULTATION,
+    example: ClinicalRoomType.CLINICAL_ROOM,
     enum: ClinicalRoomType,
   })
   room_type: string;

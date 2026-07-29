@@ -44,6 +44,10 @@ async function bootstrap() {
       'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui-bundle.js',
       'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.29.1/swagger-ui-standalone-preset.js',
     ],
+    swaggerOptions: {
+      // Large GeoJSON map payloads overflow Swagger UI's highlighter stack
+      syntaxHighlight: false,
+    },
   };
   SwaggerModule.setup('api-docs', app, documentFactory, customerConfig);
 

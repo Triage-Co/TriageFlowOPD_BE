@@ -42,5 +42,11 @@ export class CreateTransactionRequestDto {
     })
     cancelUrl: string;
 
-
+    @IsString()
+    @ApiProperty({
+        name: "service_order_id",
+        example: "97f0a82e-9d22-48ea-8b4e-9f37c35a8bc5",
+        required: false
+    })
+    service_order_id?: string;
 }

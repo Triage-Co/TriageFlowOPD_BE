@@ -26,7 +26,7 @@ import { JwtStrategy } from './guards/jwt.strategy';
 import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repository';
 import { PrismaServiceOrderDetailRepository } from './repositories/prisma-service-order-detail.repository';
 import { PrismaServiceOrderRepository } from './repositories/prisma-service-order.repository';
-import { PrismaServiceRepository } from './repositories/prisma-service-order.repository copy';
+import { PrismaServiceRepository } from './repositories/prisma-service.repository';
 
 @Global()
 @Module({
@@ -141,6 +141,7 @@ import { PrismaServiceRepository } from './repositories/prisma-service-order.rep
     'ISpecialtyRepository',
     'IServiceOrderRepository',
     'IServiceOrderDetailRepository',
+    'IServiceRepository',
     PassportModule,
   ],
 })

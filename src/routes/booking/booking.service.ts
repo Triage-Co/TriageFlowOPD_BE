@@ -12,6 +12,8 @@ import { PrismaService } from '../../shared/config/prisma.service';
 import {
   PaymentStatusEnum,
   PrismaClient,
+  ServiceOrderDetailStatusEnum,
+  ServiceOrderStatusEnum,
   StepStatusEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
@@ -24,6 +26,9 @@ import type { IShiftRepository } from '../../shared/interfaces/i-shift.repositor
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import type { ITriageInformationRepository } from '../../shared/interfaces/i-triage-information.repository';
 import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
+import type { IServiceOrderDetailRepository } from '../../shared/interfaces/i-service-order-detail.repository';
+import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
+import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 
 @Injectable()
 export class BookingService {
@@ -56,6 +61,12 @@ export class BookingService {
     private readonly triageInformationRepository: ITriageInformationRepository,
     @Inject('ISlotRepository')
     private readonly SlotRepository: ISlotRepository,
+    @Inject('IServiceOrderDetailRepository')
+    private readonly serviceOrderDetailRepository: IServiceOrderDetailRepository,
+    @Inject('IServiceOrderRepository')
+    private readonly serviceOrderRepository: IServiceOrderRepository,
+    @Inject('IServiceRepository')
+    private readonly serviceRepository: IServiceRepository,
   ) {
     this.BOOKING = this.prismaService.booking;
     this.SHIFT = this.prismaService.shift;
@@ -119,28 +130,37 @@ export class BookingService {
         });
       }
 
-      const createPaymentData = await this.transactionService.create({
-        amount: 2000,
-        cancelUrl:
-          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
-        returnUrl:
-          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
-        clientId: existedPatient.account_id,
-        transType: 'APPOINTMENT_PAYMENT',
-      });
+      const service =
+        await this.serviceRepository.findByServiceCode('KHAM_CHUYEN_KHOA');
 
-      if (!createPaymentData || !('data' in createPaymentData)) {
-        throw new BadRequestException(
-          (createPaymentData?.detail as any).error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
-        );
-      }
       const rs = await this.prismaService.$transaction(async (tx) => {
         const booking = await this.bookingRepository.create(
           createBookingRequestDto,
           tx,
         );
 
+        const serviceOrderDto = {
+          booking_id: booking.booking_id,
+          status: ServiceOrderStatusEnum.PENDING,
+        };
+
+        const serviceOrder = await this.serviceOrderRepository.create(
+          serviceOrderDto,
+          tx,
+        );
+
+        const serviceOrderDetailDto = {
+          status: ServiceOrderDetailStatusEnum.PENDING,
+          quantity: 1,
+          price_at_order: service?.price,
+          service_id: service?.service_id,
+          service_order_id: serviceOrder.service_order_id,
+        };
+
+        await this.serviceOrderDetailRepository.create(
+          serviceOrderDetailDto as any,
+          tx,
+        );
         const flow = await this.flowRepository.create(
           { booking_id: booking.booking_id },
           tx,
@@ -155,29 +175,54 @@ export class BookingService {
         const step = await this.stepRepository.createParentStep(
           {
             flow_id: flow.flow_id,
-            // room_id: shift.room_id,
-            // staff_id: shift.staff_id,
-            docNo: createPaymentData.data.orderCode,
             step_name: 'Đặt khám',
             step_status: StepStatusEnum.PENDING,
             payment_status: PaymentStatusEnum.PENDING,
-            qr_text: createPaymentData.data.qrCode,
+            service_order_id: serviceOrder.service_order_id,
+            service_code: service?.service_code,
           },
           tx,
         );
 
         return {
-          step_id: step.step_id,
-          booking_id: booking.booking_id,
-          payment: createPaymentData,
+          step,
+          booking,
+          serviceOrder,
         };
+      });
+
+      const createPaymentData = await this.transactionService.create({
+        amount: service?.price || 2000,
+        cancelUrl:
+          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
+        returnUrl:
+          'https://www.triageflow.me/api-docs#/Staff/StaffController_create',
+        clientId: existedPatient.account_id,
+        transType: 'APPOINTMENT_PAYMENT',
+        service_order_id: rs.serviceOrder.service_order_id,
+      });
+
+      if (!createPaymentData || !('data' in createPaymentData)) {
+        throw new BadRequestException(
+          (createPaymentData?.detail as any)?.error?.desc ||
+            'Lỗi tạo giao dịch thanh toán',
+        );
+      }
+
+      await this.STEP.update({
+        where: { step_id: rs.step.step_id },
+        data: { qr_text: createPaymentData.data.qrCode },
       });
 
       return {
         code: 200,
         message: 'tạo lịch thành công',
         status: 'success',
-        data: rs,
+        data: {
+          step_id: rs.step.step_id,
+          booking_id: rs.booking.booking_id,
+          payment: createPaymentData,
+        },
       };
     } catch (error) {
       throw error;
@@ -195,6 +240,11 @@ export class BookingService {
             },
           },
           queues: true,
+          service_order: {
+            include: {
+              serviceOrderDetails: true,
+            },
+          },
           flow: {
             include: {
               booking: {
@@ -396,6 +446,7 @@ export class BookingService {
         },
       };
     } catch (error) {
+      console.log(error);
       throw error;
     }
   }

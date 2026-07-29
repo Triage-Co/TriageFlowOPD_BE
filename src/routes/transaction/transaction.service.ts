@@ -9,6 +9,7 @@ import { randomInt } from 'crypto';
 import { PayosService } from '../../shared/config/payos.service';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { CreateTransactionRequestDto } from './dto/request-transaction.dto';
+import { QueueService } from '../queue/queue.service';
 import { PayOS } from '@payos/node';
 import { PrismaClient } from '@prisma/client';
 import { ResponseType } from '../../shared/types/response.type';
@@ -25,6 +26,7 @@ export class TransactionService {
   constructor(
     private readonly payosService: PayosService,
     private readonly prismaService: PrismaService,
+    private readonly queueService: QueueService,
     @Inject('IStepRepository')
     private readonly stepRepository: IStepRepository,
   ) {
@@ -38,19 +40,7 @@ export class TransactionService {
     createTransactionRequestDto: CreateTransactionRequestDto,
   ): Promise<ResponseType<any>> {
     try {
-      const data = await this.ACCOUNT.findUnique({
-        where: {
-          account_id: createTransactionRequestDto.clientId,
-        },
-      });
 
-      if (!data) {
-        return {
-          code: 404,
-          message: `không tìm thấy user với id ${createTransactionRequestDto.clientId}`,
-          status: 'error',
-        };
-      }
 
       const orderCode = parseInt(
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
@@ -66,10 +56,11 @@ export class TransactionService {
 
       await this.TRANSACTION.create({
         data: {
-          buyerId: data.account_id,
+          buyerId: createTransactionRequestDto.clientId,
           docNo: paymentLink.orderCode,
           transType: createTransactionRequestDto.transType,
           amount: paymentLink.amount,
+          service_order_id: createTransactionRequestDto.service_order_id,
         },
       });
 
@@ -92,7 +83,7 @@ export class TransactionService {
   async webhook(payload: any) {
     try {
       const paymentData = payload.data;
-      await this.TRANSACTION.update({
+      const transaction = await this.TRANSACTION.update({
         where: {
           docNo: paymentData.orderCode,
         },
@@ -101,26 +92,36 @@ export class TransactionService {
         },
       });
 
-      console.log('paymentData', paymentData);
-      console.log('orderCode', paymentData.orderCode);
+      if (transaction && transaction.service_order_id) {
+        // Cập nhật Service Order thành PAID
+        await this.prismaService.service_Order.update({
+          where: { service_order_id: transaction.service_order_id },
+          data: { status: 'PAID' },
+        });
 
-      const findStepData = await this.STEP.findFirst({
-        where: {
-          docNo: paymentData.orderCode,
-        },
-      });
+        // Cập nhật Service Order Detail thành PAID
+        await this.prismaService.service_Order_Detail.updateMany({
+          where: { service_order_id: transaction.service_order_id },
+          data: { status: 'PAID' },
+        });
 
-      console.log('step', findStepData);
+        // Cập nhật tất cả Step thuộc Order thành SUCCESSED
+        await this.STEP.updateMany({
+          where: { service_order_id: transaction.service_order_id },
+          data: { payment_status: 'SUCCESSED' },
+        });
 
-      if (findStepData) {
-        await this.STEP.update({
-          where: {
-            step_id: findStepData.step_id,
-          },
+        // Cập nhật Invoice thành PAID
+        await this.prismaService.invoice.updateMany({
+          where: { service_order_id: transaction.service_order_id },
           data: {
-            payment_status: 'SUCCESSED',
+            status: 'PAID',
+            payment_date: new Date(),
           },
         });
+
+        // Generate số thứ tự cho các phòng Cận lâm sàng
+        await this.queueService.generateServiceQueueNumber(transaction.service_order_id);
       }
 
       return {

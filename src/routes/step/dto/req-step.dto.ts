@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateParentStepReqDto {
   @ApiProperty({
@@ -18,6 +25,25 @@ export class CreateParentStepReqDto {
   @IsUUID('4')
   @IsOptional()
   room_id?: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'KHAM_CHUYEN_KHOA',
+  })
+  service_code: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'Khám chuyên khoa Cơ Xương Khớp',
+    description: 'Tên của bước khám',
+  })
+  step_name: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'THANH_TOAN',
+  })
+  step_type?: string;
 
   @ApiPropertyOptional({
     description: 'ID của nhân viên phụ trách (nếu có)',
@@ -61,6 +87,25 @@ export class CreateSubStepReqDto {
   @IsUUID('4')
   @IsOptional()
   staff_id?: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'KHAM_CHUYEN_KHOA',
+  })
+  service_code: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'Khám chuyên khoa Cơ Xương Khớp',
+    description: 'Tên của bước khám',
+  })
+  step_name: string;
+
+  @IsString()
+  @ApiProperty({
+    example: 'THANH_TOAN',
+  })
+  step_type?: string;
 
   @ApiPropertyOptional({
     enum: StepStatusEnum,
