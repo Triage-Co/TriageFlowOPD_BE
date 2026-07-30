@@ -94,35 +94,20 @@ export class CronService {
       };
     }
 
-    const [updatedTransactions, updatedSteps] =
-      await this.prismaService.$transaction([
-        this.prismaService.transaction.updateMany({
-          where: {
-            docNo: {
-              in: docNos,
-            },
-          },
-          data: {
-            status: PaymentStatusEnum.CANCELLED,
-          },
-        }),
-        this.prismaService.step.updateMany({
-          where: {
-            docNo: {
-              in: docNos,
-            },
-          },
-          data: {
-            step_status: StepStatusEnum.CANCELLED,
-            payment_status: PaymentStatusEnum.CANCELLED,
-          },
-        }),
-      ]);
+    const updatedTransactions = await this.prismaService.transaction.updateMany({
+      where: {
+        docNo: {
+          in: docNos,
+        },
+      },
+      data: {
+        status: PaymentStatusEnum.CANCELLED,
+      },
+    });
 
     return {
-      message: 'Cập nhật Transaction và Step quá hạn thành công',
+      message: 'Cập nhật Transaction quá hạn thành công',
       updatedTransactionCount: updatedTransactions.count,
-      updatedStepCount: updatedSteps.count,
     };
   }
 

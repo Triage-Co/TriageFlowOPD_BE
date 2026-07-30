@@ -30,6 +30,11 @@ export class CreatePrescriptionDto {
   @IsNotEmpty()
   visit_session_id: string;
 
+  @ApiPropertyOptional({ description: 'ID của chỉ định dịch vụ (Service_Order), nếu chưa truyền hệ thống sẽ tự động khởi tạo' })
+  @IsUUID()
+  @IsOptional()
+  service_order_id?: string;
+
   @ApiPropertyOptional({ description: 'ID Bác sĩ kê đơn (nếu không truyền sẽ tự động lấy theo Staff ID của tài khoản đang đăng nhập)' })
   @IsUUID()
   @IsOptional()

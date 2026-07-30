@@ -30,7 +30,26 @@ export class MedicineController {
     summary: '[STAFF - ADMIN] Tạo loại thuốc mới',
     description: 'Endpoint dành cho Dược sĩ, Bác sĩ hoặc Quản trị viên khởi tạo thông tin loại thuốc mới vào danh mục.',
   })
-  @ApiResponse({ status: 201, description: 'Tạo thuốc mới thành công.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo thuốc mới thành công.',
+    schema: {
+      example: {
+        medicine_id: 'f6a7b8c9-d0e1-2345-fabc-6789012345fa',
+        medicine_code: 'MED-PAR-500',
+        medicine_name: 'Paracetamol 500mg',
+        active_ingredient: 'Paracetamol',
+        unit: 'Viên',
+        usage_route: 'Uống',
+        unit_price: 5000,
+        manufacturer: 'Dược Hậu Giang',
+        description: 'Giảm đau, hạ sốt nhẹ đến vừa',
+        is_active: true,
+        created_at: '2026-07-30T13:00:00.000Z',
+        updated_at: '2026-07-30T13:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 400, description: 'Dữ liệu yêu cầu không hợp lệ.' })
   @ApiResponse({ status: 409, description: 'Mã thuốc đã tồn tại.' })
   create(@Body() createMedicineDto: CreateMedicineDto) {
@@ -48,7 +67,33 @@ export class MedicineController {
   @ApiQuery({ name: 'is_active', required: false, type: Boolean, description: 'Lọc thuốc đang hoạt động' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Trang thứ bao nhiêu (mặc định 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Số bản ghi trên trang (mặc định 20)' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách thuốc thành công.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách thuốc thành công.',
+    schema: {
+      example: {
+        data: [
+          {
+            medicine_id: 'f6a7b8c9-d0e1-2345-fabc-6789012345fa',
+            medicine_code: 'MED-PAR-500',
+            medicine_name: 'Paracetamol 500mg',
+            active_ingredient: 'Paracetamol',
+            unit: 'Viên',
+            usage_route: 'Uống',
+            unit_price: 5000,
+            manufacturer: 'Dược Hậu Giang',
+            is_active: true,
+          },
+        ],
+        meta: {
+          total: 1,
+          page: 1,
+          limit: 20,
+          totalPages: 1,
+        },
+      },
+    },
+  })
   findAll(
     @Query('search') search?: string,
     @Query('is_active') is_active?: boolean,

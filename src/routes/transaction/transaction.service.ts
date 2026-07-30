@@ -101,6 +101,14 @@ export class TransactionService {
           data: { payment_status: 'SUCCESSED' },
         });
 
+        await this.prismaService.prescription.updateMany({
+          where: {
+            service_order_id: transaction.service_order_id,
+            status: 'PENDING',
+          },
+          data: { status: 'PROCESSING' },
+        });
+
         await this.prismaService.service_Order_Detail.updateMany({
           where: { service_order_id: transaction.service_order_id },
           data: { status: 'PAID' },

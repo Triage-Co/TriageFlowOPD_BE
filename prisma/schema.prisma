@@ -429,6 +429,9 @@ enum PrescriptionStatusEnum {
 
 model Prescription {
   prescription_id  String                 @id @default(uuid()) @db.Uuid
+  prescription_code String                @unique
+  qr_code          String?
+  service_order_id String?                @unique @db.Uuid
   visit_session_id String?                @unique @db.Uuid
   booking_id       String?                @db.Uuid
   flow_id          String?                @db.Uuid
@@ -439,12 +442,14 @@ model Prescription {
   created_at       DateTime               @default(now()) @db.Timestamptz()
   updated_at       DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
+  serviceOrder        Service_Order?        @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
   visitSession        Visit_Session?        @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
   booking             Booking?              @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   flow                Flow?                 @relation(fields: [flow_id], references: [flow_id], onDelete: Cascade)
   doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
   prescriptionDetails Prescription_Detail[]
 
+  @@index([prescription_code])
   @@map("prescription")
 }
 
@@ -533,6 +538,7 @@ model Service_Order {
   booking             Booking?               @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   staff               Staff?                 @relation(fields: [assign_by_staff_id], references: [staff_id])
   invoices            Invoice[]
+  prescription        Prescription?
 
   @@index([booking_id])
   @@index([assign_by_staff_id])
