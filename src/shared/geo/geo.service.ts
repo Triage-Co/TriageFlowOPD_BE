@@ -20,23 +20,26 @@ export class GeoService {
 
   /**
    * Update a geometry column using either WKT or GeoJSON string.
+   * Pass an optional Prisma transaction client to keep geom writes inside a transaction.
    */
   async updateGeom(
     table: string,
     id: string,
     column: string,
     geomStr: string,
+    client?: PrismaQueryClient,
   ): Promise<void> {
+    const db = client ?? this.prismaClient;
     const trimmed = geomStr.trim();
     const isGeoJSON = trimmed.startsWith('{') || trimmed.startsWith('[');
     if (isGeoJSON) {
-      await this.prismaClient.$queryRawUnsafe(
+      await db.$queryRawUnsafe(
         `UPDATE "${table}" SET "${column}" = ST_SetSRID(ST_GeomFromGeoJSON($1), 4326) WHERE id = $2::uuid`,
         geomStr,
         id,
       );
     } else {
-      await this.prismaClient.$queryRawUnsafe(
+      await db.$queryRawUnsafe(
         `UPDATE "${table}" SET "${column}" = ST_GeomFromText($1, 4326) WHERE id = $2::uuid`,
         geomStr,
         id,
@@ -53,13 +56,16 @@ export class GeoService {
 
   /**
    * Read a geometry column as a GeoJSON object from the database.
+   * Pass an optional Prisma transaction client to read within a transaction.
    */
   async readGeom(
     table: string,
     id: string,
     column: string,
+    client?: PrismaQueryClient,
   ): Promise<object | null> {
-    const result = await this.prismaClient.$queryRawUnsafe<GeomQueryResult[]>(
+    const db = client ?? this.prismaClient;
+    const result = await db.$queryRawUnsafe<GeomQueryResult[]>(
       `SELECT ST_AsGeoJSON("${column}") AS geom FROM "${table}" WHERE id = $1::uuid`,
       id,
     );

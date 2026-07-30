@@ -116,10 +116,8 @@ export class GraphGenerationService {
     if (!floor)
       throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
-    await this.prisma.$executeRawUnsafe(`
-      SET statement_timeout = 120000;
-      DELETE FROM "node" WHERE "floorId" = '${floorId}';
-    `);
+    await this.prisma.$executeRaw`SET statement_timeout = 120000`;
+    await this.prisma.$executeRaw`DELETE FROM "node" WHERE "floorId" = ${floorId}::uuid`;
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
     return { cleared: true };
   }
@@ -227,20 +225,23 @@ export class GraphGenerationService {
     if (!floor)
       throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
+    // Clear existing nodes/edges so regenerate is idempotent
+    await this.clearAllNodes(floorId);
+
     const floorOutlineGeoJSON = await readGeom(
-      this.prisma,
+      this.prisma as any,
       'floor',
       floorId,
       'outlineGeom',
     );
-    const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma, floorId);
+    const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma as any, floorId);
     const corridorData = await generateCorridorNodes(
-      this.prisma,
+      this.prisma as any,
       floorId,
       floorOutlineGeoJSON,
     );
     await generateGraphEdges(
-      this.prisma,
+      this.prisma as any,
       floorId,
       doorNodeCoordsMap,
       corridorData,
