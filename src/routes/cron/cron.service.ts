@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
+import { PaymentStatusEnum, PrescriptionStatusEnum, StepStatusEnum } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 @Injectable()
@@ -125,4 +125,47 @@ export class CronService {
       updatedStepCount: updatedSteps.count,
     };
   }
+
+  async updatePrescriptionExpired() {
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+    const expiredPrescriptions = await this.prismaService.prescription.findMany({
+      where: {
+        created_at: {
+          lte: oneDayAgo,
+        },
+        status: PrescriptionStatusEnum.PENDING,
+      },
+      select: {
+        prescription_id: true,
+      },
+    });
+
+    const prescriptionIds = expiredPrescriptions.map((p) => p.prescription_id);
+
+    if (prescriptionIds.length === 0) {
+      return {
+        message: 'Không có đơn thuốc nào quá hạn 1 ngày cần cập nhật',
+        updatedCount: 0,
+      };
+    }
+
+    const result = await this.prismaService.prescription.updateMany({
+      where: {
+        prescription_id: {
+          in: prescriptionIds,
+        },
+      },
+      data: {
+        status: PrescriptionStatusEnum.EXPIRED,
+      },
+    });
+
+    return {
+      message: 'Cập nhật đơn thuốc quá hạn thành EXPIRED thành công',
+      updatedCount: result.count,
+    };
+  }
 }
+

@@ -31,4 +31,14 @@ export class CronController {
     }
     return this.cronService.updateTransactionStatus();
   }
+
+  @Get('update-prescription')
+  updatePrescriptionExpired(@Headers('authorization') authHeader: string) {
+    if (authHeader != `Bearer ${envInstance.CRON_SECRET}`) {
+      throw new UnauthorizedException(
+        'Chỉ hệ thống Cron mới được quyền gọi API này',
+      );
+    }
+    return this.cronService.updatePrescriptionExpired();
+  }
 }
