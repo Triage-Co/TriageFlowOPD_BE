@@ -1,11 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
-import { IStepRepository } from '../interfaces/i-step.repository';
+import {
+  IStepRepository,
+  StepWithBookingAndSlot,
+} from '../interfaces/i-step.repository';
 import { PaymentStatusEnum, Prisma, Step } from '@prisma/client';
 
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  getById(id: string): Promise<StepWithBookingAndSlot | null> {
+    return this.prismaService.step.findUnique({
+      where: { step_id: id },
+      include: {
+        room: true,
+        queues: true,
+        service_order: {
+          include: {
+            booking: {
+              include: {
+                slot: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
   findPendingPaymentStepsByPatientId(patientId: string): Promise<Step[]> {
     return this.prismaService.step.findMany({
       where: {
@@ -14,7 +35,6 @@ export class PrismaStepRepository implements IStepRepository {
             patient_id: patientId,
           },
         },
-        payment_status: PaymentStatusEnum.PENDING,
         step_status: {
           in: ['IN_PROGRESS', 'PENDING'],
         },
@@ -114,6 +134,7 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+
   findById(id: string): Promise<any> {
     return this.prismaService.step.findUnique({
       where: {
@@ -155,6 +176,7 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+
   findSubStepsByParentId(parentId: string): Promise<any> {
     return this.prismaService.step.findMany({
       where: {
@@ -162,6 +184,7 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+
   findDependentSteps(stepId: string): Promise<any> {
     return this.prismaService.step_Dependency.findMany({
       where: {
@@ -169,6 +192,7 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+
   findDependenciesOfStep(stepId: string): Promise<any> {
     return this.prismaService.step_Dependency.findMany({
       where: {
@@ -176,6 +200,7 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+
   createDependency(
     waitingStepId: string,
     requiredStepId: string,

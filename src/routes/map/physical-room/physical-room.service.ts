@@ -12,7 +12,7 @@ export class PhysicalRoomService {
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+  ) {}
 
   async create(createPhysicalRoomDto: CreatePhysicalRoomDto) {
     try {
@@ -44,19 +44,15 @@ export class PhysicalRoomService {
       }
 
       const center = createPhysicalRoomDto.centerGeom
-        ? await this.geoService.readGeom(
-          'physical_room',
-          data.id,
-          'centerGeom',
-        )
+        ? await this.geoService.readGeom('physical_room', data.id, 'centerGeom')
         : null;
 
       const outline = createPhysicalRoomDto.outlineGeom
         ? await this.geoService.readGeom(
-          'physical_room',
-          data.id,
-          'outlineGeom',
-        )
+            'physical_room',
+            data.id,
+            'outlineGeom',
+          )
         : null;
 
       await this.clearBuildingCacheByFloorId(data.floorId);

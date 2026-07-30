@@ -15,7 +15,7 @@ export class StaffResDto {
   staff_id: string;
   full_name: string;
   license_number: string;
-  experience_years: Number;
+  experience_years: number;
   specialty_id: string;
   account: AccountResDto;
 }

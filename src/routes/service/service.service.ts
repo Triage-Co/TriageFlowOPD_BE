@@ -25,9 +25,7 @@ export class ServiceService {
     }
 
     try {
-      const data = await this.serviceRepository.create(
-        createServiceReqDto as any,
-      );
+      const data = await this.serviceRepository.create(createServiceReqDto);
 
       return {
         code: 201,
@@ -97,10 +95,7 @@ export class ServiceService {
     }
 
     try {
-      const data = await this.serviceRepository.update(
-        id,
-        updateServiceReqDto as any,
-      );
+      const data = await this.serviceRepository.update(id, updateServiceReqDto);
 
       return {
         code: 200,

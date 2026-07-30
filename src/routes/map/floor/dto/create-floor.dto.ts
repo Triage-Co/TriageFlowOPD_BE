@@ -14,7 +14,8 @@ export class CreateFloorDto {
   @ApiProperty({
     name: 'floorNumber',
     example: 1,
-    description: 'Số thứ tự tầng (ví dụ: 1 cho Tầng 1, 0 cho Tầng trệt, -1 cho Tầng hầm)',
+    description:
+      'Số thứ tự tầng (ví dụ: 1 cho Tầng 1, 0 cho Tầng trệt, -1 cho Tầng hầm)',
   })
   floorNumber: number;
 
@@ -62,8 +63,10 @@ export class CreateFloorDto {
   @IsOptional()
   @ApiProperty({
     name: 'outlineGeom',
-    example: 'POLYGON((106.1 10.1, 106.2 10.1, 106.2 10.2, 106.1 10.2, 106.1 10.1))',
-    description: 'Hình dạng đường viền bao tầng dưới dạng WKT Polygon hoặc GeoJSON',
+    example:
+      'POLYGON((106.1 10.1, 106.2 10.1, 106.2 10.2, 106.1 10.2, 106.1 10.1))',
+    description:
+      'Hình dạng đường viền bao tầng dưới dạng WKT Polygon hoặc GeoJSON',
     required: false,
   })
   outlineGeom?: string;

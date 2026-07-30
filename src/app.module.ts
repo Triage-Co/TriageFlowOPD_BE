@@ -104,6 +104,6 @@ import { InvoiceDetailModule } from './routes/invoice_detail/invoice_detail.modu
     ServiceOrderDetailModule,
     InvoiceModule,
     InvoiceDetailModule,
-  ]
+  ],
 })
 export class AppModule {}

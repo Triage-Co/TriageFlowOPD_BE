@@ -1,6 +1,12 @@
 import { PrismaClient, NodeType } from '@prisma/client';
 
-export async function updateGeom(prisma: PrismaClient, table: string, id: string, column: string, wkt: string) {
+export async function updateGeom(
+  prisma: PrismaClient,
+  table: string,
+  id: string,
+  column: string,
+  wkt: string,
+) {
   await (prisma as any).$queryRawUnsafe(
     `UPDATE "${table}" SET "${column}" = ST_GeomFromText($1, 4326) WHERE id = $2::uuid`,
     wkt,
@@ -8,18 +14,33 @@ export async function updateGeom(prisma: PrismaClient, table: string, id: string
   );
 }
 
-export async function readGeom(prisma: PrismaClient, table: string, id: string, column: string): Promise<any | null> {
+export async function readGeom(
+  prisma: PrismaClient,
+  table: string,
+  id: string,
+  column: string,
+): Promise<any | null> {
   const result = (await (prisma as any).$queryRawUnsafe(
     `SELECT ST_AsGeoJSON("${column}") AS geom FROM "${table}" WHERE id = $1::uuid`,
     id,
   )) as any[];
-  if (!result || result.length === 0 || !result[0] || typeof result[0].geom !== 'string') {
+  if (
+    !result ||
+    result.length === 0 ||
+    !result[0] ||
+    typeof result[0].geom !== 'string'
+  ) {
     return null;
   }
   return JSON.parse(result[0].geom);
 }
 
-export async function readAllGeoms(prisma: PrismaClient, table: string, floorId: string, column: string): Promise<any[]> {
+export async function readAllGeoms(
+  prisma: PrismaClient,
+  table: string,
+  floorId: string,
+  column: string,
+): Promise<any[]> {
   const idColumn = table === 'floor' ? 'id' : 'floorId';
   const result = (await (prisma as any).$queryRawUnsafe(
     `SELECT *, ST_AsGeoJSON("${column}") AS geom FROM "${table}" WHERE "${idColumn}" = $1::uuid`,
@@ -55,7 +76,10 @@ export interface NodeInsertData {
   metadata?: any;
 }
 
-export async function createNodesBatch(prisma: PrismaClient, nodes: NodeInsertData[]) {
+export async function createNodesBatch(
+  prisma: PrismaClient,
+  nodes: NodeInsertData[],
+) {
   if (nodes.length === 0) return;
 
   const valuesSql: string[] = [];
@@ -76,11 +100,11 @@ export async function createNodesBatch(prisma: PrismaClient, nodes: NodeInsertDa
       node.type,
       node.metadata ? JSON.stringify(node.metadata) : null,
       node.coords[0],
-      node.coords[1]
+      node.coords[1],
     );
 
     valuesSql.push(
-      `(${idParam}::uuid, ${floorIdParam}::uuid, ${typeParam}::text::"NodeType", ${metadataParam}::jsonb, ST_SetSRID(ST_Point(${lonParam}::float8, ${latParam}::float8), 4326))`
+      `(${idParam}::uuid, ${floorIdParam}::uuid, ${typeParam}::text::"NodeType", ${metadataParam}::jsonb, ST_SetSRID(ST_Point(${lonParam}::float8, ${latParam}::float8), 4326))`,
     );
   }
 

@@ -126,4 +126,6 @@ export class CreateVisitSessionReqDto {
   pe?: any;
 }
 
-export class UpdateVisitSessionReqDto extends PartialType(CreateVisitSessionReqDto) {}
+export class UpdateVisitSessionReqDto extends PartialType(
+  CreateVisitSessionReqDto,
+) {}

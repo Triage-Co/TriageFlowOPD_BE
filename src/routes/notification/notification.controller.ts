@@ -8,7 +8,7 @@ import { AuthGuard } from '@nestjs/passport';
 @UseGuards(IsAuthGuard)
 @Controller('notification')
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) { }
+  constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
   findAll(@Req() req: any) {

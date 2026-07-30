@@ -16,7 +16,7 @@ async function main() {
   let totalEdges = 0;
   while (true) {
     const result = await prisma.$executeRawUnsafe(
-      `DELETE FROM "edge" WHERE id IN (SELECT id FROM "edge" LIMIT 20000);`
+      `DELETE FROM "edge" WHERE id IN (SELECT id FROM "edge" LIMIT 20000);`,
     );
     if (result === 0) break;
     totalEdges += result;
@@ -26,7 +26,7 @@ async function main() {
   let totalNodes = 0;
   while (true) {
     const result = await prisma.$executeRawUnsafe(
-      `DELETE FROM "node" WHERE id IN (SELECT id FROM "node" LIMIT 20000);`
+      `DELETE FROM "node" WHERE id IN (SELECT id FROM "node" LIMIT 20000);`,
     );
     if (result === 0) break;
     totalNodes += result;

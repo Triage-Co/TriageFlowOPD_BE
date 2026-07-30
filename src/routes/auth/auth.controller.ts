@@ -26,8 +26,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
-
+  constructor(private readonly authService: AuthService) {}
 
   @Post('/register')
   signUp(@Body() signUpDto: SignUpReqDto) {
@@ -41,7 +40,6 @@ export class AuthController {
     return this.authService.signInWithEmail(signInWithEmailRequestDto);
   }
 
-  
   @Post('/login/citizen-id')
   signInWithCitizenId(
     @Body() signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
@@ -75,7 +73,6 @@ export class AuthController {
     );
   }
 
-
   @Get('/profile')
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard)
@@ -93,8 +90,6 @@ export class AuthController {
   signOut(@Body() signOutRequestDto: SignOutReqRequestDto) {
     return this.authService.signOut(signOutRequestDto);
   }
-
-
 
   @Patch('/update')
   @ApiBearerAuth()

@@ -27,6 +27,7 @@ import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repos
 import { PrismaServiceOrderDetailRepository } from './repositories/prisma-service-order-detail.repository';
 import { PrismaServiceOrderRepository } from './repositories/prisma-service-order.repository';
 import { PrismaServiceRepository } from './repositories/prisma-service.repository';
+import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
 
 @Global()
 @Module({
@@ -116,6 +117,10 @@ import { PrismaServiceRepository } from './repositories/prisma-service.repositor
       provide: 'IServiceRepository',
       useClass: PrismaServiceRepository,
     },
+    {
+      provide: 'IQueueRepository',
+      useClass: PrismaQueueRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -142,6 +147,7 @@ import { PrismaServiceRepository } from './repositories/prisma-service.repositor
     'IServiceOrderRepository',
     'IServiceOrderDetailRepository',
     'IServiceRepository',
+    'IQueueRepository',
     PassportModule,
   ],
 })

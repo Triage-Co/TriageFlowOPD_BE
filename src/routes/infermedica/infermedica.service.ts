@@ -86,7 +86,7 @@ export class InfermedicaService {
         }
       }
 
-      let currentToken = interview_token || `new_session_${Date.now()}`;
+      const currentToken = interview_token || `new_session_${Date.now()}`;
 
       const cacheKey = `interview_${currentToken}`;
 

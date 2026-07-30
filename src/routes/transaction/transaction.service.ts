@@ -14,6 +14,7 @@ import { PayOS } from '@payos/node';
 import { PrismaClient } from '@prisma/client';
 import { ResponseType } from '../../shared/types/response.type';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
+import { StepService } from '../step/step.service';
 
 @Injectable()
 export class TransactionService {
@@ -29,6 +30,7 @@ export class TransactionService {
     private readonly queueService: QueueService,
     @Inject('IStepRepository')
     private readonly stepRepository: IStepRepository,
+    private readonly stepService: StepService,
   ) {
     this.payosClient = this.payosService.getClient();
     this.TRANSACTION = this.prismaService.transaction;
@@ -38,10 +40,10 @@ export class TransactionService {
 
   async create(
     createTransactionRequestDto: CreateTransactionRequestDto,
+    tx?: any
   ): Promise<ResponseType<any>> {
     try {
-
-
+      const db = tx || this.prismaService;
       const orderCode = parseInt(
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
       );
@@ -54,7 +56,7 @@ export class TransactionService {
         cancelUrl: createTransactionRequestDto.cancelUrl,
       });
 
-      await this.TRANSACTION.create({
+      await db.transaction.create({
         data: {
           buyerId: createTransactionRequestDto.clientId,
           docNo: paymentLink.orderCode,
@@ -71,6 +73,7 @@ export class TransactionService {
         data: paymentLink,
       };
     } catch (error) {
+      console.error('Transaction Create Error:', error);
       return {
         code: 500,
         message: 'Tạo link thanh toán không thành công',
@@ -93,25 +96,27 @@ export class TransactionService {
       });
 
       if (transaction && transaction.service_order_id) {
-        // Cập nhật Service Order thành PAID
         await this.prismaService.service_Order.update({
           where: { service_order_id: transaction.service_order_id },
-          data: { status: 'PAID' },
+          data: { payment_status: 'SUCCESSED' },
         });
 
-        // Cập nhật Service Order Detail thành PAID
         await this.prismaService.service_Order_Detail.updateMany({
           where: { service_order_id: transaction.service_order_id },
           data: { status: 'PAID' },
         });
 
-        // Cập nhật tất cả Step thuộc Order thành SUCCESSED
-        await this.STEP.updateMany({
-          where: { service_order_id: transaction.service_order_id },
-          data: { payment_status: 'SUCCESSED' },
+        const paymentSteps = await this.STEP.findMany({
+          where: {
+            service_order_id: transaction.service_order_id,
+            step_type: 'PAYMENT',
+          },
         });
 
-        // Cập nhật Invoice thành PAID
+        for (const step of paymentSteps) {
+          await this.stepService.completeStep(step.step_id);
+        }
+
         await this.prismaService.invoice.updateMany({
           where: { service_order_id: transaction.service_order_id },
           data: {
@@ -120,8 +125,9 @@ export class TransactionService {
           },
         });
 
-        // Generate số thứ tự cho các phòng Cận lâm sàng
-        await this.queueService.generateServiceQueueNumber(transaction.service_order_id);
+        await this.queueService.generateServiceQueueNumber(
+          transaction.service_order_id,
+        );
       }
 
       return {
@@ -138,7 +144,6 @@ export class TransactionService {
       };
     }
   }
-
 
   // @Cron(CronExpression.EVERY_MINUTE)
   // async handleExpiredTransactions() {

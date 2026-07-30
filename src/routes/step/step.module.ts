@@ -5,5 +5,6 @@ import { StepController } from './step.controller';
 @Module({
   controllers: [StepController],
   providers: [StepService],
+  exports: [StepService],
 })
 export class StepModule {}

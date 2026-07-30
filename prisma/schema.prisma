@@ -74,15 +74,21 @@ enum FlowStatusEnum {
 }
 
 enum PaymentStatusEnum {
-  SUCCESSED
   PENDING
+  PROCESSING
+  SUCCESSED
+  EXPIRED
   CANCELLED
 }
 
 enum QueueStatusEnum {
+  PENDING
+  QUEUED
+  CALLED
+  SERVING
   FINISHED
   MISSING
-  PENDING
+  CANCELLED
 }
 
 enum StepStatusEnum {
@@ -105,6 +111,41 @@ enum ClinicalRoomType {
   CASHIER
   EMPTY
   OTHER
+}
+
+enum StepTypeEnum {
+  REGISTRATION
+  TRIAGE
+  CLINICAL
+  PROCEDURE
+  LAB_TEST
+  IMAGING
+  FUNCTIONAL_EXPLORATION
+  PAYMENT
+  DISPENSING //phân phối thuốc
+  OTHER
+}
+
+enum InvoiceStatusEnum {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum ServiceOrderStatusEnum {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  PAID
+}
+
+enum ServiceOrderDetailStatusEnum {
+  PENDING
+  PAID
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 model Account {
@@ -163,9 +204,10 @@ model Staff {
 
   account Account @relation(fields: [staff_id], references: [account_id], onDelete: Cascade)
 
-  specialty Specialty? @relation(fields: [specialty_id], references: [specialty_id], onDelete: Cascade)
-  shifts    Shift[]
-  steps     Step[]
+  specialty     Specialty?      @relation(fields: [specialty_id], references: [specialty_id], onDelete: Cascade)
+  shifts        Shift[]
+  steps         Step[]
+  serviceOrders Service_Order[]
 
   @@index([specialty_id])
   @@index([full_name])
@@ -235,21 +277,20 @@ model Shift {
 }
 
 model Booking {
-  booking_id       String            @id @default(uuid()) @db.Uuid
-  patient_id       String            @db.Uuid
-  slot_id          String            @db.Uuid
-  status           BookingStatusEnum @default(AVAILABLE)
-  service_order_id String?           @db.Uuid
-  created_at       DateTime          @default(now()) @db.Timestamptz()
-  updated_at       DateTime          @default(now()) @updatedAt @db.Timestamptz()
+  booking_id String            @id @default(uuid()) @db.Uuid
+  patient_id String            @db.Uuid
+  slot_id    String            @db.Uuid
+  status     BookingStatusEnum @default(AVAILABLE)
+  created_at DateTime          @default(now()) @db.Timestamptz()
+  updated_at DateTime          @default(now()) @updatedAt @db.Timestamptz()
 
-  patient       Patient        @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
-  slot          Slot           @relation(fields: [slot_id], references: [slot_id], onDelete: Cascade)
-  service_order Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
+  patient Patient @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  slot    Slot    @relation(fields: [slot_id], references: [slot_id], onDelete: Cascade)
 
   flows         Flow[]
   prescriptions Prescription[]
   visitSession  Visit_Session?
+  serviceOrders Service_Order[]
 
   @@index([patient_id, slot_id, status])
   @@index([patient_id])
@@ -294,37 +335,40 @@ model Room {
 }
 
 model Step {
-  step_id          String             @id @default(uuid()) @db.Uuid
-  step_name        String?
-  service_code     String?
-  step_type        String?
-  flow_id          String?            @db.Uuid
-  room_id          String?            @db.Uuid
-  staff_id         String?            @db.Uuid
-  step_status      StepStatusEnum     @default(PENDING)
-  qr_text          String?
-  docNo            Int?
-  payment_status   PaymentStatusEnum?
-  service_order_id String?            @db.Uuid
-  created_at       DateTime           @default(now()) @db.Timestamptz()
-  updated_at       DateTime           @default(now()) @updatedAt @db.Timestamptz()
-  service_order    Service_Order?     @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
-  parent_step_id   String?            @db.Uuid
-  parent_step      Step?              @relation("StepHierarchy", fields: [parent_step_id], references: [step_id])
-  sub_step         Step[]             @relation("StepHierarchy")
+  step_id   String  @id @default(uuid()) @db.Uuid
+  step_name String?
 
-  flow   Flow?   @relation(fields: [flow_id], references: [flow_id])
-  room   Room?   @relation(fields: [room_id], references: [room_id])
-  staff  Staff?  @relation(fields: [staff_id], references: [staff_id])
-  queues Queue[]
+  flow_id          String? @db.Uuid
+  room_id          String? @db.Uuid
+  staff_id         String? @db.Uuid
+  service_order_id String? @db.Uuid
 
-  physicalRoom   PhysicalRoom?     @relation(fields: [physicalRoomId], references: [id])
+  step_status  StepStatusEnum @default(PENDING)
+  service_code String?
+  step_type    StepTypeEnum?
+
+  created_at DateTime @default(now()) @db.Timestamptz()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  service_order  Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
+  parent_step_id String?        @db.Uuid
+  parent_step    Step?          @relation("StepHierarchy", fields: [parent_step_id], references: [step_id])
+  sub_step       Step[]         @relation("StepHierarchy")
+
+  flow  Flow?  @relation(fields: [flow_id], references: [flow_id])
+  room  Room?  @relation(fields: [room_id], references: [room_id])
+  staff Staff? @relation(fields: [staff_id], references: [staff_id])
+
   physicalRoomId String?           @db.Uuid
+  physicalRoom   PhysicalRoom?     @relation(fields: [physicalRoomId], references: [id])
   dependencies   Step_Dependency[] @relation("StepNeedsToWait") //step con (phải đước hoàn thành -> step cha mới hoàn thành)
   dependedBy     Step_Dependency[] @relation("StepIsDependedOn") //step mình hoàn thành -> step tiếp theo được làm tiếp
+  queues         Queue[]
 
+  @@index([flow_id])
+  @@index([room_id])
+  @@index([staff_id])
   @@index([step_status])
-  @@index([payment_status])
   @@map("step")
 }
 
@@ -412,28 +456,6 @@ model Medicine {
   @@map("medicine")
 }
 
-enum InvoiceStatusEnum {
-  PENDING
-  PAID
-  CANCELLED
-}
-
-enum ServiceOrderStatusEnum {
-  PENDING
-  PAID
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum ServiceOrderDetailStatusEnum {
-  PENDING
-  PAID
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
 model Service {
   service_id          String                 @id @default(uuid()) @db.Uuid
   service_code        String?
@@ -453,7 +475,6 @@ model Service_Order_Detail {
   service_order_id        String?                      @db.Uuid
   service_id              String?                      @db.Uuid
   price_at_order          Int?
-  docNo                   Int?
   quantity                Int?
   status                  ServiceOrderDetailStatusEnum @default(PENDING)
 
@@ -466,24 +487,31 @@ model Service_Order_Detail {
 }
 
 model Service_Order {
-  service_order_id String                 @id @default(uuid()) @db.Uuid
-  booking_id       String?                @db.Uuid
-  status           ServiceOrderStatusEnum @default(PENDING)
-  created_at       DateTime               @default(now()) @db.Timestamptz()
-  updated_at       DateTime               @default(now()) @updatedAt @db.Timestamptz()
+  service_order_id   String                 @id @default(uuid()) @db.Uuid
+  booking_id         String?                @db.Uuid
+  name               String?
+  assign_by_staff_id String?                @db.Uuid
+  status             ServiceOrderStatusEnum @default(PENDING)
+  qr_code            String?
+  payment_status     PaymentStatusEnum      @default(PENDING)
+  created_at         DateTime               @default(now()) @db.Timestamptz()
+  updated_at         DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
   serviceOrderDetails Service_Order_Detail[]
-  bookings            Booking[]
   steps               Step[]
   transactions        Transaction[]
-  invoice             Invoice?
+  booking             Booking?               @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  staff               Staff?                 @relation(fields: [assign_by_staff_id], references: [staff_id])
+  invoices            Invoice[]
 
+  @@index([booking_id])
+  @@index([assign_by_staff_id])
   @@map("service_order")
 }
 
 model Invoice {
   invoice_id       String            @id @default(uuid()) @db.Uuid
-  service_order_id String            @unique @db.Uuid
+  service_order_id String            @db.Uuid
   total_amount     Int               @default(0)
   status           InvoiceStatusEnum @default(PENDING)
   payment_method   String?

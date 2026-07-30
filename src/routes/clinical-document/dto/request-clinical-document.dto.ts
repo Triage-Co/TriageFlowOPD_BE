@@ -1,6 +1,12 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { ClinicalDocumentTypeEnum } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateClinicalDocumentReqDto {
   @IsUUID()
@@ -35,4 +41,6 @@ export class CreateClinicalDocumentReqDto {
   his_reference_id?: string;
 }
 
-export class UpdateClinicalDocumentReqDto extends PartialType(CreateClinicalDocumentReqDto) {}
+export class UpdateClinicalDocumentReqDto extends PartialType(
+  CreateClinicalDocumentReqDto,
+) {}

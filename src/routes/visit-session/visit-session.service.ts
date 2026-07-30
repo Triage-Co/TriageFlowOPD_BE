@@ -1,5 +1,13 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { CreateVisitSessionReqDto, UpdateVisitSessionReqDto } from './dto/request-visit-session.dto';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import {
+  CreateVisitSessionReqDto,
+  UpdateVisitSessionReqDto,
+} from './dto/request-visit-session.dto';
 import type { IVisitSessionRepository } from '../../shared/interfaces/i-visit-session.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
@@ -16,9 +24,13 @@ export class VisitSessionService {
   ) {}
 
   async create(createDto: CreateVisitSessionReqDto) {
-    const patient = await this.patientRepository.findOneWithPatientId(createDto.patient_id);
+    const patient = await this.patientRepository.findOneWithPatientId(
+      createDto.patient_id,
+    );
     if (!patient) {
-      throw new NotFoundException(`Patient with ID ${createDto.patient_id} not found`);
+      throw new NotFoundException(
+        `Patient with ID ${createDto.patient_id} not found`,
+      );
     }
     return this.visitSessionRepository.create(createDto);
   }
@@ -34,9 +46,14 @@ export class VisitSessionService {
     }
 
     if (account.role === 'USER') {
-      const patient = await this.patientRepository.findOne(patientId, reqUser.id);
+      const patient = await this.patientRepository.findOne(
+        patientId,
+        reqUser.id,
+      );
       if (!patient) {
-        throw new ForbiddenException("You do not have permission to access this patient's records");
+        throw new ForbiddenException(
+          "You do not have permission to access this patient's records",
+        );
       }
     }
 
@@ -50,7 +67,9 @@ export class VisitSessionService {
     }
     const sessions: any[] = [];
     for (const patient of patients) {
-      const patientSessions = await this.visitSessionRepository.findAll(patient.patient_id);
+      const patientSessions = await this.visitSessionRepository.findAll(
+        patient.patient_id,
+      );
       sessions.push(...patientSessions);
     }
     return sessions;
@@ -69,7 +88,9 @@ export class VisitSessionService {
 
     if (account.role === 'USER') {
       if (session.patient.account_id !== reqUser.id) {
-        throw new ForbiddenException('You do not have permission to view this visit session');
+        throw new ForbiddenException(
+          'You do not have permission to view this visit session',
+        );
       }
     }
 
@@ -91,25 +112,42 @@ export class VisitSessionService {
     }
 
     if (account.role === 'USER') {
-      const patient = await this.patientRepository.findOne(patientId, reqUser.id);
+      const patient = await this.patientRepository.findOne(
+        patientId,
+        reqUser.id,
+      );
       if (!patient) {
-        throw new ForbiddenException("You do not have permission to access this patient's records");
+        throw new ForbiddenException(
+          "You do not have permission to access this patient's records",
+        );
       }
     }
 
-    const session = await this.visitSessionRepository.findLatestByPatient(patientId);
+    const session =
+      await this.visitSessionRepository.findLatestByPatient(patientId);
     if (!session) {
-      throw new NotFoundException(`No visit session found for patient ID ${patientId}`);
+      throw new NotFoundException(
+        `No visit session found for patient ID ${patientId}`,
+      );
     }
     return session;
   }
 
-  async updateLatestByPatient(patientId: string, updateDto: UpdateVisitSessionReqDto) {
-    const session = await this.visitSessionRepository.findLatestByPatient(patientId);
+  async updateLatestByPatient(
+    patientId: string,
+    updateDto: UpdateVisitSessionReqDto,
+  ) {
+    const session =
+      await this.visitSessionRepository.findLatestByPatient(patientId);
     if (!session) {
-      throw new NotFoundException(`No visit session found for patient ID ${patientId}`);
+      throw new NotFoundException(
+        `No visit session found for patient ID ${patientId}`,
+      );
     }
-    return this.visitSessionRepository.update(session.visit_session_id, updateDto);
+    return this.visitSessionRepository.update(
+      session.visit_session_id,
+      updateDto,
+    );
   }
 
   async remove(id: string) {

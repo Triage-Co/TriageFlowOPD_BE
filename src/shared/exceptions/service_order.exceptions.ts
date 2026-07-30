@@ -1,11 +1,7 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 
 export class ServiceOrderException extends HttpException {
-  constructor(
-    status: HttpStatus,
-    message: string,
-    detail: string,
-  ) {
+  constructor(status: HttpStatus, message: string, detail: string) {
     super(
       {
         message,
@@ -45,14 +41,10 @@ export const ServiceOrderErrors = {
       `Không thể xóa Service Order ${id}.`,
     ),
 
-  ActionFailed: (
-    action: string,
-    detail?: string,
-  ) =>
+  ActionFailed: (action: string, detail?: string) =>
     new ServiceOrderException(
       HttpStatus.BAD_REQUEST,
       `${action} không thành công`,
-      detail ??
-        `Đã xảy ra lỗi khi ${action.toLowerCase()}.`,
+      detail ?? `Đã xảy ra lỗi khi ${action.toLowerCase()}.`,
     ),
 };

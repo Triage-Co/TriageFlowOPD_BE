@@ -6,8 +6,13 @@ Sentry.init({
     urlQueryParams: true,
     userInfo: true,
     databaseQueryData: true,
-    httpBodies: ['incomingRequest', 'incomingResponse', 'outgoingRequest', 'outgoingResponse'],
-    httpHeaders: {request: true, response: true},
-    stackFrameVariables: true
+    httpBodies: [
+      'incomingRequest',
+      'incomingResponse',
+      'outgoingRequest',
+      'outgoingResponse',
+    ],
+    httpHeaders: { request: true, response: true },
+    stackFrameVariables: true,
   },
 });

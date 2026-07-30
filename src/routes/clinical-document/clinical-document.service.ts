@@ -1,5 +1,13 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { CreateClinicalDocumentReqDto, UpdateClinicalDocumentReqDto } from './dto/request-clinical-document.dto';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import {
+  CreateClinicalDocumentReqDto,
+  UpdateClinicalDocumentReqDto,
+} from './dto/request-clinical-document.dto';
 import type { IClinicalDocumentRepository } from '../../shared/interfaces/i-clinical-document.repository';
 import type { IVisitSessionRepository } from '../../shared/interfaces/i-visit-session.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
@@ -19,9 +27,13 @@ export class ClinicalDocumentService {
   ) {}
 
   async create(createDto: CreateClinicalDocumentReqDto) {
-    const session = await this.visitSessionRepository.findById(createDto.visit_session_id);
+    const session = await this.visitSessionRepository.findById(
+      createDto.visit_session_id,
+    );
     if (!session) {
-      throw new NotFoundException(`Visit session with ID ${createDto.visit_session_id} not found`);
+      throw new NotFoundException(
+        `Visit session with ID ${createDto.visit_session_id} not found`,
+      );
     }
     return this.clinicalDocumentRepository.create(createDto);
   }
@@ -33,7 +45,9 @@ export class ClinicalDocumentService {
   async findByVisitSession(visitSessionId: string, reqUser: any) {
     const session = await this.visitSessionRepository.findById(visitSessionId);
     if (!session) {
-      throw new NotFoundException(`Visit session with ID ${visitSessionId} not found`);
+      throw new NotFoundException(
+        `Visit session with ID ${visitSessionId} not found`,
+      );
     }
 
     const account = await this.accountRepository.findById(reqUser.id);
@@ -43,7 +57,9 @@ export class ClinicalDocumentService {
 
     if (account.role === 'USER') {
       if (session.patient.account_id !== reqUser.id) {
-        throw new ForbiddenException("You do not have permission to view this visit session's clinical documents");
+        throw new ForbiddenException(
+          "You do not have permission to view this visit session's clinical documents",
+        );
       }
     }
 
@@ -58,9 +74,13 @@ export class ClinicalDocumentService {
 
     const documents: any[] = [];
     for (const patient of patients) {
-      const sessions = await this.visitSessionRepository.findAll(patient.patient_id);
+      const sessions = await this.visitSessionRepository.findAll(
+        patient.patient_id,
+      );
       for (const session of sessions) {
-        const sessionDocs = await this.clinicalDocumentRepository.findAll(session.visit_session_id);
+        const sessionDocs = await this.clinicalDocumentRepository.findAll(
+          session.visit_session_id,
+        );
         documents.push(...sessionDocs);
       }
     }
@@ -80,7 +100,9 @@ export class ClinicalDocumentService {
 
     if (account.role === 'USER') {
       if (doc.visitSession?.patient?.account_id !== reqUser.id) {
-        throw new ForbiddenException('You do not have permission to view this clinical document');
+        throw new ForbiddenException(
+          'You do not have permission to view this clinical document',
+        );
       }
     }
 
@@ -94,9 +116,13 @@ export class ClinicalDocumentService {
     }
 
     if (updateDto.visit_session_id) {
-      const session = await this.visitSessionRepository.findById(updateDto.visit_session_id);
+      const session = await this.visitSessionRepository.findById(
+        updateDto.visit_session_id,
+      );
       if (!session) {
-        throw new NotFoundException(`Visit session with ID ${updateDto.visit_session_id} not found`);
+        throw new NotFoundException(
+          `Visit session with ID ${updateDto.visit_session_id} not found`,
+        );
       }
     }
 

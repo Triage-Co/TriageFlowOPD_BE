@@ -118,8 +118,16 @@ export class AreaService {
         };
       }
 
-      const center = await this.geoService.readGeom('area', data.id, 'centerGeom');
-      const outline = await this.geoService.readGeom('area', data.id, 'outlineGeom');
+      const center = await this.geoService.readGeom(
+        'area',
+        data.id,
+        'centerGeom',
+      );
+      const outline = await this.geoService.readGeom(
+        'area',
+        data.id,
+        'outlineGeom',
+      );
 
       return {
         code: 200,
@@ -177,8 +185,16 @@ export class AreaService {
         );
       }
 
-      const center = await this.geoService.readGeom('area', data.id, 'centerGeom');
-      const outline = await this.geoService.readGeom('area', data.id, 'outlineGeom');
+      const center = await this.geoService.readGeom(
+        'area',
+        data.id,
+        'centerGeom',
+      );
+      const outline = await this.geoService.readGeom(
+        'area',
+        data.id,
+        'outlineGeom',
+      );
 
       await this.clearBuildingCacheByFloorId(data.floorId);
 

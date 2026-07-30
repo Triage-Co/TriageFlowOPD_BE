@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../../shared/config/prisma.service';
@@ -13,7 +18,7 @@ export class NavigationService {
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+  ) {}
 
   /**
    * Get the complete map layout of a building, with caching.
@@ -34,7 +39,9 @@ export class NavigationService {
     }
 
     if (!building) {
-      throw new NotFoundException(`Không tìm thấy tòa nhà hoặc tầng với ID ${buildingId}`);
+      throw new NotFoundException(
+        `Không tìm thấy tòa nhà hoặc tầng với ID ${buildingId}`,
+      );
     }
 
     const cacheKey = `building_map:${building.id}`;
@@ -54,7 +61,11 @@ export class NavigationService {
     const floorMaps = await Promise.all(
       floors.map(async (floor) => {
         // Read floor outline geom
-        const outlineGeom = await this.geoService.readGeom('floor', floor.id, 'outlineGeom');
+        const outlineGeom = await this.geoService.readGeom(
+          'floor',
+          floor.id,
+          'outlineGeom',
+        );
 
         // Query rooms on this floor
         const rooms = await this.prisma.physicalRoom.findMany({
@@ -63,8 +74,16 @@ export class NavigationService {
 
         const roomMaps = await Promise.all(
           rooms.map(async (room) => {
-            const centerGeom = await this.geoService.readGeom('physical_room', room.id, 'centerGeom');
-            const outlineGeomRoom = await this.geoService.readGeom('physical_room', room.id, 'outlineGeom');
+            const centerGeom = await this.geoService.readGeom(
+              'physical_room',
+              room.id,
+              'centerGeom',
+            );
+            const outlineGeomRoom = await this.geoService.readGeom(
+              'physical_room',
+              room.id,
+              'outlineGeom',
+            );
 
             // Query boundaries for this room
             const boundaries = await this.prisma.boundary.findMany({
@@ -74,7 +93,11 @@ export class NavigationService {
 
             const boundaryMaps = await Promise.all(
               boundaries.map(async (boundary) => {
-                const lineGeom = await this.geoService.readGeom('boundary', boundary.id, 'lineGeom');
+                const lineGeom = await this.geoService.readGeom(
+                  'boundary',
+                  boundary.id,
+                  'lineGeom',
+                );
                 return {
                   ...boundary,
                   lineGeom,
@@ -112,7 +135,11 @@ export class NavigationService {
 
         const doorMaps = await Promise.all(
           doors.map(async (door) => {
-            const positionGeom = await this.geoService.readGeom('door', door.id, 'positionGeom');
+            const positionGeom = await this.geoService.readGeom(
+              'door',
+              door.id,
+              'positionGeom',
+            );
             return {
               ...door,
               positionGeom,
@@ -127,8 +154,16 @@ export class NavigationService {
 
         const areaMaps = await Promise.all(
           areas.map(async (area) => {
-            const centerGeom = await this.geoService.readGeom('area', area.id, 'centerGeom');
-            const outlineGeomArea = await this.geoService.readGeom('area', area.id, 'outlineGeom');
+            const centerGeom = await this.geoService.readGeom(
+              'area',
+              area.id,
+              'centerGeom',
+            );
+            const outlineGeomArea = await this.geoService.readGeom(
+              'area',
+              area.id,
+              'outlineGeom',
+            );
 
             // Query boundaries for this area
             const boundaries = await this.prisma.boundary.findMany({
@@ -138,7 +173,11 @@ export class NavigationService {
 
             const boundaryMaps = await Promise.all(
               boundaries.map(async (boundary) => {
-                const lineGeom = await this.geoService.readGeom('boundary', boundary.id, 'lineGeom');
+                const lineGeom = await this.geoService.readGeom(
+                  'boundary',
+                  boundary.id,
+                  'lineGeom',
+                );
                 return {
                   ...boundary,
                   lineGeom,
@@ -163,7 +202,11 @@ export class NavigationService {
 
         const standaloneBoundaryMaps = await Promise.all(
           standaloneBoundaries.map(async (boundary) => {
-            const lineGeom = await this.geoService.readGeom('boundary', boundary.id, 'lineGeom');
+            const lineGeom = await this.geoService.readGeom(
+              'boundary',
+              boundary.id,
+              'lineGeom',
+            );
             return {
               ...boundary,
               lineGeom,
@@ -171,7 +214,11 @@ export class NavigationService {
           }),
         );
 
-        const nodeFeatures = await this.geoService.readAllGeoms('node', floor.id, 'coordsGeom');
+        const nodeFeatures = await this.geoService.readAllGeoms(
+          'node',
+          floor.id,
+          'coordsGeom',
+        );
         const nodeMaps = nodeFeatures
           .filter((feature) => feature.properties.active !== false)
           .map((feature) => ({
@@ -225,7 +272,10 @@ export class NavigationService {
     // 2. Resolve target node
     const targetNode = await this.resolveNode(dto.targetType, dto.targetId);
 
-    if (startNode.floorId === targetNode.floorId && startNode.id === targetNode.id) {
+    if (
+      startNode.floorId === targetNode.floorId &&
+      startNode.id === targetNode.id
+    ) {
       return {
         totalDistance: 0,
         path: [startNode],
@@ -249,12 +299,18 @@ export class NavigationService {
       select: { id: true, floorNumber: true },
     });
     const floorIds = floors.map((f) => f.id);
-    const floorMap = new Map<string, number>(floors.map((f) => [f.id, f.floorNumber]));
+    const floorMap = new Map<string, number>(
+      floors.map((f) => [f.id, f.floorNumber]),
+    );
 
     // 5. Fetch all nodes with coordinates in this building
     const nodesList: any[] = [];
     for (const floor of floors) {
-      const nodeFeatures = await this.geoService.readAllGeoms('node', floor.id, 'coordsGeom');
+      const nodeFeatures = await this.geoService.readAllGeoms(
+        'node',
+        floor.id,
+        'coordsGeom',
+      );
       for (const feature of nodeFeatures) {
         if (feature.properties.active !== false) {
           nodesList.push({
@@ -275,7 +331,9 @@ export class NavigationService {
     const fullStartNode = nodesMap.get(startNode.id);
     const fullTargetNode = nodesMap.get(targetNode.id);
     if (!fullStartNode || !fullTargetNode) {
-      throw new BadRequestException('Điểm bắt đầu hoặc điểm đích không nằm trong cùng đồ thị tòa nhà');
+      throw new BadRequestException(
+        'Điểm bắt đầu hoặc điểm đích không nằm trong cùng đồ thị tòa nhà',
+      );
     }
 
     // 6. Fetch all edges connecting these active nodes
@@ -289,7 +347,10 @@ export class NavigationService {
     });
 
     // 7. Build adjacency list representation of the graph
-    const adjacencyList = new Map<string, { toNodeId: string; distance: number }[]>();
+    const adjacencyList = new Map<
+      string,
+      { toNodeId: string; distance: number }[]
+    >();
     for (const id of nodeIds) {
       adjacencyList.set(id, []);
     }
@@ -309,7 +370,9 @@ export class NavigationService {
     );
 
     if (!pathIds) {
-      throw new BadRequestException('Không tìm thấy đường đi giữa hai địa điểm này');
+      throw new BadRequestException(
+        'Không tìm thấy đường đi giữa hai địa điểm này',
+      );
     }
 
     // 9. Map path IDs back to node structures
@@ -381,7 +444,9 @@ export class NavigationService {
       });
 
       if (!roomNode) {
-        throw new NotFoundException(`Không tìm thấy node chỉ đường tương ứng cho phòng ${room.roomLabel}`);
+        throw new NotFoundException(
+          `Không tìm thấy node chỉ đường tương ứng cho phòng ${room.roomLabel}`,
+        );
       }
       return roomNode;
     }
@@ -429,7 +494,9 @@ export class NavigationService {
       });
 
       if (!roomNode) {
-        throw new NotFoundException(`Không tìm thấy node chỉ đường tương ứng cho POI ${poi.name}`);
+        throw new NotFoundException(
+          `Không tìm thấy node chỉ đường tương ứng cho POI ${poi.name}`,
+        );
       }
       return roomNode;
     }
@@ -461,11 +528,16 @@ export class NavigationService {
       fScore.set(id, Infinity);
     }
     gScore.set(startId, 0);
-    fScore.set(startId, this.calculateHeuristic(nodesMap.get(startId), nodesMap.get(targetId)));
+    fScore.set(
+      startId,
+      this.calculateHeuristic(nodesMap.get(startId), nodesMap.get(targetId)),
+    );
 
     while (openSet.length > 0) {
       // Sort openSet by fScore in ascending order
-      openSet.sort((a, b) => (fScore.get(a) || Infinity) - (fScore.get(b) || Infinity));
+      openSet.sort(
+        (a, b) => (fScore.get(a) || Infinity) - (fScore.get(b) || Infinity),
+      );
       const currentId = openSet.shift()!;
 
       if (currentId === targetId) {
@@ -488,14 +560,19 @@ export class NavigationService {
           continue;
         }
 
-        const tentativeGScore = (gScore.get(currentId) || 0) + neighbor.distance;
+        const tentativeGScore =
+          (gScore.get(currentId) || 0) + neighbor.distance;
 
         if (tentativeGScore < (gScore.get(neighborId) || Infinity)) {
           cameFrom.set(neighborId, currentId);
           gScore.set(neighborId, tentativeGScore);
           fScore.set(
             neighborId,
-            tentativeGScore + this.calculateHeuristic(nodesMap.get(neighborId), nodesMap.get(targetId)),
+            tentativeGScore +
+              this.calculateHeuristic(
+                nodesMap.get(neighborId),
+                nodesMap.get(targetId),
+              ),
           );
 
           if (!openSet.includes(neighborId)) {
@@ -534,4 +611,3 @@ export class NavigationService {
     return get3DMapHtml(buildingMap);
   }
 }
-

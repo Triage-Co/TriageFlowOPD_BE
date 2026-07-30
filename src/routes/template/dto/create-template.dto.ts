@@ -1,16 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ClinicalRoomType } from '@prisma/client';
+import { ClinicalRoomType, StepTypeEnum } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsEnum,
-  IsInt,
-  isInt,
-  IsJSON,
   IsOptional,
   IsString,
-  IsUUID,
   ValidateNested,
 } from 'class-validator';
 
@@ -19,7 +15,14 @@ export class TemplateStepDto {
   @ApiProperty({
     example: 'step_1',
   })
-  template_step_id: string;
+  template_id?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({
+    example: 'step_1',
+  })
+  template_step_id?: string;
 
   @IsString()
   @ApiProperty({
@@ -34,17 +37,18 @@ export class TemplateStepDto {
   })
   step_name: string;
 
-  @IsString()
+  @IsEnum(StepTypeEnum)
   @ApiProperty({
-    example: 'THANH_TOAN',
+    enum: StepTypeEnum,
+    example: StepTypeEnum.PAYMENT,
   })
-  step_type?: String;
+  step_type?: StepTypeEnum;
 
   @IsEnum(ClinicalRoomType)
   @ApiProperty({
     enum: ClinicalRoomType,
-    example: 'CONSULTATION',
-    description: 'Tên của bước khám',
+    example: ClinicalRoomType.CLINICAL_ROOM,
+    description: 'Loại phòng khám',
   })
   room_type: ClinicalRoomType;
 
@@ -71,7 +75,7 @@ export class TemplateStepDto {
   @ValidateNested({ each: true })
   @Type(() => TemplateStepDto)
   @ApiPropertyOptional({
-    type: () => [TemplateStepDto],
+    type: [TemplateStepDto],
     description:
       'Danh sách các bước con. Cần hoàn thành hết để bước cha được đánh dấu hoàn thành.',
   })
@@ -94,4 +98,15 @@ export class CreateTemplateDto {
     description: 'Danh sách các bước trong quy trình',
   })
   steps: TemplateStepDto[];
+}
+
+export class AssignTemplateRequestDto {
+  @ApiProperty({
+    type: [TemplateStepDto],
+    description: 'Danh sách các template steps',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TemplateStepDto)
+  templates: TemplateStepDto[];
 }

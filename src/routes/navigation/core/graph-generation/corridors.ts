@@ -39,27 +39,58 @@ export async function generateCorridorNodes(
   floorId: string,
   floorOutlineGeoJSON: any,
 ) {
-  console.log(`🛣️  Calculating walkable space and generating MPRSS corridor nodes...`);
+  console.log(
+    `🛣️  Calculating walkable space and generating MPRSS corridor nodes...`,
+  );
 
   // 1. Load all rooms outlines & non-door areas outlines (e.g. Garden)
-  const roomFeatures = await readAllGeoms(prisma, 'physical_room', floorId, 'outlineGeom');
+  const roomFeatures = await readAllGeoms(
+    prisma,
+    'physical_room',
+    floorId,
+    'outlineGeom',
+  );
   const roomPolygons = roomFeatures
-    .filter((rf) => rf.geometry && (rf.geometry.type === 'Polygon' || rf.geometry.type === 'MultiPolygon'))
-    .map((rf) => turf.feature(rf.geometry as Polygon | MultiPolygon, rf.properties));
+    .filter(
+      (rf) =>
+        rf.geometry &&
+        (rf.geometry.type === 'Polygon' || rf.geometry.type === 'MultiPolygon'),
+    )
+    .map((rf) =>
+      turf.feature(rf.geometry as Polygon | MultiPolygon, rf.properties),
+    );
 
   // Load non-door area outlines (e.g., Garden or closed areas without doors)
-  const boundaryFeaturesAll = await readAllGeoms(prisma, 'boundary', floorId, 'lineGeom');
+  const boundaryFeaturesAll = await readAllGeoms(
+    prisma,
+    'boundary',
+    floorId,
+    'lineGeom',
+  );
   const doorBoundariesAreaIds = new Set(
     boundaryFeaturesAll
-      .filter((bf) => bf.properties.boundaryType === 'DOOR' && bf.properties.areaId)
+      .filter(
+        (bf) => bf.properties.boundaryType === 'DOOR' && bf.properties.areaId,
+      )
       .map((bf) => bf.properties.areaId),
   );
 
-  const areaFeatures = await readAllGeoms(prisma, 'area', floorId, 'outlineGeom');
+  const areaFeatures = await readAllGeoms(
+    prisma,
+    'area',
+    floorId,
+    'outlineGeom',
+  );
   const nonDoorAreaPolygons = areaFeatures
-    .filter((af) => af.geometry && (af.geometry.type === 'Polygon' || af.geometry.type === 'MultiPolygon'))
+    .filter(
+      (af) =>
+        af.geometry &&
+        (af.geometry.type === 'Polygon' || af.geometry.type === 'MultiPolygon'),
+    )
     .filter((af) => !doorBoundariesAreaIds.has(af.properties.id))
-    .map((af) => turf.feature(af.geometry as Polygon | MultiPolygon, af.properties));
+    .map((af) =>
+      turf.feature(af.geometry as Polygon | MultiPolygon, af.properties),
+    );
 
   const obstaclePolygons = [...roomPolygons, ...nonDoorAreaPolygons];
 
@@ -74,7 +105,7 @@ export async function generateCorridorNodes(
 
     const floorFeature = turf.feature(floorOutlineGeoJSON);
     const diff = turf.difference(
-      turf.featureCollection([floorFeature as any, obstacleUnion as any]),
+      turf.featureCollection([floorFeature as any, obstacleUnion]),
     );
     if (diff) {
       walkable = diff.geometry;
@@ -82,7 +113,12 @@ export async function generateCorridorNodes(
   }
 
   // 2. Fetch wall boundaries for edge collision filtering
-  const boundaryFeatures = await readAllGeoms(prisma, 'boundary', floorId, 'lineGeom');
+  const boundaryFeatures = await readAllGeoms(
+    prisma,
+    'boundary',
+    floorId,
+    'lineGeom',
+  );
   const wallBoundaries = boundaryFeatures
     .filter((bf) => bf.properties.boundaryType === 'WALL' && bf.geometry)
     .map((bf) => turf.feature(bf.geometry));
@@ -131,7 +167,12 @@ export async function generateCorridorNodes(
   }
 
   // Load Door nodes from database for the floor
-  const doorFeatures = await readAllGeoms(prisma, 'door', floorId, 'positionGeom');
+  const doorFeatures = await readAllGeoms(
+    prisma,
+    'door',
+    floorId,
+    'positionGeom',
+  );
   const doorCoords = doorFeatures
     .filter((df) => df.geometry && df.geometry.type === 'Point')
     .map((df) => df.geometry.coordinates as [number, number]);
@@ -148,7 +189,9 @@ export async function generateCorridorNodes(
   // De-duplicate critical points with a 10cm tolerance to merge overlapping corners
   for (const p of allCriticalCandidates) {
     const exists = criticalPoints.some((existing) => {
-      const d = turf.distance(turf.point(p), turf.point(existing), { units: 'meters' });
+      const d = turf.distance(turf.point(p), turf.point(existing), {
+        units: 'meters',
+      });
       return d < 0.1;
     });
     if (!exists) {
@@ -175,7 +218,9 @@ export async function generateCorridorNodes(
         // Check distance to all critical points (1.5m clearance to corners & doors)
         let tooClose = false;
         for (const crit of criticalPoints) {
-          const d = turf.distance(turf.point(p), turf.point(crit), { units: 'meters' });
+          const d = turf.distance(turf.point(p), turf.point(crit), {
+            units: 'meters',
+          });
           if (d > 1e-4 && d < 1.5) {
             tooClose = true;
             break;
@@ -185,7 +230,9 @@ export async function generateCorridorNodes(
 
         // Check distance to already accepted densified points (1.5m clearance to prevent overlapping walls duplicate nodes)
         for (const existing of acceptedDensified) {
-          const d = turf.distance(turf.point(p), turf.point(existing), { units: 'meters' });
+          const d = turf.distance(turf.point(p), turf.point(existing), {
+            units: 'meters',
+          });
           if (d < 1.5) {
             tooClose = true;
             break;
@@ -213,7 +260,9 @@ export async function generateCorridorNodes(
 
   // ── Step 2: Constrained Delaunay Triangulation (TIN) ────────────────────────
   const tinMesh = turf.tin(turf.featureCollection(uniquePoints));
-  console.log(`📐 Delaunay Triangulation generated ${tinMesh.features.length} triangles`);
+  console.log(
+    `📐 Delaunay Triangulation generated ${tinMesh.features.length} triangles`,
+  );
 
   // Precompute room BBoxes
   const roomBBoxes = roomPolygons.map((room) => {
@@ -341,7 +390,9 @@ export async function generateCorridorNodes(
           my >= wallItem.bbox.minY - 0.000002 &&
           my <= wallItem.bbox.maxY + 0.000002
         ) {
-          const dist = turf.pointToLineDistance(midPoint, wallItem.feature, { units: 'meters' });
+          const dist = turf.pointToLineDistance(midPoint, wallItem.feature, {
+            units: 'meters',
+          });
           if (dist <= 0.1) {
             tooCloseToWall = true;
             break;
@@ -353,7 +404,9 @@ export async function generateCorridorNodes(
       candidateEdges.push([p1, p2]);
     }
   }
-  console.log(`⚡ Extracted ${candidateEdges.length} internal crosswise edges {E_zigzag}`);
+  console.log(
+    `⚡ Extracted ${candidateEdges.length} internal crosswise edges {E_zigzag}`,
+  );
 
   // ── Step 4: Midpoint Node Creation {P_Mid} with Step Sampling ─────────────
   const rawMidpoints: [number, number][] = [];
@@ -376,7 +429,9 @@ export async function generateCorridorNodes(
         my >= wallItem.bbox.minY - 0.000006 &&
         my <= wallItem.bbox.maxY + 0.000006
       ) {
-        const dist = turf.pointToLineDistance(mid, wallItem.feature, { units: 'meters' });
+        const dist = turf.pointToLineDistance(mid, wallItem.feature, {
+          units: 'meters',
+        });
         if (dist < 0.55) {
           tooCloseToWall = true;
           break;
@@ -402,7 +457,9 @@ export async function generateCorridorNodes(
     const pointsFC = turf.featureCollection(
       finalNodeCoords.map((c, idx) => turf.point(c, { idx })),
     ) as any;
-    const walkableBBox = getBBox(turf.coordAll(walkableFeature) as [number, number][]);
+    const walkableBBox = getBBox(
+      turf.coordAll(walkableFeature) as [number, number][],
+    );
     const paddedBBox: [number, number, number, number] = [
       walkableBBox.minX - 0.001,
       walkableBBox.minY - 0.001,
@@ -419,7 +476,11 @@ export async function generateCorridorNodes(
       let matchedCellFeature: any = null;
       if (voronoiResult && voronoiResult.features) {
         for (const feature of voronoiResult.features) {
-          if (feature && feature.geometry && turf.booleanPointInPolygon(pt, feature as any)) {
+          if (
+            feature &&
+            feature.geometry &&
+            turf.booleanPointInPolygon(pt, feature as any)
+          ) {
             matchedCellFeature = feature;
             break;
           }
@@ -430,7 +491,10 @@ export async function generateCorridorNodes(
       if (matchedCellFeature) {
         try {
           const intersected = turf.intersect(
-            turf.featureCollection([matchedCellFeature, walkableFeature as any]),
+            turf.featureCollection([
+              matchedCellFeature,
+              walkableFeature as any,
+            ]),
           );
           if (intersected && intersected.geometry) {
             finalCellGeom = intersected.geometry;
@@ -453,8 +517,13 @@ export async function generateCorridorNodes(
   }
 
   // Helper: Comprehensive Line-of-sight collision check against room polygons AND wall boundaries
-  const hasCleanLineOfSight = (p1: [number, number], p2: [number, number]): boolean => {
-    const dist = turf.distance(turf.point(p1), turf.point(p2), { units: 'meters' });
+  const hasCleanLineOfSight = (
+    p1: [number, number],
+    p2: [number, number],
+  ): boolean => {
+    const dist = turf.distance(turf.point(p1), turf.point(p2), {
+      units: 'meters',
+    });
     if (dist > 25.0) return false;
 
     const line = turf.lineString([p1, p2]);
@@ -510,14 +579,19 @@ export async function generateCorridorNodes(
 
       const pA = finalNodeCoords[i];
       const pB = finalNodeCoords[j];
-      const dist = turf.distance(turf.point(pA), turf.point(pB), { units: 'meters' });
+      const dist = turf.distance(turf.point(pA), turf.point(pB), {
+        units: 'meters',
+      });
 
       if (dist > 8.0) continue;
 
       let isCandidate = false;
       try {
         if (
-          (cellA && cellB && (turf.booleanTouches(cellA, cellB) || turf.booleanIntersects(cellA, cellB))) ||
+          (cellA &&
+            cellB &&
+            (turf.booleanTouches(cellA, cellB) ||
+              turf.booleanIntersects(cellA, cellB))) ||
           dist <= 5.5
         ) {
           isCandidate = true;
@@ -537,7 +611,11 @@ export async function generateCorridorNodes(
 
   // ── Step 7: Dual-Pruning Condition (Geometric Angle + Wall Clearance) ──────
   // 1. Geometric Angle Filter (< 45 deg)
-  const computeAngleDegrees = (pB: [number, number], pA: [number, number], pC: [number, number]): number => {
+  const computeAngleDegrees = (
+    pB: [number, number],
+    pA: [number, number],
+    pC: [number, number],
+  ): number => {
     const vBA = [pA[0] - pB[0], pA[1] - pB[1]];
     const vBC = [pC[0] - pB[0], pC[1] - pB[1]];
     const dot = vBA[0] * vBC[0] + vBA[1] * vBC[1];
@@ -549,7 +627,10 @@ export async function generateCorridorNodes(
   };
 
   // 2. Wall Clearance / Convex Corner Filter (< 0.55m)
-  const isTooCloseToWallCorner = (p1: [number, number], p2: [number, number]): boolean => {
+  const isTooCloseToWallCorner = (
+    p1: [number, number],
+    p2: [number, number],
+  ): boolean => {
     const line = turf.lineString([p1, p2]);
     const pt1 = turf.point(p1);
     const pt2 = turf.point(p2);
@@ -560,7 +641,9 @@ export async function generateCorridorNodes(
       const dEnd = turf.distance(pt2, cPt, { units: 'meters' });
 
       if (dStart > 0.35 && dEnd > 0.35) {
-        const distToLine = turf.pointToLineDistance(cPt, line, { units: 'meters' });
+        const distToLine = turf.pointToLineDistance(cPt, line, {
+          units: 'meters',
+        });
         if (distToLine < 0.55) {
           return true;
         }
@@ -606,10 +689,11 @@ export async function generateCorridorNodes(
   }
 
   // ── Step 8: Classify JUNCTION vs CORRIDOR and Persist Nodes ───────────────
-  const nodeMap = new Map<string, string>();                 // key -> nodeId
+  const nodeMap = new Map<string, string>(); // key -> nodeId
   const nodeCoordsMap = new Map<string, [number, number]>(); // nodeId -> coords
-  const createdNodeTypesMap = new Map<string, NodeType>();    // nodeId -> type
-  const getCoordKey = (p: [number, number]) => `${p[0].toFixed(6)}_${p[1].toFixed(6)}`;
+  const createdNodeTypesMap = new Map<string, NodeType>(); // nodeId -> type
+  const getCoordKey = (p: [number, number]) =>
+    `${p[0].toFixed(6)}_${p[1].toFixed(6)}`;
 
   const nodesToCreate: NodeInsertData[] = [];
 
@@ -641,7 +725,9 @@ export async function generateCorridorNodes(
   // Batch insert all corridor nodes at once
   await createNodesBatch(prisma, nodesToCreate);
 
-  console.log(`🛣️  Created ${nodeMap.size} MPRSSEM corridor/junction nodes {P_Mid}`);
+  console.log(
+    `🛣️  Created ${nodeMap.size} MPRSSEM corridor/junction nodes {P_Mid}`,
+  );
 
   // Build centerline edge list for edges.ts
   const centerlineEdgesTyped: [[number, number], [number, number]][] = [];
@@ -664,9 +750,9 @@ export async function generateCorridorNodes(
     nodeCoordsMap,
     createdNodeTypesMap,
     voronoiCellsMap,
-    uniquePoints,       // Step 1: P_b Base points
-    tinEdges,           // Step 2: Delaunay TIN triangle edges
-    candidateEdges,     // Step 3: E_zigzag internal crosswise edges
-    finalNodeCoords,    // Step 4: P_Mid midpoint corridor nodes
+    uniquePoints, // Step 1: P_b Base points
+    tinEdges, // Step 2: Delaunay TIN triangle edges
+    candidateEdges, // Step 3: E_zigzag internal crosswise edges
+    finalNodeCoords, // Step 4: P_Mid midpoint corridor nodes
   };
 }
