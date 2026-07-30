@@ -39,7 +39,12 @@ export async function generateGraph(floorId: string) {
   console.log(`\n🔧 Generating navigation graph for Floor ID: ${floorId}...`);
 
   // Load floor outline
-  const floorOutlineGeoJSON = await readGeom(prisma, 'floor', floorId, 'outlineGeom');
+  const floorOutlineGeoJSON = await readGeom(
+    prisma,
+    'floor',
+    floorId,
+    'outlineGeom',
+  );
   if (!floorOutlineGeoJSON) {
     throw new Error('Floor has no outline geometry defined');
   }
@@ -55,13 +60,19 @@ export async function generateGraph(floorId: string) {
   const { doorNodeCoordsMap } = await generateDoorNodes(prisma, floorId);
 
   // ── Step 2: Divide walkable areas and create corridor nodes ───────────────
-  const corridorData = await generateCorridorNodes(prisma, floorId, floorOutlineGeoJSON);
+  const corridorData = await generateCorridorNodes(
+    prisma,
+    floorId,
+    floorOutlineGeoJSON,
+  );
 
   // ── Step 3: Create corridor connections and connect doors ─────────────────
   await generateGraphEdges(prisma, floorId, doorNodeCoordsMap, corridorData);
 
   const totalNodes = await prisma.node.count({ where: { floorId } });
-  const totalEdges = await prisma.edge.count({ where: { fromNode: { floorId } } });
+  const totalEdges = await prisma.edge.count({
+    where: { fromNode: { floorId } },
+  });
   const durationMs = Date.now() - startTime;
 
   console.log('\n============================================================');
@@ -80,14 +91,20 @@ async function main() {
     where: { name: BUILDING_NAME },
   });
   if (!building) {
-    throw new Error(`Building "${BUILDING_NAME}" not found. Please run the seed first.`);
+    throw new Error(
+      `Building "${BUILDING_NAME}" not found. Please run the seed first.`,
+    );
   }
 
   const floor = await prisma.floor.findUnique({
-    where: { buildingId_floorNumber: { buildingId: building.id, floorNumber: 1 } },
+    where: {
+      buildingId_floorNumber: { buildingId: building.id, floorNumber: 1 },
+    },
   });
   if (!floor) {
-    throw new Error(`Floor 1 of building "${BUILDING_NAME}" not found. Please run the seed first.`);
+    throw new Error(
+      `Floor 1 of building "${BUILDING_NAME}" not found. Please run the seed first.`,
+    );
   }
 
   console.log(`🏢 Building: ${building.name} (${building.id})`);

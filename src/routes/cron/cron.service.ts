@@ -5,7 +5,7 @@ import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 @Injectable()
 export class CronService {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prismaService: PrismaService) { }
   async updateFlowAndStepExpired() {
     const timeZone = 'Asia/Ho_Chi_Minh';
     const now = new Date();

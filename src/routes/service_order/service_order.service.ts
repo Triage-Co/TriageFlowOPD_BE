@@ -17,7 +17,7 @@ export class ServiceOrderService {
   async create(createServiceOrderReqDto: CreateServiceOrderReqDto) {
     try {
       const data = await this.serviceOrderRepository.create(
-        createServiceOrderReqDto as any,
+        createServiceOrderReqDto,
       );
 
       return {
@@ -74,16 +74,20 @@ export class ServiceOrderService {
 
   async findPendingByPatientId(patientId: string) {
     try {
-      const data = await this.serviceOrderRepository.findPendingByPatientId(patientId);
-      
+      const data =
+        await this.serviceOrderRepository.findPendingByPatientId(patientId);
+
       // Tính toán tổng tiền cho mỗi Service Order
       const enrichedData = data.map((order: any) => {
-        const totalPrice = order.serviceOrderDetails.reduce((sum: number, detail: any) => {
-          return sum + (detail.price_at_order || 0) * (detail.quantity || 1);
-        }, 0);
+        const totalPrice = order.serviceOrderDetails.reduce(
+          (sum: number, detail: any) => {
+            return sum + (detail.price_at_order || 0) * (detail.quantity || 1);
+          },
+          0,
+        );
         return {
           ...order,
-          total_price: totalPrice
+          total_price: totalPrice,
         };
       });
 
@@ -114,7 +118,7 @@ export class ServiceOrderService {
     try {
       const data = await this.serviceOrderRepository.update(
         id,
-        updateServiceOrderReqDto as any,
+        updateServiceOrderReqDto,
       );
 
       return {

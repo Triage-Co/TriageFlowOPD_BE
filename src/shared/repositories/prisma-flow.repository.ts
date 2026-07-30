@@ -4,8 +4,6 @@ import { IFlowRepository } from '../interfaces/i-flow.repository';
 import { Flow, Prisma } from '@prisma/client';
 import { formatInTimeZone } from 'date-fns-tz';
 
-
-
 const findQuery = {
   steps: {
     include: {
@@ -91,11 +89,12 @@ export class PrismaFlowRepository implements IFlowRepository {
     const formattedSteps = rawFlow.steps.map((step) => {
       return {
         step_id: step.step_id,
+        step_name: step.step_name,
         flow_id: step.flow_id,
         room_id: step.room_id,
         staff_id: step.staff_id,
         step_status: step.step_status,
-        docNo: step.docNo,
+        service_order_id: step.service_order_id,
         room_info: step.room
           ? {
               room_name: step.room.room_name,
@@ -115,7 +114,6 @@ export class PrismaFlowRepository implements IFlowRepository {
               full_name: step.staff.full_name || 'N/A',
             }
           : null,
-        payment_status: step.payment_status,
         parent_step_id: step.parent_step_id,
         physicalRoomId: step.physicalRoomId,
         depends_on: step.dependencies.map((d: any) => d.depends_on_step_id), //bước cần hoàn thành
@@ -146,15 +144,19 @@ export class PrismaFlowRepository implements IFlowRepository {
       .filter((s: any) => s.step_status === 'IN_PROGRESS')
       .map((s: any) => s.step_id);
 
-   const timeZone = "Asia/Ho_Chi_Minh";
-  const createAt = formatInTimeZone(rawFlow.created_at, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const createAt = formatInTimeZone(
+      rawFlow.created_at,
+      timeZone,
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
     return {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
       create_at: createAt,
       current_processing_steps: currentProcessingSteps,
-      steps: rootSteps, 
+      steps: rootSteps,
     };
   }
 
@@ -164,10 +166,12 @@ export class PrismaFlowRepository implements IFlowRepository {
     const formattedSteps = rawFlow.steps.map((step: any) => {
       return {
         step_id: step.step_id,
+        step_name: step.step_name,
         flow_id: step.flow_id,
         room_id: step.room_id,
         staff_id: step.staff_id,
         step_status: step.step_status,
+        service_order_id: step.service_order_id,
         docNo: step.docNo,
         room_info: step.room
           ? {
@@ -215,12 +219,16 @@ export class PrismaFlowRepository implements IFlowRepository {
       }
     });
 
-    const currentProcessingSteps = (rawFlow.steps as any)
+    const currentProcessingSteps = rawFlow.steps
       .filter((s: any) => s.step_status === 'IN_PROGRESS')
       .map((s: any) => s.step_id);
 
-      const timeZone = "Asia/Ho_Chi_Minh";
-const createAt = formatInTimeZone(rawFlow.created_at, timeZone, "yyyy-MM-dd'T'HH:mm:ss");
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const createAt = formatInTimeZone(
+      rawFlow.created_at,
+      timeZone,
+      "yyyy-MM-dd'T'HH:mm:ss",
+    );
 
     return {
       flow_id: rawFlow.flow_id,

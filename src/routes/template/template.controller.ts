@@ -46,8 +46,7 @@ export class TemplateController {
   @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary:
-      '[ADMIN - STAFF] Tìm template theo tên',
+    summary: '[ADMIN - STAFF] Tìm template theo tên',
   })
   findByName(@Param('name') name: string) {
     return this.templateService.findByName(name);

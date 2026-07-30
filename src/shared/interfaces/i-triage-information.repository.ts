@@ -2,6 +2,6 @@ import { Triage_Information } from '@prisma/client';
 
 export interface ITriageInformationRepository {
   findOneByInterviewToken(
-    interviewToken: String,
+    interviewToken: string,
   ): Promise<Triage_Information | null>;
 }

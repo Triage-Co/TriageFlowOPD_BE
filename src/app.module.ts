@@ -110,4 +110,4 @@ import { PrescriptionModule } from './routes/prescription/prescription.module';
     PrescriptionModule,
   ]
 })
-export class AppModule {}
+export class AppModule { }

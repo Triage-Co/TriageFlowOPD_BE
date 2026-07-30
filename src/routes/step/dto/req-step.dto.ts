@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
+import {
+  PaymentStatusEnum,
+  StepStatusEnum,
+  StepTypeEnum,
+} from '@prisma/client';
 import {
   IsEnum,
   IsInt,
@@ -39,11 +43,12 @@ export class CreateParentStepReqDto {
   })
   step_name: string;
 
-  @IsString()
-  @ApiProperty({
-    example: 'THANH_TOAN',
+  @IsEnum(StepTypeEnum, { message: 'Loại bước không hợp lệ' })
+  @ApiPropertyOptional({
+    enum: StepTypeEnum,
+    example: StepTypeEnum.PAYMENT,
   })
-  step_type?: string;
+  step_type?: StepTypeEnum;
 
   @ApiPropertyOptional({
     description: 'ID của nhân viên phụ trách (nếu có)',
@@ -101,11 +106,12 @@ export class CreateSubStepReqDto {
   })
   step_name: string;
 
-  @IsString()
-  @ApiProperty({
-    example: 'THANH_TOAN',
+  @IsEnum(StepTypeEnum, { message: 'Loại bước không hợp lệ' })
+  @ApiPropertyOptional({
+    enum: StepTypeEnum,
+    example: StepTypeEnum.PAYMENT,
   })
-  step_type?: string;
+  step_type?: StepTypeEnum;
 
   @ApiPropertyOptional({
     enum: StepStatusEnum,

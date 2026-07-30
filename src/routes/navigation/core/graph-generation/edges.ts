@@ -51,7 +51,7 @@ export async function generateGraphEdges(
   corridorData: CorridorData,
 ) {
   console.log(`🔗 Constructing graph edge connections...`);
-  
+
   const {
     roomPolygons = [],
     wallBoundaries = [],
@@ -79,7 +79,8 @@ export async function generateGraphEdges(
     };
   });
 
-  const getVertexKey = (p: [number, number]) => `${p[0].toFixed(6)}_${p[1].toFixed(6)}`;
+  const getVertexKey = (p: [number, number]) =>
+    `${p[0].toFixed(6)}_${p[1].toFixed(6)}`;
 
   // 1. Build corridor connections directly from Voronoi centerline edges (no 3m step sampling)
   const corridorConnections: [string, string][] = [];
@@ -95,7 +96,11 @@ export async function generateGraphEdges(
   }
 
   // 2. Accumulate edges
-  const edgesToCreate: { fromNodeId: string; toNodeId: string; distance: number }[] = [];
+  const edgesToCreate: {
+    fromNodeId: string;
+    toNodeId: string;
+    distance: number;
+  }[] = [];
   const uniqueEdges = new Set<string>();
 
   const addBidirectionalEdge = (n1: string, n2: string, dist: number) => {
@@ -111,7 +116,9 @@ export async function generateGraphEdges(
   for (const [fromNodeId, toNodeId] of corridorConnections) {
     const cA = nodeCoordsMap.get(fromNodeId)!;
     const cB = nodeCoordsMap.get(toNodeId)!;
-    const distance = turf.distance(turf.point(cA), turf.point(cB), { units: 'meters' });
+    const distance = turf.distance(turf.point(cA), turf.point(cB), {
+      units: 'meters',
+    });
     addBidirectionalEdge(fromNodeId, toNodeId, distance);
   }
 
@@ -122,7 +129,9 @@ export async function generateGraphEdges(
     roomAId?: string | null,
     roomBId?: string | null,
   ): boolean => {
-    const dist = turf.distance(turf.point(p1), turf.point(p2), { units: 'meters' });
+    const dist = turf.distance(turf.point(p1), turf.point(p2), {
+      units: 'meters',
+    });
     if (dist > 25.0) return false;
 
     const line = turf.lineString([p1, p2]);
@@ -168,7 +177,9 @@ export async function generateGraphEdges(
   };
 
   // 3. Connect door nodes to Corridor/Junction nodes on BOTH SIDES of area/room boundary walls (Dual-Sided Door Connection)
-  const doors = await prisma.door.findMany({ where: { floorId, active: true } });
+  const doors = await prisma.door.findMany({
+    where: { floorId, active: true },
+  });
   for (const door of doors) {
     const doorNodeId = door.nodeId;
     if (!doorNodeId) continue;
@@ -178,13 +189,26 @@ export async function generateGraphEdges(
     const dPt = turf.point(doorCoords);
 
     // Collect all candidate corridor/junction nodes with clean line of sight to door
-    const candidateNodes: { nodeId: string; coords: [number, number]; dist: number }[] = [];
+    const candidateNodes: {
+      nodeId: string;
+      coords: [number, number];
+      dist: number;
+    }[] = [];
     for (const [cNodeId, cCoords] of nodeCoordsMap.entries()) {
       const type = createdNodeTypesMap.get(cNodeId);
       if (type !== NodeType.CORRIDOR && type !== NodeType.JUNCTION) continue;
 
-      if (hasCleanLineOfSightToDoor(doorCoords, cCoords, door.roomAId, door.roomBId)) {
-        const dist = turf.distance(dPt, turf.point(cCoords), { units: 'meters' });
+      if (
+        hasCleanLineOfSightToDoor(
+          doorCoords,
+          cCoords,
+          door.roomAId,
+          door.roomBId,
+        )
+      ) {
+        const dist = turf.distance(dPt, turf.point(cCoords), {
+          units: 'meters',
+        });
         candidateNodes.push({ nodeId: cNodeId, coords: cCoords, dist });
       }
     }
@@ -198,7 +222,9 @@ export async function generateGraphEdges(
       for (const [cNodeId, cCoords] of nodeCoordsMap.entries()) {
         const type = createdNodeTypesMap.get(cNodeId);
         if (type !== NodeType.CORRIDOR && type !== NodeType.JUNCTION) continue;
-        const dist = turf.distance(dPt, turf.point(cCoords), { units: 'meters' });
+        const dist = turf.distance(dPt, turf.point(cCoords), {
+          units: 'meters',
+        });
         if (dist < minDist) {
           minDist = dist;
           fallbackId = cNodeId;
@@ -212,7 +238,11 @@ export async function generateGraphEdges(
 
     // Side A (Primary Connection): Closest candidate node with clean line of sight
     const primaryCandidate = candidateNodes[0];
-    addBidirectionalEdge(doorNodeId, primaryCandidate.nodeId, primaryCandidate.dist);
+    addBidirectionalEdge(
+      doorNodeId,
+      primaryCandidate.nodeId,
+      primaryCandidate.dist,
+    );
 
     // Side B (Secondary Connection on Opposite Side of Door Wall):
     // Find candidate node whose direction vector from door forms dot product <= 0 (opposite side)
@@ -221,7 +251,7 @@ export async function generateGraphEdges(
       primaryCandidate.coords[1] - doorCoords[1],
     ];
 
-    let secondaryCandidate: typeof candidateNodes[0] | null = null;
+    let secondaryCandidate: (typeof candidateNodes)[0] | null = null;
     for (let i = 1; i < candidateNodes.length; i++) {
       const cand = candidateNodes[i];
       const vecCand = [
@@ -254,14 +284,20 @@ export async function generateGraphEdges(
     }
 
     if (secondaryCandidate) {
-      addBidirectionalEdge(doorNodeId, secondaryCandidate.nodeId, secondaryCandidate.dist);
+      addBidirectionalEdge(
+        doorNodeId,
+        secondaryCandidate.nodeId,
+        secondaryCandidate.dist,
+      );
     }
   }
 
   // 4. Save all edges in database
   if (edgesToCreate.length > 0) {
     await prisma.edge.createMany({ data: edgesToCreate, skipDuplicates: true });
-    console.log(`🛣️  Persisted ${edgesToCreate.length} directed edges (including bidirectional pairs)`);
+    console.log(
+      `🛣️  Persisted ${edgesToCreate.length} directed edges (including bidirectional pairs)`,
+    );
   } else {
     console.log(`⚠️ No edges were generated to persist.`);
   }

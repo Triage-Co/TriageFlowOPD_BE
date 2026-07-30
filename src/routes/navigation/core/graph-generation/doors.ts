@@ -1,12 +1,22 @@
 import { PrismaClient, NodeType } from '@prisma/client';
-import { readAllGeoms, updateGeom, createNodesBatch, NodeInsertData } from './utils';
+import {
+  readAllGeoms,
+  updateGeom,
+  createNodesBatch,
+  NodeInsertData,
+} from './utils';
 import { randomUUID } from 'crypto';
 
 export async function generateDoorNodes(prisma: PrismaClient, floorId: string) {
   console.log(`🚪 Resolving doors and creating entrance nodes...`);
 
   // 1. Fetch all boundaries on the floor to find those representing doors
-  const boundaryFeatures = await readAllGeoms(prisma, 'boundary', floorId, 'lineGeom');
+  const boundaryFeatures = await readAllGeoms(
+    prisma,
+    'boundary',
+    floorId,
+    'lineGeom',
+  );
   const doorBoundaries = boundaryFeatures.filter(
     (bf) => bf.properties.boundaryType === 'DOOR',
   );
@@ -16,7 +26,7 @@ export async function generateDoorNodes(prisma: PrismaClient, floorId: string) {
   // 2. Resolve missing Door records
   for (const boundaryFeature of doorBoundaries) {
     const properties = boundaryFeature.properties;
-    
+
     if (!properties.doorId) {
       const geo = boundaryFeature.geometry;
       if (geo && geo.type === 'LineString' && geo.coordinates.length >= 2) {
@@ -49,14 +59,23 @@ export async function generateDoorNodes(prisma: PrismaClient, floorId: string) {
           data: { doorId: newDoor.id },
         });
 
-        console.log(`🆕 Created missing Door record for boundary: ${properties.id} (Label: ${properties.label || 'N/A'})`);
+        console.log(
+          `🆕 Created missing Door record for boundary: ${properties.id} (Label: ${properties.label || 'N/A'})`,
+        );
       }
     }
   }
 
   // 3. Load all active Door features from the database (including the newly created ones)
-  const doorFeatures = await readAllGeoms(prisma, 'door', floorId, 'positionGeom');
-  const activeDoorFeatures = doorFeatures.filter((df) => df.properties.active !== false);
+  const doorFeatures = await readAllGeoms(
+    prisma,
+    'door',
+    floorId,
+    'positionGeom',
+  );
+  const activeDoorFeatures = doorFeatures.filter(
+    (df) => df.properties.active !== false,
+  );
 
   const doorNodeCoordsMap = new Map<string, [number, number]>(); // nodeId -> coords
   const nodesToCreate: NodeInsertData[] = [];
@@ -73,7 +92,9 @@ export async function generateDoorNodes(prisma: PrismaClient, floorId: string) {
     const doorId = doorFeature.properties.id;
 
     if (!coords) {
-      console.warn(`⚠️ Door ${doorId} has no coordinate geometry. Skipping node creation for this door.`);
+      console.warn(
+        `⚠️ Door ${doorId} has no coordinate geometry. Skipping node creation for this door.`,
+      );
       continue;
     }
 

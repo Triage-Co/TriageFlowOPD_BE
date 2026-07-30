@@ -59,10 +59,7 @@ export class AreaController {
   @roles(RoleTypeEnum.ADMIN)
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({ summary: 'Cập nhật khu vực (Admin)' })
-  update(
-    @Param('id') id: string,
-    @Body() updateAreaDto: UpdateAreaDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateAreaDto: UpdateAreaDto) {
     return this.areaService.update(id, updateAreaDto);
   }
 

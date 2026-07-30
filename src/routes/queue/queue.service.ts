@@ -1,8 +1,13 @@
-import { BadRequestException, forwardRef, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
-import { StepStatusEnum } from '@prisma/client';
+import { PaymentStatusEnum, StepStatusEnum } from '@prisma/client';
 
 @Injectable()
 export class QueueService {
@@ -107,11 +112,12 @@ export class QueueService {
   }
 
   async generateServiceQueueNumber(serviceOrderId: string) {
-    // Tìm tất cả các Step liên quan tới service_order_id đã thanh toán
     const steps = await this.prisma.step.findMany({
       where: {
         service_order_id: serviceOrderId,
-        payment_status: 'SUCCESSED',
+        service_order: {
+          payment_status: PaymentStatusEnum.SUCCESSED,
+        },
       },
       include: {
         queues: true,
@@ -119,13 +125,10 @@ export class QueueService {
     });
 
     for (const step of steps) {
-      // Nếu Step đã có queue rồi thì bỏ qua
       if (step.queues && step.queues.length > 0) continue;
 
-      // Nếu Step không gắn với phòng nào thì không xếp hàng
       if (!step.room_id) continue;
 
-      // Đếm số lượng queue đã tạo trong ngày hôm nay của phòng đó
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -142,7 +145,6 @@ export class QueueService {
 
       const nextNumber = count + 1;
 
-      // Tạo queue mới cho Step
       await this.prisma.queue.create({
         data: {
           step_id: step.step_id,
@@ -152,4 +154,3 @@ export class QueueService {
     }
   }
 }
-

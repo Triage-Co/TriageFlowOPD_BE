@@ -1,15 +1,28 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
-import { 
-  ApiOperation, 
-  ApiTags, 
-  ApiCreatedResponse, 
-  ApiOkResponse, 
-  ApiBadRequestResponse, 
-  ApiConflictResponse, 
-  ApiNotFoundResponse 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiTags,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { ServiceService } from './service.service';
-import { CreateServiceReqDto, UpdateServiceReqDto, QueryServiceReqDto } from './dto/req-service.dto';
+import {
+  CreateServiceReqDto,
+  UpdateServiceReqDto,
+  QueryServiceReqDto,
+} from './dto/req-service.dto';
 
 @ApiTags('Service')
 @Controller('service')
@@ -20,7 +33,9 @@ export class ServiceController {
   @ApiOperation({ summary: 'Tạo mới một dịch vụ' })
   @ApiCreatedResponse({ description: 'Tạo dịch vụ mới thành công.' })
   @ApiConflictResponse({ description: 'Mã dịch vụ đã tồn tại trong hệ thống.' })
-  @ApiBadRequestResponse({ description: 'Dữ liệu đầu vào không hợp lệ hoặc lỗi hệ thống.' })
+  @ApiBadRequestResponse({
+    description: 'Dữ liệu đầu vào không hợp lệ hoặc lỗi hệ thống.',
+  })
   create(@Body() createServiceReqDto: CreateServiceReqDto) {
     return this.serviceService.create(createServiceReqDto);
   }
@@ -35,7 +50,9 @@ export class ServiceController {
   @Get(':id')
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một dịch vụ' })
   @ApiOkResponse({ description: 'Lấy thông tin dịch vụ thành công.' })
-  @ApiNotFoundResponse({ description: 'Không tìm thấy dịch vụ với ID tương ứng.' })
+  @ApiNotFoundResponse({
+    description: 'Không tìm thấy dịch vụ với ID tương ứng.',
+  })
   findOne(@Param('id') id: string) {
     return this.serviceService.findOne(id);
   }
@@ -45,10 +62,12 @@ export class ServiceController {
   @ApiOkResponse({ description: 'Cập nhật dịch vụ thành công.' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy dịch vụ để cập nhật.' })
   @ApiConflictResponse({ description: 'Mã dịch vụ muốn cập nhật đã tồn tại.' })
-  @ApiBadRequestResponse({ description: 'Dữ liệu đầu vào không hợp lệ hoặc lỗi hệ thống.' })
+  @ApiBadRequestResponse({
+    description: 'Dữ liệu đầu vào không hợp lệ hoặc lỗi hệ thống.',
+  })
   update(
-    @Param('id') id: string, 
-    @Body() updateServiceReqDto: UpdateServiceReqDto
+    @Param('id') id: string,
+    @Body() updateServiceReqDto: UpdateServiceReqDto,
   ) {
     return this.serviceService.update(id, updateServiceReqDto);
   }

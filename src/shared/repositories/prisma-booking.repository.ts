@@ -6,6 +6,13 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class PrismaBookingRepository implements IBookingRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  countBySlotId(slotId: string): Promise<number> {
+    return this.prismaService.slot.count({
+      where: {
+        slot_id: slotId,
+      },
+    });
+  }
   findOne(id: string): Promise<Booking | null> {
     return this.prismaService.booking.findUnique({
       where: {

@@ -15,7 +15,7 @@ export class GeoService {
   private readonly prismaClient: PrismaQueryClient;
 
   constructor(private readonly prisma: PrismaService) {
-    this.prismaClient = this.prisma as unknown as PrismaQueryClient;
+    this.prismaClient = this.prisma;
   }
 
   /**

@@ -27,9 +27,7 @@ import {
 @ApiTags('Service Order')
 @Controller('service-order')
 export class ServiceOrderController {
-  constructor(
-    private readonly serviceOrderService: ServiceOrderService,
-  ) {}
+  constructor(private readonly serviceOrderService: ServiceOrderService) {}
 
   @Post()
   @ApiOperation({
@@ -45,9 +43,7 @@ export class ServiceOrderController {
     @Body()
     createServiceOrderReqDto: CreateServiceOrderReqDto,
   ) {
-    return this.serviceOrderService.create(
-      createServiceOrderReqDto,
-    );
+    return this.serviceOrderService.create(createServiceOrderReqDto);
   }
 
   @Get()
@@ -115,10 +111,7 @@ export class ServiceOrderController {
     @Body()
     updateServiceOrderReqDto: UpdateServiceOrderReqDto,
   ) {
-    return this.serviceOrderService.update(
-      id,
-      updateServiceOrderReqDto,
-    );
+    return this.serviceOrderService.update(id, updateServiceOrderReqDto);
   }
 
   @Delete(':id')

@@ -9,7 +9,12 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 import { GraphGenerationService } from './graph.service';
 import { IsAuthGuard } from '../../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../../shared/guards/is-role.guard';
@@ -30,7 +35,8 @@ export class CreateCorridorNodeDto {
 
 export class LinkConnectorDto {
   @ApiProperty({
-    description: 'Optional [longitude, latitude] coordinates of the connector for matching nearest nodes',
+    description:
+      'Optional [longitude, latitude] coordinates of the connector for matching nearest nodes',
     required: false,
     type: [Number],
   })
@@ -80,7 +86,12 @@ export class GraphController {
   @ApiOperation({ summary: 'Generate door nodes only (Debug)' })
   async generateDoors(@Param('floorId') floorId: string) {
     const data = await this.graphService.generateDoorsPhase(floorId);
-    return { code: 200, message: 'Generated door nodes', status: 'success', data };
+    return {
+      code: 200,
+      message: 'Generated door nodes',
+      status: 'success',
+      data,
+    };
   }
 
   @Post(':floorId/generate/corridors')
@@ -88,7 +99,12 @@ export class GraphController {
   @ApiOperation({ summary: 'Generate corridor nodes only (Debug)' })
   async generateCorridors(@Param('floorId') floorId: string) {
     const data = await this.graphService.generateCorridorsPhase(floorId);
-    return { code: 200, message: 'Generated corridor nodes', status: 'success', data };
+    return {
+      code: 200,
+      message: 'Generated corridor nodes',
+      status: 'success',
+      data,
+    };
   }
 
   @Post(':floorId/generate/edges')
@@ -100,10 +116,17 @@ export class GraphController {
   }
 
   @Get(':floorId/debug-steps')
-  @ApiOperation({ summary: 'Get MPRSS algorithm debug steps geometry layers (Debug)' })
+  @ApiOperation({
+    summary: 'Get MPRSS algorithm debug steps geometry layers (Debug)',
+  })
   async getDebugSteps(@Param('floorId') floorId: string) {
     const data = await this.graphService.getCorridorDebugSteps(floorId);
-    return { code: 200, message: 'Retrieved debug steps successfully', status: 'success', data };
+    return {
+      code: 200,
+      message: 'Retrieved debug steps successfully',
+      status: 'success',
+      data,
+    };
   }
 
   @Post(':floorId/generate')
@@ -111,7 +134,9 @@ export class GraphController {
   @ApiBearerAuth()
   @roles(RoleTypeEnum.ADMIN)
   @UseGuards(IsAuthGuard, IsRoleGuard)
-  @ApiOperation({ summary: 'Auto-generate navigation graph for a floor (Admin)' })
+  @ApiOperation({
+    summary: 'Auto-generate navigation graph for a floor (Admin)',
+  })
   async generate(@Param('floorId') floorId: string) {
     const data = await this.graphService.generateGraph(floorId);
     return {
@@ -125,7 +150,9 @@ export class GraphController {
   @Get(':floorId')
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard)
-  @ApiOperation({ summary: 'Get navigation graph (nodes and edges) for a floor' })
+  @ApiOperation({
+    summary: 'Get navigation graph (nodes and edges) for a floor',
+  })
   async findOne(@Param('floorId') floorId: string) {
     const data = await this.graphService.getGraph(floorId);
     return {
@@ -141,12 +168,17 @@ export class GraphController {
   @ApiBearerAuth()
   @roles(RoleTypeEnum.ADMIN)
   @UseGuards(IsAuthGuard, IsRoleGuard)
-  @ApiOperation({ summary: 'Link inter-floor connector nodes across served floors (Admin)' })
+  @ApiOperation({
+    summary: 'Link inter-floor connector nodes across served floors (Admin)',
+  })
   async link(
     @Param('connectorId') connectorId: string,
     @Body() body: LinkConnectorDto,
   ) {
-    const data = await this.graphService.linkConnector(connectorId, body.coords);
+    const data = await this.graphService.linkConnector(
+      connectorId,
+      body.coords,
+    );
     return {
       code: 200,
       message: 'Linked connector successfully',

@@ -12,7 +12,7 @@ export class FloorService {
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+  ) {}
 
   async create(createFloorDto: CreateFloorDto) {
     try {

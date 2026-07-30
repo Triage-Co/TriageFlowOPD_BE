@@ -8,4 +8,4 @@ import { TransactionModule } from '../transaction/transaction.module';
   controllers: [BookingController],
   providers: [BookingService],
 })
-export class BookingModule { }
+export class BookingModule {}

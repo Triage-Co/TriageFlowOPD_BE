@@ -103,10 +103,8 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
         status: 'PENDING',
         OR: [
           {
-            bookings: {
-              some: {
-                patient_id: patientId,
-              },
+            booking: {
+              patient_id: patientId,
             },
           },
           {

@@ -131,7 +131,6 @@ export class PatientService {
     };
   }
 
-  
   async findByCitizenId(citizenId: string) {
     const data = await this.patientRepository.findByCitizenId(citizenId);
     if (!data) {

@@ -5,7 +5,7 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaAccountRepository implements IAccountRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
   findByPhone(phone: string): Promise<any> {
     return this.prismaService.account.findUnique({
       where: {

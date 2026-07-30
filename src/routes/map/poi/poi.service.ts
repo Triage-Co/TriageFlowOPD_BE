@@ -11,7 +11,7 @@ export class PoiService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+  ) {}
 
   async create(createPoiDto: CreatePoiDto) {
     try {

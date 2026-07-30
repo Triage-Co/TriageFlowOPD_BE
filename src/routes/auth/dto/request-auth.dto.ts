@@ -79,7 +79,6 @@ export class SignInWithCitizenIdRequestDto {
     message: 'Vui lòng nhập CMND/CCCD hợp lệ.',
   })
   citizen_id: string;
-
 }
 
 export class SignInWithOtpRequestDto {

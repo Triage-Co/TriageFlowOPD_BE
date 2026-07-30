@@ -4,10 +4,9 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PrismaService } from '../../../shared/config/prisma.service';
 import { Prisma } from '@prisma/client';
 
-
 @Injectable()
 export class CategoryService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createCategoryDto: CreateCategoryDto) {
     try {
