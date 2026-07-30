@@ -12,17 +12,24 @@ export class InvoiceService {
           invoice_details: true,
           service_order: {
             include: {
-              bookings: {
-                include: { patient: true }
-              }
-            }
+              booking: true,
+            },
           },
         },
-        orderBy: { created_at: 'desc' }
+        orderBy: { created_at: 'desc' },
       });
-      return { code: 200, status: 'success', message: 'Lấy danh sách hóa đơn thành công', data };
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Lấy danh sách hóa đơn thành công',
+        data,
+      };
     } catch (error) {
-      return { code: 500, status: 'error', message: 'Lỗi khi lấy danh sách hóa đơn' };
+      return {
+        code: 500,
+        status: 'error',
+        message: 'Lỗi khi lấy danh sách hóa đơn',
+      };
     }
   }
 
@@ -34,18 +41,27 @@ export class InvoiceService {
           invoice_details: true,
           service_order: {
             include: {
-              bookings: {
-                include: { patient: true }
-              }
-            }
+              booking: {
+                include: { patient: true },
+              },
+            },
           },
         },
       });
       if (!data) throw new NotFoundException('Không tìm thấy hóa đơn');
-      return { code: 200, status: 'success', message: 'Lấy chi tiết hóa đơn thành công', data };
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Lấy chi tiết hóa đơn thành công',
+        data,
+      };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      return { code: 500, status: 'error', message: 'Lỗi khi lấy chi tiết hóa đơn' };
+      return {
+        code: 500,
+        status: 'error',
+        message: 'Lỗi khi lấy chi tiết hóa đơn',
+      };
     }
   }
 
@@ -54,7 +70,11 @@ export class InvoiceService {
       await this.prisma.invoice.delete({
         where: { invoice_id: id },
       });
-      return { code: 200, status: 'success', message: 'Xóa hóa đơn thành công' };
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Xóa hóa đơn thành công',
+      };
     } catch (error) {
       return { code: 500, status: 'error', message: 'Lỗi khi xóa hóa đơn' };
     }

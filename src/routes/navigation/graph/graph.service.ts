@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../../shared/config/prisma.service';
@@ -16,7 +21,7 @@ export class GraphGenerationService {
     private readonly prisma: PrismaService,
     private readonly geoService: GeoService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+  ) {}
 
   private async createNode(
     floorId: string,
@@ -97,12 +102,19 @@ export class GraphGenerationService {
       });
     }
 
-    return { nodeId: node.id, connectedTo: nearestNodeId, distance: minDistance };
+    return {
+      nodeId: node.id,
+      connectedTo: nearestNodeId,
+      distance: minDistance,
+    };
   }
 
   async clearAllNodes(floorId: string) {
-    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
-    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor)
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
     await this.prisma.$executeRaw`SET statement_timeout = 120000`;
     await this.prisma.$executeRaw`DELETE FROM "node" WHERE "floorId" = ${floorId}::uuid`;
@@ -111,44 +123,75 @@ export class GraphGenerationService {
   }
 
   async generateDoorsPhase(floorId: string) {
-    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
-    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor)
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
     await this.clearAllNodes(floorId);
 
     // Explicitly cast this.prisma to any to bypass strict type checking when passing to external script
-    const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma as any, floorId);
+    const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma, floorId);
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
     return { doorsGenerated: doorNodeCoordsMap.size };
   }
 
   async generateCorridorsPhase(floorId: string) {
-    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
-    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor)
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
     await this.clearAllNodes(floorId);
-    await generateDoorNodes(this.prisma as any, floorId);
+    await generateDoorNodes(this.prisma, floorId);
 
-    const floorOutlineGeoJSON = await readGeom(this.prisma as any, 'floor', floorId, 'outlineGeom');
-    if (!floorOutlineGeoJSON) throw new BadRequestException('Floor has no outline geometry defined');
+    const floorOutlineGeoJSON = await readGeom(
+      this.prisma,
+      'floor',
+      floorId,
+      'outlineGeom',
+    );
+    if (!floorOutlineGeoJSON)
+      throw new BadRequestException('Floor has no outline geometry defined');
 
-    const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
+    const corridorData = await generateCorridorNodes(
+      this.prisma,
+      floorId,
+      floorOutlineGeoJSON,
+    );
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
     return { corridorsGenerated: corridorData.nodeMap.size };
   }
 
   async getCorridorDebugSteps(floorId: string) {
-    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
-    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor)
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
-    const floorOutlineGeoJSON = await readGeom(this.prisma as any, 'floor', floorId, 'outlineGeom');
-    if (!floorOutlineGeoJSON) throw new BadRequestException('Floor has no outline geometry defined');
+    const floorOutlineGeoJSON = await readGeom(
+      this.prisma,
+      'floor',
+      floorId,
+      'outlineGeom',
+    );
+    if (!floorOutlineGeoJSON)
+      throw new BadRequestException('Floor has no outline geometry defined');
 
-    const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
+    const corridorData = await generateCorridorNodes(
+      this.prisma,
+      floorId,
+      floorOutlineGeoJSON,
+    );
 
-    const pbPoints = (corridorData.uniquePoints || []).map((feat: any) => feat.geometry.coordinates);
+    const pbPoints = (corridorData.uniquePoints || []).map(
+      (feat: any) => feat.geometry.coordinates,
+    );
     const tinEdges = corridorData.tinEdges || [];
     const zigzagEdges = corridorData.candidateEdges || [];
     const pmidPoints = corridorData.finalNodeCoords || [];
@@ -176,19 +219,38 @@ export class GraphGenerationService {
   async generateGraph(floorId: string) {
     const startTime = Date.now();
 
-    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
-    if (!floor) throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor)
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
 
     // Clear existing nodes/edges so regenerate is idempotent
     await this.clearAllNodes(floorId);
 
-    const floorOutlineGeoJSON = await readGeom(this.prisma as any, 'floor', floorId, 'outlineGeom');
+    const floorOutlineGeoJSON = await readGeom(
+      this.prisma as any,
+      'floor',
+      floorId,
+      'outlineGeom',
+    );
     const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma as any, floorId);
-    const corridorData = await generateCorridorNodes(this.prisma as any, floorId, floorOutlineGeoJSON);
-    await generateGraphEdges(this.prisma as any, floorId, doorNodeCoordsMap, corridorData);
+    const corridorData = await generateCorridorNodes(
+      this.prisma as any,
+      floorId,
+      floorOutlineGeoJSON,
+    );
+    await generateGraphEdges(
+      this.prisma as any,
+      floorId,
+      doorNodeCoordsMap,
+      corridorData,
+    );
 
     const totalNodes = await this.prisma.node.count({ where: { floorId } });
-    const totalEdges = await this.prisma.edge.count({ where: { fromNode: { floorId } } });
+    const totalEdges = await this.prisma.edge.count({
+      where: { fromNode: { floorId } },
+    });
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
 
@@ -238,7 +300,9 @@ export class GraphGenerationService {
 
     const servedFloors = connector.servedFloors;
     if (servedFloors.length < 2) {
-      throw new BadRequestException('Connector must serve at least 2 floors to link');
+      throw new BadRequestException(
+        'Connector must serve at least 2 floors to link',
+      );
     }
 
     // Fetch the served floors records
@@ -262,7 +326,11 @@ export class GraphGenerationService {
       targetType = NodeType.ELEVATOR;
     }
 
-    const floorNodes: { floorNumber: number; node: any; coords: [number, number] }[] = [];
+    const floorNodes: {
+      floorNumber: number;
+      node: any;
+      coords: [number, number];
+    }[] = [];
 
     for (const floor of floors) {
       // Read all nodes of type on this floor
@@ -325,7 +393,8 @@ export class GraphGenerationService {
       const nodeB = floorNodes[i + 1];
 
       // Standard distance between floors (4m height difference per floor)
-      const heightDifference = Math.abs(nodeA.floorNumber - nodeB.floorNumber) * 4.0;
+      const heightDifference =
+        Math.abs(nodeA.floorNumber - nodeB.floorNumber) * 4.0;
 
       // Penalties: Stairs = +30m, Elevator = +60m
       let penalty = 0;

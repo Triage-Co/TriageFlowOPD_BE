@@ -57,8 +57,6 @@ export class UpdatePatientReqDto extends PartialType(
   OmitType(CreatePatientReqDto, ['citizen_id', 'medical_coverage_id']),
 ) {}
 
-
-
 export class CreatePatientByStaffReqDto extends CreatePatientReqDto {
   @IsString()
   @ApiProperty({
@@ -69,7 +67,9 @@ export class CreatePatientByStaffReqDto extends CreatePatientReqDto {
   account_id: string;
 }
 
-export class UpdatePatientByStaffReqDto extends PartialType(CreatePatientReqDto) {
+export class UpdatePatientByStaffReqDto extends PartialType(
+  CreatePatientReqDto,
+) {
   @IsString()
   @IsOptional()
   @ApiProperty({

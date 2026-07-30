@@ -19,7 +19,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 @Controller('doctor')
 export class DoctorController {
-  constructor(private readonly doctorService: DoctorService) { }
+  constructor(private readonly doctorService: DoctorService) {}
 
   @Get('patients')
   @ApiBearerAuth()

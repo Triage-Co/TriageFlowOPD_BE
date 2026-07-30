@@ -1,10 +1,28 @@
 import { Injectable } from '@nestjs/common';
 import { IRoomRepository } from '../interfaces/i-room.repository';
 import { PrismaService } from '../config/prisma.service';
+import { ClinicalRoomType, Room } from '@prisma/client';
 
 @Injectable()
 export class PrismaRoomRepository implements IRoomRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  countByType(type: ClinicalRoomType): Promise<number> {
+    return this.prismaService.room.count({
+      where: {
+        room_type: type,
+      },
+    });
+  }
+  countAll(): Promise<number> {
+    return this.prismaService.room.count();
+  }
+  findByType(type: ClinicalRoomType): Promise<Room[]> {
+    return this.prismaService.room.findMany({
+      where: {
+        room_type: type,
+      },
+    });
+  }
   createMany(data: any): Promise<any> {
     return this.prismaService.room.createMany({
       data: {

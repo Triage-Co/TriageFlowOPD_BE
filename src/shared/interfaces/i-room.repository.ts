@@ -1,3 +1,5 @@
+import { ClinicalRoomType, Room } from '@prisma/client';
+
 export interface IRoomRepository {
   create(data: any): Promise<any>;
   update(id: string, data: any): Promise<any>;
@@ -5,4 +7,7 @@ export interface IRoomRepository {
   findById(id: string): Promise<any>;
   delete(id: string): Promise<any>;
   createMany(data: any): Promise<any>;
+  findByType(type: ClinicalRoomType): Promise<Room[]>;
+  countByType(type: ClinicalRoomType): Promise<number>;
+  countAll(): Promise<number>;
 }

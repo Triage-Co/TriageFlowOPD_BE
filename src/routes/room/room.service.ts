@@ -6,7 +6,6 @@ import {
 import type { IRoomRepository } from '../../shared/interfaces/i-room.repository';
 import { RoomErrors } from '../../shared/exceptions/room.exceptions';
 
-
 @Injectable()
 export class RoomService {
   constructor(

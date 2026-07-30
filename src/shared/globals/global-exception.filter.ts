@@ -60,10 +60,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         }
         case 'P2007': {
           status = HttpStatus.BAD_REQUEST;
-          let rawMessage = (exception.meta as any)?.driverAdapterError.cause
-            .message as String;
+          const rawMessage = (exception.meta as any)?.driverAdapterError.cause
+            .message as string;
 
-          let match = rawMessage.match(/"([^"]+)"/);
+          const match = rawMessage.match(/"([^"]+)"/);
 
           message = 'Lỗi xác thực dữ liệu ở database';
           detail = match

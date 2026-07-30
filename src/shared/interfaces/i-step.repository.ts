@@ -1,5 +1,21 @@
 import { Prisma, Step } from '@prisma/client';
 
+export type StepWithBookingAndSlot = Prisma.StepGetPayload<{
+  include: {
+    queues: true;
+    room: true;
+    service_order: {
+      include: {
+        booking: {
+          include: {
+            slot: true;
+          };
+        };
+      };
+    };
+  };
+}>;
+
 export interface IStepRepository {
   createParentStep(
     data: Prisma.StepUncheckedCreateWithoutParent_stepInput,
@@ -23,4 +39,5 @@ export interface IStepRepository {
     patientId: string,
   ): Promise<Step | null>;
   findPendingPaymentStepsByPatientId(patientId: string): Promise<Step[]>;
+  getById(id: string): Promise<StepWithBookingAndSlot | null>;
 }

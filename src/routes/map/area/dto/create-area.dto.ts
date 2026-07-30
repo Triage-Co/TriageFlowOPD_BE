@@ -50,7 +50,8 @@ export class CreateAreaDto {
   @IsOptional()
   @ApiProperty({
     name: 'outlineGeom',
-    example: 'POLYGON((106.1 10.1, 106.2 10.1, 106.2 10.2, 106.1 10.2, 106.1 10.1))',
+    example:
+      'POLYGON((106.1 10.1, 106.2 10.1, 106.2 10.2, 106.1 10.2, 106.1 10.1))',
     description: 'Hình dạng bao quanh khu vực (WKT Polygon)',
     required: false,
   })

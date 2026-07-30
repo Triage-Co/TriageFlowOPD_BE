@@ -8,4 +8,5 @@ export interface IBookingRepository {
 
   findOne(id: string): Promise<Booking | null>;
   findMany(): Promise<Booking[]>;
+  countBySlotId(slotId: string): Promise<number>;
 }

@@ -69,7 +69,7 @@ export class PatientController {
     summary: '[USER] xóa bệnh nhân theo patient id',
   })
   removeMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
-     const id = req.user.id || req.user.sub;
+    const id = req.user.id || req.user.sub;
     return this.patientService.remove(id, patient_id);
   }
 
@@ -80,7 +80,7 @@ export class PatientController {
     summary: '[USER] lấy bệnh nhân theo patient id',
   })
   findMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
-     const id = req.user.id || req.user.sub;
+    const id = req.user.id || req.user.sub;
     return this.patientService.getMyPatient(patient_id, id);
   }
 

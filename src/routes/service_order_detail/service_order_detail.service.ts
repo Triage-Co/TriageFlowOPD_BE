@@ -19,7 +19,7 @@ export class ServiceOrderDetailService {
 
   async create(dto: CreateServiceOrderDetailReqDto) {
     try {
-      const data = await this.serviceOrderDetailRepository.create(dto as any);
+      const data = await this.serviceOrderDetailRepository.create(dto);
 
       return {
         code: 201,
@@ -84,10 +84,7 @@ export class ServiceOrderDetailService {
       throw ServiceOrderDetailErrors.ServiceOrderDetailNotFoundById(id);
     }
     try {
-      const data = await this.serviceOrderDetailRepository.update(
-        id,
-        dto as any,
-      );
+      const data = await this.serviceOrderDetailRepository.update(id, dto);
 
       return {
         code: 200,

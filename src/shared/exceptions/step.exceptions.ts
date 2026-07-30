@@ -39,7 +39,7 @@ export const StepErrors = {
     throw new StepException(
       HttpStatus.NOT_FOUND,
       'Không tìm thấy dữ liệu',
-      `Không tìm thấy bước với id: ${step_id} nào trong hệ thống.`,
+      `Không tìm thấy step với id: ${step_id} nào trong hệ thống.`,
     );
   },
   ProviderError: (action: string, detail: string) =>

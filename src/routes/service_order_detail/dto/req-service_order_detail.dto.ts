@@ -1,11 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import {
-  IsInt,
-  IsOptional,
-  IsUUID,
-  Min,
-} from 'class-validator';
+import { IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreateServiceOrderDetailReqDto {
   @IsUUID()
@@ -16,7 +11,6 @@ export class CreateServiceOrderDetailReqDto {
   })
   service_order_id: string;
 
-
   @IsUUID()
   @ApiProperty({
     name: 'service_id',
@@ -24,7 +18,6 @@ export class CreateServiceOrderDetailReqDto {
     description: 'ID của Service',
   })
   service_id: string;
-
 
   @IsOptional()
   @IsInt()
@@ -35,7 +28,6 @@ export class CreateServiceOrderDetailReqDto {
     description: 'Số lượng dịch vụ',
   })
   quantity?: number;
-
 
   @IsOptional()
   @IsInt()
@@ -48,11 +40,9 @@ export class CreateServiceOrderDetailReqDto {
   price_at_order?: number;
 }
 
-
 export class UpdateServiceOrderDetailReqDto extends PartialType(
   CreateServiceOrderDetailReqDto,
 ) {}
-
 
 export class QueryServiceOrderDetailReqDto {
   @ApiPropertyOptional({
@@ -65,7 +55,6 @@ export class QueryServiceOrderDetailReqDto {
   @Type(() => Number)
   @Min(1)
   page?: number = 1;
-
 
   @ApiPropertyOptional({
     name: 'limit',

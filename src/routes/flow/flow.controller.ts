@@ -17,6 +17,10 @@ import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
 import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
+import {
+  AssignTemplateRequestDto,
+  TemplateStepDto,
+} from '../template/dto/create-template.dto';
 
 @Controller('flow')
 export class FlowController {
@@ -105,21 +109,10 @@ export class FlowController {
   @ApiOperation({
     summary: '[DOCTOR - ADMIN] thêm template vào flow',
   })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        template_id: {
-          title: 'template_id',
-          example: '4ce502df-6f77-4eac-8e6f-7c1bdad92bcc',
-        },
-      },
-    },
-  })
   async doctorAssignTemplate(
     @Param('flow_id') flowId: string,
-    @Body('template_id') templateId: string,
+    @Body() template: AssignTemplateRequestDto,
   ) {
-    return await this.flowService.addTemplateToFlow(flowId, templateId);
+    return await this.flowService.addTemplateToFlow(flowId, template.templates);
   }
 }
