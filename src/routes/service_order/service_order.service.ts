@@ -115,7 +115,7 @@ export class ServiceOrderService {
 
       let room: any = null;
       let stepStaffId: string | undefined | null = null;
-      
+
       if (assigned_room_id) {
         room = await this.roomRepository.findById(assigned_room_id);
         if (!room) {
@@ -409,7 +409,7 @@ export class ServiceOrderService {
             }
             await this.invoiceRepository.delete(invoice.invoice_id);
           }
-          
+
           await this.stepRepository.delete(paymentStep.step_id);
         }
       }
