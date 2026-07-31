@@ -114,7 +114,23 @@ export class TransactionService {
         });
 
         for (const step of paymentSteps) {
+          if (step.step_status === 'PENDING') {
+            await this.STEP.update({
+              where: { step_id: step.step_id },
+              data: { step_status: 'IN_PROGRESS' },
+            });
+          }
           await this.stepService.completeStep(step.step_id);
+
+          if (step.flow_id) {
+            await this.prismaService.flow.updateMany({
+              where: {
+                flow_id: step.flow_id,
+                status: 'PENDING',
+              },
+              data: { status: 'IN_PROGRESS' },
+            });
+          }
         }
 
         await this.prismaService.invoice.updateMany({
