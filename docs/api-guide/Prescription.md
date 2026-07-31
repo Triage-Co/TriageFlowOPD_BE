@@ -117,6 +117,7 @@ Tài liệu này cung cấp chi tiết quy trình nghiệp vụ, sơ đồ chuy�
   ]
 }
 ```
+> **Lưu ý hỗ trợ FE Test độc lập**: Trường `visit_session_id` là **tùy chọn (Optional)**. FE có thể bỏ qua trường này khi test nhanh quy trình kê đơn & thanh toán mà không cần khởi tạo luồng đặt khám/phiên khám trước.
 - **Response (201 Created)**:
 ```json
 {

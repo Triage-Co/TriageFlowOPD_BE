@@ -25,23 +25,29 @@ export class PrescriptionService {
   async create(createPrescriptionDto: CreatePrescriptionDto, defaultStaffId?: string) {
     const { visit_session_id, service_order_id, prescribed_by, diagnosis_note, details } = createPrescriptionDto;
 
-    // 1. Kiểm tra xem phiên khám có tồn tại không
-    const visitSession = await this.prismaService.visit_Session.findUnique({
-      where: { visit_session_id },
-      include: { patient: true },
-    });
+    let bookingId: string | undefined = undefined;
 
-    if (!visitSession) {
-      throw new NotFoundException(`Không tìm thấy phiên khám bệnh với ID: ${visit_session_id}`);
-    }
+    if (visit_session_id) {
+      // 1. Kiểm tra xem phiên khám có tồn tại không
+      const visitSession = await this.prismaService.visit_Session.findUnique({
+        where: { visit_session_id },
+        include: { patient: true },
+      });
 
-    // 2. Kiểm tra xem phiên khám đã có đơn thuốc chưa
-    const existingPrescription = await this.prismaService.prescription.findUnique({
-      where: { visit_session_id },
-    });
+      if (!visitSession) {
+        throw new NotFoundException(`Không tìm thấy phiên khám bệnh với ID: ${visit_session_id}`);
+      }
 
-    if (existingPrescription) {
-      throw new ConflictException(`Phiên khám '${visit_session_id}' đã có đơn thuốc được kê.`);
+      // 2. Kiểm tra xem phiên khám đã có đơn thuốc chưa
+      const existingPrescription = await this.prismaService.prescription.findUnique({
+        where: { visit_session_id },
+      });
+
+      if (existingPrescription) {
+        throw new ConflictException(`Phiên khám '${visit_session_id}' đã có đơn thuốc được kê.`);
+      }
+
+      bookingId = visitSession.booking_id ?? undefined;
     }
 
     if (!details || details.length === 0) {
@@ -96,7 +102,7 @@ export class PrescriptionService {
       if (!targetServiceOrderId) {
         const newServiceOrder = await tx.service_Order.create({
           data: {
-            booking_id: visitSession.booking_id,
+            booking_id: bookingId,
             name: `Đơn thuốc - ${prescriptionCode}`,
             assign_by_staff_id: staffId,
             status: ServiceOrderStatusEnum.PENDING,
@@ -109,7 +115,7 @@ export class PrescriptionService {
 
       const qrCodePayload = JSON.stringify({
         code: prescriptionCode,
-        visit_session_id,
+        visit_session_id: visit_session_id || null,
         service_order_id: targetServiceOrderId,
         total_amount: totalAmount,
       });
@@ -119,7 +125,7 @@ export class PrescriptionService {
           prescription_code: prescriptionCode,
           qr_code: qrCodePayload,
           service_order_id: targetServiceOrderId,
-          visit_session_id,
+          visit_session_id: visit_session_id || null,
           prescribed_by: staffId,
           diagnosis_note,
           total_amount: totalAmount,

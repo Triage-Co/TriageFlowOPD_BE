@@ -25,10 +25,10 @@ export class PrescriptionDetailItemDto {
 }
 
 export class CreatePrescriptionDto {
-  @ApiProperty({ description: 'ID của phiên khám bệnh (Visit_Session)', example: 'd0b81048-2615-4674-8d96-5cb39a1b6357' })
+  @ApiPropertyOptional({ description: 'ID của phiên khám bệnh (Visit_Session). Có thể để trống nếu FE test đơn thuốc độc lập', example: 'd0b81048-2615-4674-8d96-5cb39a1b6357' })
   @IsUUID()
-  @IsNotEmpty()
-  visit_session_id: string;
+  @IsOptional()
+  visit_session_id?: string;
 
   @ApiPropertyOptional({ description: 'ID của chỉ định dịch vụ (Service_Order), nếu chưa truyền hệ thống sẽ tự động khởi tạo' })
   @IsUUID()
