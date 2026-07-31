@@ -13,4 +13,11 @@ export interface IInvoiceRepository {
   ): Promise<Invoice>;
 
   findOne(id: string): Promise<Invoice | null>;
+
+  findByServiceOrderId(serviceOrderId: string): Promise<Invoice | null>;
+
+  delete(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Invoice>;
 }

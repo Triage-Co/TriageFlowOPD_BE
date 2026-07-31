@@ -48,6 +48,14 @@ export class CreateServiceOrderReqDto {
   })
   specialty_id: string;
 
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({
+    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
+    description: 'Phòng chỉ định (nếu có)',
+  })
+  room_id?: string;
+
   @IsBoolean()
   @ApiProperty({
     description: 'Dịch vụ có cần thanh toán hay không',

@@ -10,4 +10,15 @@ export interface IInvoiceDetailRepository {
     data: Prisma.Invoice_DetailUncheckedCreateInput[],
     tx?: Prisma.TransactionClient,
   ): Promise<Prisma.BatchPayload>;
+
+  update(
+    id: string,
+    data: Prisma.Invoice_DetailUncheckedUpdateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Invoice_Detail>;
+
+  delete(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Invoice_Detail>;
 }

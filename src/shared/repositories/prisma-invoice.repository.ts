@@ -37,4 +37,23 @@ export class PrismaInvoiceRepository implements IInvoiceRepository {
       },
     });
   }
+
+  findByServiceOrderId(serviceOrderId: string): Promise<Invoice | null> {
+    return this.prismaService.invoice.findFirst({
+      where: { service_order_id: serviceOrderId },
+      include: {
+        invoice_details: true,
+      },
+    });
+  }
+
+  delete(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Invoice> {
+    const db = tx || this.prismaService;
+    return db.invoice.delete({
+      where: { invoice_id: id },
+    });
+  }
 }
