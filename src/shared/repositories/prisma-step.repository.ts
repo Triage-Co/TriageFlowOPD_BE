@@ -213,6 +213,24 @@ export class PrismaStepRepository implements IStepRepository {
     });
   }
 
+  updateDependency(
+    waitingStepId: string,
+    oldRequiredStepId: string,
+    newRequiredStepId: string,
+  ): Promise<any> {
+    return this.prismaService.step_Dependency.update({
+      where: {
+        step_id_depends_on_step_id: {
+          step_id: waitingStepId,
+          depends_on_step_id: oldRequiredStepId,
+        },
+      },
+      data: {
+        depends_on_step_id: newRequiredStepId,
+      },
+    });
+  }
+
   createParentStep(
     data: Prisma.StepUncheckedCreateWithoutParent_stepInput,
     tx?: Prisma.TransactionClient,

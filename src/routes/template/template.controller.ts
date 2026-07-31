@@ -36,7 +36,7 @@ export class TemplateController {
   @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary: '[ADMIN - STAFF] Tìm template theo id',
+    summary: '[ADMIN - STAFF] Tìm tất cả template',
   })
   findAll() {
     return this.templateService.findAll();
