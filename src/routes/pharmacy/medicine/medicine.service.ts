@@ -1,8 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../shared/config/prisma.service';
+import { PrismaService } from '../../../shared/config/prisma.service';
 import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
-import { seedMedicines, seedPrescriptions } from '../../../prisma/medicine.seed';
+import { seedMedicines, seedPrescriptions } from '../../../../prisma/medicine.seed';
 
 @Injectable()
 export class MedicineService {

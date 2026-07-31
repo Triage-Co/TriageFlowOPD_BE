@@ -1,6 +1,6 @@
-# Hướng Dẫn Sử Dụng API Module Prescription & Medicine
+# Hướng Dẫn Sử Dụng API Module Pharmacy (Prescription & Medicine)
 
-Tài liệu này cung cấp chi tiết quy trình nghiệp vụ, sơ đồ chuyển trạng thái và tài liệu tham khảo API cho 2 module **Prescription** (Đơn thuốc) và **Medicine** (Danh mục thuốc) thuộc hệ thống **TriageFlowOPD_BE**.
+Tài liệu này cung cấp chi tiết quy trình nghiệp vụ, sơ đồ chuyển trạng thái và tài liệu tham khảo API cho module **Pharmacy** gồm **Prescription** (Đơn thuốc) và **Medicine** (Danh mục thuốc) thuộc hệ thống **TriageFlowOPD_BE**.
 
 ---
 
@@ -98,10 +98,10 @@ Tài liệu này cung cấp chi tiết quy trình nghiệp vụ, sơ đồ chuy�
 
 ### B. Quản Lý Đơn Thuốc (`/prescription`)
 
-#### 1. Kê đơn thuốc cho phiên khám (Bác sĩ)
+#### 1. Kê đơn thuốc cho phiên khám (Bác sĩ / Dược sĩ)
 - **Method**: `POST`
 - **Path**: `/prescription`
-- **Roles**: `DOCTOR`, `ADMIN`
+- **Roles**: `DOCTOR`, `PHARMACIST`, `ADMIN`
 - **Request Body**:
 ```json
 {

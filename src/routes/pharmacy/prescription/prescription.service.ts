@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../shared/config/prisma.service';
+import { PrismaService } from '../../../shared/config/prisma.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { PaymentStatusEnum, PrescriptionStatusEnum, ServiceOrderStatusEnum, TransStatusEnum, TransTypeEnum } from '@prisma/client';

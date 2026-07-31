@@ -13,9 +13,9 @@ import { MedicineService } from './medicine.service';
 import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { IsRoleGuard } from '../../shared/guards/is-role.guard';
-import { roles } from '../../shared/decorator/role.decorator';
+import { IsAuthGuard } from '../../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../../shared/guards/is-role.guard';
+import { roles } from '../../../shared/decorator/role.decorator';
 
 @ApiTags('Medicine')
 @Controller('medicine')

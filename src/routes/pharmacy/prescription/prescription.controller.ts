@@ -15,9 +15,9 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { UpdatePrescriptionStatusDto } from './dto/update-prescription-status.dto';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { IsRoleGuard } from '../../shared/guards/is-role.guard';
-import { roles } from '../../shared/decorator/role.decorator';
+import { IsAuthGuard } from '../../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../../shared/guards/is-role.guard';
+import { roles } from '../../../shared/decorator/role.decorator';
 import { PrescriptionStatusEnum } from '@prisma/client';
 
 @ApiTags('Prescription')
@@ -26,12 +26,12 @@ export class PrescriptionController {
   constructor(private readonly prescriptionService: PrescriptionService) {}
 
   @Post()
-  @roles('DOCTOR', 'ADMIN')
+  @roles('DOCTOR', 'PHARMACIST', 'ADMIN')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '[DOCTOR - ADMIN] Tạo đơn thuốc mới cho phiên khám',
-    description: 'Endpoint dành cho Bác sĩ khởi tạo đơn thuốc gắn liền với 1 phiên khám (Visit_Session). Tự động khởi tạo Service_Order tương ứng và sinh mã QR đơn thuốc.',
+    summary: '[DOCTOR - PHARMACIST - ADMIN] Tạo đơn thuốc mới cho phiên khám',
+    description: 'Endpoint dành cho Bác sĩ / Dược sĩ khởi tạo đơn thuốc gắn liền với 1 phiên khám (Visit_Session). Tự động khởi tạo Service_Order tương ứng và sinh mã QR đơn thuốc.',
   })
   @ApiResponse({
     status: 201,

@@ -1,5 +1,7 @@
 # Hướng Dẫn Sử Dụng API Module Medicine (Quản Lý Danh Mục Thuốc)
 
+Lệnh chạy CLI độc lập: `npx ts-node prisma/medicine.seed.ts`
+
 Tài liệu này hướng dẫn chi tiết các API quản lý thuốc, seed dữ liệu mẫu và lấy thông tin phục vụ bộ lọc FE.
 
 ---
