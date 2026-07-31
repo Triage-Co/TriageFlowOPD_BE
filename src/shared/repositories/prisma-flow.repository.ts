@@ -5,6 +5,15 @@ import { Flow, Prisma } from '@prisma/client';
 import { formatInTimeZone } from 'date-fns-tz';
 
 const findQuery = {
+  booking: {
+    include: {
+      slot: {
+        include: {
+          shift: true,
+        },
+      },
+    },
+  },
   steps: {
     include: {
       dependedBy: true, //bước yêu cầu hoàn thành (sub step)
@@ -26,7 +35,7 @@ const findQuery = {
 
 @Injectable()
 export class PrismaFlowRepository implements IFlowRepository {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prismaService: PrismaService) { }
   create(
     data: Prisma.FlowUncheckedCreateInput,
     tx?: Prisma.TransactionClient,
@@ -97,22 +106,22 @@ export class PrismaFlowRepository implements IFlowRepository {
         service_order_id: step.service_order_id,
         room_info: step.room
           ? {
-              room_name: step.room.room_name,
-              room_id: step.room.room_id,
-            }
+            room_name: step.room.room_name,
+            room_id: step.room.room_id,
+          }
           : null,
         specialty_info:
           step.room && step.room.specialty
             ? {
-                specialty_name: step.room?.specialty.specialty_name,
-                specialty_id: step.room?.specialty.specialty_id,
-              }
+              specialty_name: step.room?.specialty.specialty_name,
+              specialty_id: step.room?.specialty.specialty_id,
+            }
             : null,
         staff_info: step.staff
           ? {
-              staff_id: step.staff.staff_id,
-              full_name: step.staff.full_name || 'N/A',
-            }
+            staff_id: step.staff.staff_id,
+            full_name: step.staff.full_name || 'N/A',
+          }
           : null,
         parent_step_id: step.parent_step_id,
         physicalRoomId: step.physicalRoomId,
@@ -150,10 +159,16 @@ export class PrismaFlowRepository implements IFlowRepository {
       timeZone,
       "yyyy-MM-dd'T'HH:mm:ss",
     );
+    const shiftDate = rawFlow.booking?.slot?.shift?.date;
+    const dateStr = shiftDate
+      ? formatInTimeZone(shiftDate, timeZone, 'yyyy-MM-dd')
+      : null;
+
     return {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
+      date: dateStr,
       create_at: createAt,
       current_processing_steps: currentProcessingSteps,
       steps: rootSteps,
@@ -175,22 +190,22 @@ export class PrismaFlowRepository implements IFlowRepository {
         docNo: step.docNo,
         room_info: step.room
           ? {
-              room_name: step.room.room_name,
-              room_id: step.room.room_id,
-            }
+            room_name: step.room.room_name,
+            room_id: step.room.room_id,
+          }
           : null,
         specialty_info:
           step.room && step.room.specialty
             ? {
-                specialty_name: step.room.specialty.specialty_name,
-                specialty_id: step.room.specialty.specialty_id,
-              }
+              specialty_name: step.room.specialty.specialty_name,
+              specialty_id: step.room.specialty.specialty_id,
+            }
             : null,
         staff_info: step.staff
           ? {
-              staff_id: step.staff.staff_id,
-              full_name: step.staff.full_name || 'N/A',
-            }
+            staff_id: step.staff.staff_id,
+            full_name: step.staff.full_name || 'N/A',
+          }
           : null,
         payment_status: step.payment_status,
         parent_step_id: step.parent_step_id,
@@ -229,11 +244,16 @@ export class PrismaFlowRepository implements IFlowRepository {
       timeZone,
       "yyyy-MM-dd'T'HH:mm:ss",
     );
+    const shiftDate = rawFlow.booking?.slot?.shift?.date;
+    const dateStr = shiftDate
+      ? formatInTimeZone(shiftDate, timeZone, 'yyyy-MM-dd')
+      : null;
 
     return {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
       status: rawFlow.status,
+      date: dateStr,
       create_at: createAt,
       current_processing_steps: currentProcessingSteps,
       steps: rootSteps,

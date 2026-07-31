@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   CreateDependencyReqDto,
+  UpdateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
   FindByIdAndPatientIdReqDto,
@@ -56,6 +57,21 @@ export class StepService {
       code: '200',
       status: 'success',
       message: 'Tạo liên kết bước thành công',
+      data: data,
+    };
+  }
+
+  async updateDependency(updateDependencyReqDto: UpdateDependencyReqDto) {
+    const data = await this.stepRepository.updateDependency(
+      updateDependencyReqDto.waiting_step_id,
+      updateDependencyReqDto.old_required_step_id,
+      updateDependencyReqDto.new_required_step_id,
+    );
+
+    return {
+      code: '200',
+      status: 'success',
+      message: 'Cập nhật liên kết bước thành công',
       data: data,
     };
   }

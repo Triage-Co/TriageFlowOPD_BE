@@ -18,13 +18,6 @@ export class TemplateStepDto {
   template_id?: string;
 
   @IsString()
-  @IsOptional()
-  @ApiProperty({
-    example: 'step_1',
-  })
-  template_step_id?: string;
-
-  @IsString()
   @ApiProperty({
     example: 'KHAM_CHUYEN_KHOA',
   })

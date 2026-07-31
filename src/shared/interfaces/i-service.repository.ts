@@ -1,6 +1,7 @@
 import { Prisma, Service, Staff } from '@prisma/client';
 
 export interface IServiceRepository {
+  findByCode(code: string): Promise<Service | null>
   create(
     data: Prisma.ServiceUncheckedCreateInput,
     tx?: Prisma.TransactionClient,

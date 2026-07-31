@@ -41,6 +41,22 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
+  findClinicalStepByServiceOrderId(serviceOrderId: string): Promise<Step | null> {
+    return this.prismaService.step.findFirst({
+      where: {
+        service_order_id: serviceOrderId,
+        step_type: 'CLINICAL',
+      },
+    });
+  }
+  findPaymentStepByServiceOrderId(serviceOrderId: string): Promise<Step | null> {
+    return this.prismaService.step.findFirst({
+      where: {
+        service_order_id: serviceOrderId,
+        step_type: 'PAYMENT',
+      },
+    });
+  }
   findStepByIdAndPatientId(
     stepId: string,
     patientId: string,
@@ -209,6 +225,24 @@ export class PrismaStepRepository implements IStepRepository {
       data: {
         step_id: waitingStepId,
         depends_on_step_id: requiredStepId,
+      },
+    });
+  }
+
+  updateDependency(
+    waitingStepId: string,
+    oldRequiredStepId: string,
+    newRequiredStepId: string,
+  ): Promise<any> {
+    return this.prismaService.step_Dependency.update({
+      where: {
+        step_id_depends_on_step_id: {
+          step_id: waitingStepId,
+          depends_on_step_id: oldRequiredStepId,
+        },
+      },
+      data: {
+        depends_on_step_id: newRequiredStepId,
       },
     });
   }

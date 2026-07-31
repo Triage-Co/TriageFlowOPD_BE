@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -11,14 +12,59 @@ import {
 import { ServiceOrderStatusEnum } from '@prisma/client';
 
 export class CreateServiceOrderReqDto {
+  @IsUUID()
+  @ApiProperty({
+    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
+    description: 'Booking liên kết',
+  })
+  booking_id: string;
+
+  @IsUUID()
+  @ApiProperty({
+    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
+    description: 'Bác sĩ/Nhân viên chỉ định',
+  })
+  assign_by_staff_id: string;
+
+  @IsString()
+  @ApiProperty({
+    example: "Xét nghiệm máu",
+    description: 'Tên của Service Order',
+  })
+  name: string;
+
+  @IsString()
+  @ApiProperty({
+    example: "XET_NGHIEM_MAU",
+    description: 'Mã của Service Order',
+  })
+  service_code: string;
+
   @IsOptional()
   @IsUUID()
   @ApiPropertyOptional({
     example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Booking liên kết',
+    description: 'Mã chuyên khoa [có thể null]',
   })
-  booking_id?: string;
+  specialty_id: string;
+
+  @IsOptional()
+  @IsUUID()
+  @ApiPropertyOptional({
+    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
+    description: 'Phòng chỉ định (nếu có)',
+  })
+  room_id?: string;
+
+  @IsBoolean()
+  @ApiProperty({
+    description: 'Dịch vụ có cần thanh toán hay không',
+    default: true,
+    example: true,
+  })
+  is_payment: boolean;
 }
+
 
 export class UpdateServiceOrderReqDto extends PartialType(
   CreateServiceOrderReqDto,

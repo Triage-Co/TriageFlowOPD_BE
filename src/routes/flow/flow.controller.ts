@@ -24,7 +24,7 @@ import {
 
 @Controller('flow')
 export class FlowController {
-  constructor(private readonly flowService: FlowService) {}
+  constructor(private readonly flowService: FlowService) { }
 
   @Get('patient/:patient_id/kiosk')
   @ApiBearerAuth()
@@ -114,5 +114,19 @@ export class FlowController {
     @Body() template: AssignTemplateRequestDto,
   ) {
     return await this.flowService.addTemplateToFlow(flowId, template.templates);
+  }
+
+  @Post('/assign/:flow_id/template/:template_id')
+  @ApiBearerAuth()
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiOperation({
+    summary: '[DOCTOR - ADMIN] thêm template vào flow bằng template_id',
+  })
+  async doctorAssignTemplateById(
+    @Param('flow_id') flowId: string,
+    @Param('template_id') templateId: string,
+  ) {
+    return await this.flowService.addTemplateToFlowByTeamplateId(flowId, templateId);
   }
 }
