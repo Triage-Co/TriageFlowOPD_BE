@@ -40,16 +40,14 @@ export class VisitSessionService {
   }
 
   async findByPatient(patientId: string, reqUser: any) {
-    const account = await this.accountRepository.findById(reqUser.id);
+    const id = reqUser.sub || reqUser.id;
+    const account = await this.accountRepository.findById(id);
     if (!account) {
       throw new NotFoundException('Account not found');
     }
 
     if (account.role === 'USER') {
-      const patient = await this.patientRepository.findOne(
-        patientId,
-        reqUser.id,
-      );
+      const patient = await this.patientRepository.findOne(patientId, id);
       if (!patient) {
         throw new ForbiddenException(
           "You do not have permission to access this patient's records",
@@ -76,18 +74,19 @@ export class VisitSessionService {
   }
 
   async findOne(id: string, reqUser: any) {
+    const userId = reqUser.sub || reqUser.id;
     const session = await this.visitSessionRepository.findById(id);
     if (!session) {
       throw new NotFoundException(`Visit session with ID ${id} not found`);
     }
 
-    const account = await this.accountRepository.findById(reqUser.id);
+    const account = await this.accountRepository.findById(userId);
     if (!account) {
       throw new NotFoundException('Account not found');
     }
 
     if (account.role === 'USER') {
-      if (session.patient.account_id !== reqUser.id) {
+      if (session.patient.account_id !== userId) {
         throw new ForbiddenException(
           'You do not have permission to view this visit session',
         );
@@ -106,16 +105,14 @@ export class VisitSessionService {
   }
 
   async findLatestByPatient(patientId: string, reqUser: any) {
+    const id = reqUser.sub || reqUser.id;
     const account = await this.accountRepository.findById(reqUser.id);
     if (!account) {
       throw new NotFoundException('Account not found');
     }
 
     if (account.role === 'USER') {
-      const patient = await this.patientRepository.findOne(
-        patientId,
-        reqUser.id,
-      );
+      const patient = await this.patientRepository.findOne(patientId, id);
       if (!patient) {
         throw new ForbiddenException(
           "You do not have permission to access this patient's records",

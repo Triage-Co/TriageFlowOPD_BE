@@ -206,7 +206,10 @@ export class PrismaStepRepository implements IStepRepository {
       where: {
         depends_on_step_id: stepId,
       },
-    });
+      include: {
+        step: true,
+      },
+    }).then((deps) => deps.map((d) => d.step));
   }
 
   findDependenciesOfStep(stepId: string): Promise<any> {
@@ -214,7 +217,10 @@ export class PrismaStepRepository implements IStepRepository {
       where: {
         step_id: stepId,
       },
-    });
+      include: {
+        dependsOnStep: true,
+      },
+    }).then((deps) => deps.map((d) => d.dependsOnStep));
   }
 
   createDependency(
