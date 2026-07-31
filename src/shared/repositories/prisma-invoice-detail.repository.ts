@@ -26,4 +26,26 @@ export class PrismaInvoiceDetailRepository implements IInvoiceDetailRepository {
       data,
     });
   }
+
+  update(
+    id: string,
+    data: Prisma.Invoice_DetailUncheckedUpdateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Invoice_Detail> {
+    const db = tx || this.prismaService;
+    return db.invoice_Detail.update({
+      where: { invoice_detail_id: id },
+      data,
+    });
+  }
+
+  delete(
+    id: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<Invoice_Detail> {
+    const db = tx || this.prismaService;
+    return db.invoice_Detail.delete({
+      where: { invoice_detail_id: id },
+    });
+  }
 }

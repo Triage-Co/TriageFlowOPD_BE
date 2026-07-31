@@ -23,6 +23,7 @@ export interface IServiceOrderDetailRepository {
     };
   }>;
   findById(id: string): Promise<Partial<Service_Order_Detail> | null>;
+  findByServiceOrderId(serviceOrderId: string): Promise<Service_Order_Detail | null>;
   delete(
     id: string,
     tx?: Prisma.TransactionClient,

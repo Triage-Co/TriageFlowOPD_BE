@@ -47,6 +47,7 @@ export class ServiceOrderService {
       booking_id,
       name,
       assign_by_staff_id,
+      room_id: assigned_room_id,
     } = createServiceOrderReqDto;
 
     try {
@@ -113,7 +114,18 @@ export class ServiceOrderService {
       }
 
       let room: any = null;
-      if (service.room_type) {
+      let stepStaffId: string | undefined | null = null;
+      
+      if (assigned_room_id) {
+        room = await this.roomRepository.findById(assigned_room_id);
+        if (!room) {
+          throw new NotFoundException({
+            message: 'Không tìm thấy phòng',
+            detail: `Không tìm thấy phòng với id: ${assigned_room_id}`,
+          });
+        }
+        stepStaffId = null;
+      } else if (service.room_type) {
         room = await this.roomRepository.findBestRoomByRoomType(service.room_type);
         if (!room) {
           throw new NotFoundException({
@@ -140,14 +152,17 @@ export class ServiceOrderService {
       }
 
       if (room) {
-        const staff = room.shifts && room.shifts.length > 0 ? room.shifts[0].staff : null;
+        if (!assigned_room_id) {
+          const staff = room.shifts && room.shifts.length > 0 ? room.shifts[0].staff : null;
+          stepStaffId = staff?.staff_id;
+        }
         const step = await this.stepRepository.createParentStep({
           flow_id: flow.flow_id,
           step_type: StepTypeEnum.CLINICAL,
           step_name: `${service.service_name}`,
           service_code: service_code,
           room_id: room.room_id,
-          staff_id: staff?.staff_id,
+          staff_id: stepStaffId,
           service_order_id: serviceOrder.service_order_id,
         })
 
@@ -226,7 +241,6 @@ export class ServiceOrderService {
       const data =
         await this.serviceOrderRepository.findPendingByPatientId(patientId);
 
-      // Tính toán tổng tiền cho mỗi Service Order
       const enrichedData = data.map((order: any) => {
         const totalPrice = order.serviceOrderDetails.reduce(
           (sum: number, detail: any) => {
@@ -265,9 +279,161 @@ export class ServiceOrderService {
     }
 
     try {
+      const {
+        room_id,
+        specialty_id,
+        service_code,
+        is_payment,
+        booking_id,
+        ...updateData
+      } = updateServiceOrderReqDto;
+
+      const invoice: any = await this.invoiceRepository.findByServiceOrderId(id);
+      const clinicalStep = await this.stepRepository.findClinicalStepByServiceOrderId(id);
+      let paymentStep = await this.stepRepository.findPaymentStepByServiceOrderId(id);
+      const orderDetail = await this.serviceOrderDetailRepository.findByServiceOrderId(id);
+
+      let newService: any = null;
+      let newPrice: number | undefined = undefined;
+      let newServiceName: string | undefined = undefined;
+
+      if (service_code) {
+        newService = await this.serviceRepository.findByCode(service_code);
+        if (!newService) {
+          throw new Error(`Không tìm thấy service với code: ${service_code}`);
+        }
+        newPrice = newService.price;
+        newServiceName = newService.service_name;
+      }
+
+      if (invoice && invoice.status === 'PAID') {
+        if (service_code !== undefined && newService?.service_id !== orderDetail?.service_id) {
+          throw new Error('Không thể thay đổi dịch vụ vì hóa đơn đã được thanh toán.');
+        }
+        if (is_payment === false) {
+          throw new Error('Không thể hủy thanh toán vì hóa đơn đã được thanh toán.');
+        }
+      }
+
+      if (service_code) {
+        if (orderDetail) {
+          await this.serviceOrderDetailRepository.update(
+            orderDetail.service_order_detail_id,
+            {
+              service_id: newService.service_id,
+              price_at_order: newPrice,
+              name: newServiceName,
+            }
+          );
+        }
+
+        if (invoice) {
+          await this.invoiceRepository.update(invoice.invoice_id, {
+            total_amount: newPrice,
+          });
+          if (invoice.invoice_details && invoice.invoice_details.length > 0) {
+            const detailId = invoice.invoice_details[0].invoice_detail_id;
+            await this.invoiceDetailRepository.update(detailId, {
+              item_name: newServiceName ?? 'Dịch vụ',
+              unit_price: newPrice,
+              sub_total: newPrice,
+            });
+          }
+        }
+
+        if (clinicalStep) {
+          await this.stepRepository.update(clinicalStep.step_id, {
+            service_code: service_code,
+            step_name: newServiceName,
+          });
+        }
+        if (paymentStep) {
+          await this.stepRepository.update(paymentStep.step_id, {
+            service_code: service_code,
+            step_name: `Thanh toán ${newServiceName}`,
+          });
+        }
+      }
+
+      if (is_payment !== undefined) {
+        if (is_payment === true && !paymentStep) {
+          if (!newService) {
+            if (orderDetail && orderDetail.service_id) {
+              newService = await this.serviceRepository.findById(orderDetail.service_id);
+            }
+          }
+          if (newService) {
+            let flowId = clinicalStep?.flow_id;
+            if (!flowId) {
+              const bookingId = existing.booking_id ?? booking_id;
+              if (!bookingId) {
+                throw new Error('Không tìm thấy booking_id để xác định flow khi tạo payment step.');
+              }
+              const booking = await this.bookingRepository.findOne(bookingId);
+              flowId = booking?.flow?.flow_id;
+              if (!flowId) {
+                throw new Error('Không tìm thấy flow liên kết với booking để tạo payment step.');
+              }
+            }
+
+            paymentStep = await this.stepRepository.createParentStep({
+              flow_id: flowId,
+              step_type: 'PAYMENT',
+              service_code: newService.service_code,
+              step_name: `Thanh toán ${newService.service_name}`,
+              service_order_id: id,
+            });
+
+            const newInvoice = await this.invoiceRepository.create({
+              service_order_id: id,
+              total_amount: newService.price,
+              status: 'PENDING',
+            });
+            await this.invoiceDetailRepository.create({
+              invoice_id: newInvoice.invoice_id,
+              item_name: newService.service_name ?? 'Dịch vụ',
+              quantity: 1,
+              unit_price: newService.price,
+              sub_total: newService.price,
+            });
+            if (clinicalStep) {
+              await this.stepRepository.createDependency(clinicalStep.step_id, paymentStep.step_id);
+            }
+          }
+        } else if (is_payment === false && paymentStep) {
+          if (invoice) {
+            if (invoice.invoice_details) {
+              for (const det of invoice.invoice_details) {
+                await this.invoiceDetailRepository.delete(det.invoice_detail_id);
+              }
+            }
+            await this.invoiceRepository.delete(invoice.invoice_id);
+          }
+          
+          await this.stepRepository.delete(paymentStep.step_id);
+        }
+      }
+
+      if (room_id !== undefined || specialty_id !== undefined) {
+        if (room_id) {
+          if (clinicalStep) {
+            await this.stepRepository.update(clinicalStep.step_id, {
+              room_id: room_id,
+            });
+          }
+        } else if (specialty_id && clinicalStep) {
+          const room = await this.roomRepository.findBestRoomBySpecialtyId(specialty_id);
+          if (room) {
+            await this.stepRepository.update(clinicalStep.step_id, {
+              room_id: room.room_id,
+            });
+          }
+        }
+      }
+
       const data = await this.serviceOrderRepository.update(
         id,
-        updateServiceOrderReqDto,
+        updateData,
       );
 
       return {

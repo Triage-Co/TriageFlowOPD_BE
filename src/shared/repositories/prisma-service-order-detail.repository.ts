@@ -86,4 +86,12 @@ export class PrismaServiceOrderDetailRepository implements IServiceOrderDetailRe
       },
     });
   }
+
+  findByServiceOrderId(serviceOrderId: string): Promise<Service_Order_Detail | null> {
+    return this.prismaService.service_Order_Detail.findFirst({
+      where: {
+        service_order_id: serviceOrderId,
+      },
+    });
+  }
 }
