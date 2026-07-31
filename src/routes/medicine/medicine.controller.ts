@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { MedicineService } from './medicine.service';
-import { CreateMedicineDto } from './dto/create-medicine.dto';
+import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
@@ -21,6 +21,32 @@ import { roles } from '../../shared/decorator/role.decorator';
 @Controller('medicine')
 export class MedicineController {
   constructor(private readonly medicineService: MedicineService) {}
+
+  @Post('seed')
+  @roles('ADMIN', 'PHARMACIST')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ADMIN - PHARMACIST] Seed danh mục 20 loại thuốc OPD phổ biến',
+    description: 'Tự động chèn/cập nhật 20 loại thuốc thông dụng tại Việt Nam (Paracetamol, Amoxicillin, Augmentin, Ibuprofen, Omeprazole, Smecta, Berberin, Panadol...) vào cơ sở dữ liệu.',
+  })
+  @ApiResponse({ status: 201, description: 'Seed danh mục thuốc thành công.' })
+  seedMedicines() {
+    return this.medicineService.seedMedicines();
+  }
+
+  @Post('bulk')
+  @roles('PHARMACIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[PHARMACIST - ADMIN] Tạo/Khởi tạo hàng loạt loại thuốc',
+    description: 'Endpoint nhận vào mảng danh sách thuốc để chèn hàng loạt vào DB.',
+  })
+  @ApiResponse({ status: 201, description: 'Tạo hàng loạt thuốc thành công.' })
+  bulkCreate(@Body() bulkDto: BulkCreateMedicineDto) {
+    return this.medicineService.bulkCreate(bulkDto);
+  }
 
   @Post()
   @roles('PHARMACIST', 'ADMIN', 'DOCTOR')
@@ -54,6 +80,30 @@ export class MedicineController {
   @ApiResponse({ status: 409, description: 'Mã thuốc đã tồn tại.' })
   create(@Body() createMedicineDto: CreateMedicineDto) {
     return this.medicineService.create(createMedicineDto);
+  }
+
+  @Get('routes')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ALL] Lấy danh sách các đường dùng thuốc (Dropdown FE)',
+    description: 'Trả về mảng danh sách các đường dùng thuốc độc nhất (VD: Uống, Tiêm, Bôi, Ngậm...) phục vụ bộ lọc FE.',
+  })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách đường dùng thành công.' })
+  getRoutes() {
+    return this.medicineService.getRoutes();
+  }
+
+  @Get('active-ingredients')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ALL] Lấy danh sách các hoạt chất thuốc (Dropdown FE)',
+    description: 'Trả về mảng danh sách các hoạt chất thuốc độc nhất phục vụ bộ lọc FE.',
+  })
+  @ApiResponse({ status: 200, description: 'Lấy danh sách hoạt chất thành công.' })
+  getActiveIngredients() {
+    return this.medicineService.getActiveIngredients();
   }
 
   @Get()
@@ -114,6 +164,20 @@ export class MedicineController {
   @ApiResponse({ status: 404, description: 'Không tìm thấy loại thuốc.' })
   findOne(@Param('id') id: string) {
     return this.medicineService.findOne(id);
+  }
+
+  @Patch(':id/restore')
+  @roles('PHARMACIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[PHARMACIST - ADMIN] Khôi phục loại thuốc đã vô hiệu hóa',
+    description: 'Chuyển is_active về true để tiếp tục sử dụng/kê đơn loại thuốc này.',
+  })
+  @ApiResponse({ status: 200, description: 'Khôi phục loại thuốc thành công.' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy loại thuốc.' })
+  restore(@Param('id') id: string) {
+    return this.medicineService.restore(id);
   }
 
   @Patch(':id')

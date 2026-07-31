@@ -1,11 +1,22 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { CreateMedicineDto } from './dto/create-medicine.dto';
+import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
+import { seedMedicines, seedPrescriptions } from '../../../prisma/medicine.seed';
 
 @Injectable()
 export class MedicineService {
   constructor(private readonly prismaService: PrismaService) {}
+
+  async seedMedicines() {
+    const medicines = await seedMedicines();
+    const prescriptions = await seedPrescriptions();
+    return {
+      message: `Đã seed thành công ${medicines.length} loại thuốc cơ bản và ${prescriptions.length} đơn thuốc mẫu vào cơ sở dữ liệu.`,
+      medicine_count: medicines.length,
+      prescription_count: prescriptions.length,
+    };
+  }
 
   async create(createMedicineDto: CreateMedicineDto) {
     const existing = await this.prismaService.medicine.findUnique({
@@ -18,6 +29,30 @@ export class MedicineService {
 
     return this.prismaService.medicine.create({
       data: createMedicineDto,
+    });
+  }
+
+  async bulkCreate(bulkDto: BulkCreateMedicineDto) {
+    const { medicines } = bulkDto;
+    if (!medicines || medicines.length === 0) {
+      return { message: 'Danh sách thuốc trống.', count: 0, data: [] };
+    }
+
+    return this.prismaService.$transaction(async (tx) => {
+      const results: any[] = [];
+      for (const item of medicines) {
+        const upserted = await tx.medicine.upsert({
+          where: { medicine_code: item.medicine_code },
+          update: item,
+          create: item,
+        });
+        results.push(upserted);
+      }
+      return {
+        message: `Đã khởi tạo thành công ${results.length} loại thuốc.`,
+        count: results.length,
+        data: results,
+      };
     });
   }
 
@@ -73,6 +108,28 @@ export class MedicineService {
     return medicine;
   }
 
+  async getRoutes() {
+    const medicines = await this.prismaService.medicine.findMany({
+      where: { usage_route: { not: null }, is_active: true },
+      select: { usage_route: true },
+      distinct: ['usage_route'],
+    });
+
+    const routes = medicines.map((m) => m.usage_route).filter(Boolean);
+    return { data: routes };
+  }
+
+  async getActiveIngredients() {
+    const medicines = await this.prismaService.medicine.findMany({
+      where: { active_ingredient: { not: null }, is_active: true },
+      select: { active_ingredient: true },
+      distinct: ['active_ingredient'],
+    });
+
+    const ingredients = medicines.map((m) => m.active_ingredient).filter(Boolean);
+    return { data: ingredients };
+  }
+
   async update(id: string, updateMedicineDto: UpdateMedicineDto) {
     await this.findOne(id);
 
@@ -92,6 +149,14 @@ export class MedicineService {
     return this.prismaService.medicine.update({
       where: { medicine_id: id },
       data: updateMedicineDto,
+    });
+  }
+
+  async restore(id: string) {
+    await this.findOne(id);
+    return this.prismaService.medicine.update({
+      where: { medicine_id: id },
+      data: { is_active: true },
     });
   }
 

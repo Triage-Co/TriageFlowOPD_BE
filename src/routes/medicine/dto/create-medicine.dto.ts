@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class CreateMedicineDto {
   @ApiProperty({ description: 'Mã thuốc (duy nhất)', example: 'MED-PAR-500' })
@@ -47,4 +48,12 @@ export class CreateMedicineDto {
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;
+}
+
+export class BulkCreateMedicineDto {
+  @ApiProperty({ type: [CreateMedicineDto], description: 'Danh sách các thuốc cần khởi tạo hàng loạt' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateMedicineDto)
+  medicines: CreateMedicineDto[];
 }
