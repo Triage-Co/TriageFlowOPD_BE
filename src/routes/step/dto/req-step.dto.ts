@@ -141,6 +141,32 @@ export class CreateDependencyReqDto {
   required_step_id: string;
 }
 
+export class UpdateDependencyReqDto {
+  @ApiProperty({
+    description: 'ID của bước đang phải chờ (bước theo sau)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID('4')
+  @IsNotEmpty()
+  waiting_step_id: string;
+
+  @ApiProperty({
+    description: 'ID của bước điều kiện cũ (cần thay đổi)',
+    example: '123e4567-e89b-12d3-a456-426614174001',
+  })
+  @IsUUID('4')
+  @IsNotEmpty()
+  old_required_step_id: string;
+
+  @ApiProperty({
+    description: 'ID của bước điều kiện mới',
+    example: '123e4567-e89b-12d3-a456-426614174002',
+  })
+  @IsUUID('4')
+  @IsNotEmpty()
+  new_required_step_id: string;
+}
+
 export class UpdateStepReqDto {
   @ApiPropertyOptional({
     description: 'ID của phòng',

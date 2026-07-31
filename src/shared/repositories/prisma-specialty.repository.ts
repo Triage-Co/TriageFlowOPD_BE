@@ -6,6 +6,13 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class PrismaSpecialtyRepository implements ISpecialtyRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findOne(id: string): Promise<Specialty | null> {
+    return this.prismaService.specialty.findFirst({
+      where: {
+        specialty_id: id,
+      },
+    })
+  }
   findAll(page?: number, limit?: number): Promise<Partial<Specialty>[]> {
     const skip =
       page && limit && page > 0 && limit > 0

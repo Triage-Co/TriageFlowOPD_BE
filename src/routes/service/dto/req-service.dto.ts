@@ -8,7 +8,9 @@ import {
   IsOptional,
   IsString,
   Min,
+  IsEnum,
 } from 'class-validator';
+import { ClinicalRoomType } from '@prisma/client';
 
 export class CreateServiceDto {}
 
@@ -37,6 +39,15 @@ export class CreateServiceReqDto {
     description: 'Giá dịch vụ',
   })
   price: number;
+
+  @IsOptional()
+  @IsEnum(ClinicalRoomType)
+  @ApiPropertyOptional({
+    name: 'room_type',
+    enum: ClinicalRoomType,
+    description: 'Loại phòng cho dịch vụ (tuỳ chọn, dùng cho cận lâm sàng/thủ thuật)',
+  })
+  room_type?: ClinicalRoomType;
 }
 
 export class UpdateServiceReqDto extends PartialType(CreateServiceReqDto) {

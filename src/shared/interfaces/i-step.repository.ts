@@ -26,6 +26,11 @@ export interface IStepRepository {
     tx?: Prisma.TransactionClient,
   ): Promise<Step>;
   createDependency(waitingStepId: string, requiredStepId: string): Promise<any>;
+  updateDependency(
+    waitingStepId: string,
+    oldRequiredStepId: string,
+    newRequiredStepId: string,
+  ): Promise<any>;
   update(id: string, data: any): Promise<any>;
   findAll(): Promise<any>;
   findById(id: string): Promise<any>;

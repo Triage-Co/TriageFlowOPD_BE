@@ -13,6 +13,7 @@ import {
 import { StepService } from './step.service';
 import {
   CreateDependencyReqDto,
+  UpdateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
   FindByIdAndPatientIdReqDto,
@@ -105,6 +106,18 @@ export class StepController {
   createDependency(@Body() createDependencyReqDto: CreateDependencyReqDto) {
     return this.stepService.createDependency(createDependencyReqDto);
   }
+
+  @Patch('dependency')
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Cập nhật phụ thuộc của bước (đổi required_step_id cũ thành mới)',
+  })
+  updateDependency(@Body() updateDependencyReqDto: UpdateDependencyReqDto) {
+    return this.stepService.updateDependency(updateDependencyReqDto);
+  }
+
   @Patch(':step_id/complete')
   @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
   @UseGuards(IsRoleGuard)

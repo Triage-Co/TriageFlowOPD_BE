@@ -28,6 +28,8 @@ import { PrismaServiceOrderDetailRepository } from './repositories/prisma-servic
 import { PrismaServiceOrderRepository } from './repositories/prisma-service-order.repository';
 import { PrismaServiceRepository } from './repositories/prisma-service.repository';
 import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
+import { PrismaInvoiceRepository } from './repositories/prisma-invoice.repository';
+import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-detail.repository';
 
 @Global()
 @Module({
@@ -121,6 +123,14 @@ import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
       provide: 'IQueueRepository',
       useClass: PrismaQueueRepository,
     },
+    {
+      provide: 'IInvoiceRepository',
+      useClass: PrismaInvoiceRepository,
+    },
+    {
+      provide: 'IInvoiceDetailRepository',
+      useClass: PrismaInvoiceDetailRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -148,6 +158,8 @@ import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
     'IServiceOrderDetailRepository',
     'IServiceRepository',
     'IQueueRepository',
+    'IInvoiceRepository',
+    'IInvoiceDetailRepository',
     PassportModule,
   ],
 })
