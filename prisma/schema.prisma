@@ -126,6 +126,13 @@ enum StepTypeEnum {
   OTHER
 }
 
+enum ServiceTypeEnum {
+  CLINICAL_EXAMINATION
+  PRESCRIPTION
+  DIAGNOSTIC_TEST
+  PROCEDURE
+}
+
 enum InvoiceStatusEnum {
   PENDING
   PAID
@@ -496,6 +503,7 @@ model Service {
   service_code        String?
   service_name        String?
   price               Int
+  service_type        ServiceTypeEnum
   room_type           ClinicalRoomType?
   is_active           Boolean                @default(true)
   serviceOrderDetails Service_Order_Detail[]
@@ -503,6 +511,7 @@ model Service {
   updated_at          DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
   @@index([service_code])
+  @@index([service_type])
   @@map("service")
 }
 

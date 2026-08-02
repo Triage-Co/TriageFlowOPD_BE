@@ -14,19 +14,19 @@ Tài liệu này hướng dẫn cách dọn dẹp dữ liệu, chạy seed bản
 
 ## 1. Dọn dẹp Database & Chạy Seed Bản đồ (Map Seeding)
 
-Khi bạn muốn làm sạch toàn bộ dữ liệu bản đồ cũ để cập nhật từ file SVG mới (`OPD2.svg`):
+Khi bạn muốn làm sạch toàn bộ dữ liệu bản đồ cũ để cập nhật từ file SVG mới (`OPD4.svg`):
 
 ### Thực hiện qua dòng lệnh:
 Chạy lệnh sau từ thư mục gốc của project:
 ```bash
-npx ts-node -r tsconfig-paths/register prisma/Map-3.0.seed.ts
+npx ts-node -r tsconfig-paths/register prisma/Map-4.0.seed.ts
 ```
 
 ### Cách hoạt động:
 Script seed sẽ tự động thực hiện các thao tác:
 1.  **Dọn sạch dữ liệu cũ**: Tự động gỡ bỏ các ràng buộc khóa ngoại tạm thời ở các bảng liên quan như `Shift`, `Step` và tiến hành xóa theo tầng từ dưới lên: `Edge` ➔ `Node` ➔ `Poi` ➔ `PlacedFeature` ➔ `Boundary` ➔ `Door` ➔ `PhysicalRoom` ➔ `Area` ➔ `Floor` ➔ `Building`.
 2.  **Tạo mới với ID cố định**: Tạo lại Tòa nhà G2 và Tầng 1 với đúng các ID ở phần 📌.
-3.  **Import SVG**: Phân tích file SVG để tạo phòng clinic, các cửa (doors) và các đường bao tường.
+3.  **Import SVG (`OPD4.svg`)**: Phân tích file SVG để tạo các khu vực (`Area`), phòng khám (`PhysicalRoom`), cửa ra vào (`Door`) và tường bao (`Boundary`).
 
 ---
 

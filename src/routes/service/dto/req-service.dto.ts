@@ -10,7 +10,7 @@ import {
   Min,
   IsEnum,
 } from 'class-validator';
-import { ClinicalRoomType } from '@prisma/client';
+import { ClinicalRoomType, ServiceTypeEnum } from '@prisma/client';
 
 export class CreateServiceDto {}
 
@@ -39,6 +39,16 @@ export class CreateServiceReqDto {
     description: 'Giá dịch vụ',
   })
   price: number;
+
+  @IsNotEmpty()
+  @IsEnum(ServiceTypeEnum)
+  @ApiProperty({
+    name: 'service_type',
+    enum: ServiceTypeEnum,
+    example: ServiceTypeEnum.CLINICAL_EXAMINATION,
+    description: 'Loại dịch vụ (CLINICAL_EXAMINATION, PRESCRIPTION, DIAGNOSTIC_TEST, PROCEDURE)',
+  })
+  service_type: ServiceTypeEnum;
 
   @IsOptional()
   @IsEnum(ClinicalRoomType)
@@ -83,4 +93,14 @@ export class QueryServiceReqDto {
   @Min(1)
   @Type(() => Number)
   limit?: number = 10;
+
+  @ApiPropertyOptional({
+    name: 'service_type',
+    enum: ServiceTypeEnum,
+    description: 'Lọc dịch vụ theo loại',
+  })
+  @IsOptional()
+  @IsEnum(ServiceTypeEnum)
+  service_type?: ServiceTypeEnum;
 }
+

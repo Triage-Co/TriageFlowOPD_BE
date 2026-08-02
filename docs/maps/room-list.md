@@ -45,3 +45,5 @@ G2.2.35	Nhi 2
 G2.4.4	Da liễu 1
 G2.4.5	Da liễu 2
 G2.4.6	Da liễu 3
+G2.4.40	Thủ thuật
+
