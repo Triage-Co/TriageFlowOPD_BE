@@ -45,7 +45,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     return this.prismaService.flow.findMany({
       where: {
         status: {
-          in: [FlowStatusEnum.PENDING, FlowStatusEnum.IN_PROGRESS],
+          in: [FlowStatusEnum.IN_PROGRESS],
         },
         booking: {
           patient_id: patient_id,
@@ -100,7 +100,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     const rawFlow = await this.prismaService.flow.findMany({
       where: {
         status: {
-          in: ['PENDING', 'IN_PROGRESS'],
+          in: ['IN_PROGRESS'],
         },
         booking: {
           patient_id: patient_id,
