@@ -22,19 +22,6 @@ import { roles } from '../../../shared/decorator/role.decorator';
 export class MedicineController {
   constructor(private readonly medicineService: MedicineService) {}
 
-  @Post('seed')
-  @roles('ADMIN', 'PHARMACIST')
-  @UseGuards(IsAuthGuard, IsRoleGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: '[ADMIN - PHARMACIST] Seed danh mục 20 loại thuốc OPD phổ biến',
-    description: 'Tự động chèn/cập nhật 20 loại thuốc thông dụng tại Việt Nam (Paracetamol, Amoxicillin, Augmentin, Ibuprofen, Omeprazole, Smecta, Berberin, Panadol...) vào cơ sở dữ liệu.',
-  })
-  @ApiResponse({ status: 201, description: 'Seed danh mục thuốc thành công.' })
-  seedMedicines() {
-    return this.medicineService.seedMedicines();
-  }
-
   @Post('bulk')
   @roles('PHARMACIST', 'ADMIN')
   @UseGuards(IsAuthGuard, IsRoleGuard)

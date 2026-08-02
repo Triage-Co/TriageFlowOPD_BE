@@ -2,21 +2,12 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../../../shared/config/prisma.service';
 import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
-import { seedMedicines, seedPrescriptions } from '../../../../prisma/medicine.seed';
 
 @Injectable()
 export class MedicineService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async seedMedicines() {
-    const medicines = await seedMedicines();
-    const prescriptions = await seedPrescriptions();
-    return {
-      message: `Đã seed thành công ${medicines.length} loại thuốc cơ bản và ${prescriptions.length} đơn thuốc mẫu vào cơ sở dữ liệu.`,
-      medicine_count: medicines.length,
-      prescription_count: prescriptions.length,
-    };
-  }
+
 
   async create(createMedicineDto: CreateMedicineDto) {
     const existing = await this.prismaService.medicine.findUnique({
