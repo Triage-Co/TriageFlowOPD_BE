@@ -5,6 +5,8 @@ import {
   FlowStatusEnum,
   PaymentStatusEnum,
   PrescriptionStatusEnum,
+  ServiceOrderDetailStatusEnum,
+  ServiceOrderStatusEnum,
   StepStatusEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
@@ -83,6 +85,32 @@ export class CronService {
         },
       });
 
+      await tx.service_Order.updateMany({
+        where: {
+          booking: {
+            flow: {
+              flow_id: { in: flowIds },
+            },
+          },
+          status: { in: [ServiceOrderStatusEnum.PENDING, ServiceOrderStatusEnum.IN_PROGRESS] },
+        },
+        data: { status: ServiceOrderStatusEnum.CANCELLED },
+      });
+
+      await tx.service_Order_Detail.updateMany({
+        where: {
+          order: {
+            booking: {
+              flow: {
+                flow_id: { in: flowIds },
+              },
+            },
+          },
+          status: { in: [ServiceOrderDetailStatusEnum.PENDING, ServiceOrderDetailStatusEnum.IN_PROGRESS] },
+        },
+        data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+      });
+
       return {
         message: 'Cập nhật Flow và Step quá hạn thành công',
         updatedCount: flowResult.count,
@@ -151,6 +179,22 @@ export class CronService {
             await tx.booking.update({
               where: { booking_id: flow.booking_id },
               data: { status: BookingStatusEnum.CANCELLED },
+            });
+
+            await tx.service_Order.updateMany({
+              where: {
+                booking_id: flow.booking_id,
+                status: { in: [ServiceOrderStatusEnum.PENDING, ServiceOrderStatusEnum.IN_PROGRESS] },
+              },
+              data: { status: ServiceOrderStatusEnum.CANCELLED },
+            });
+
+            await tx.service_Order_Detail.updateMany({
+              where: {
+                order: { booking_id: flow.booking_id },
+                status: { in: [ServiceOrderDetailStatusEnum.PENDING, ServiceOrderDetailStatusEnum.IN_PROGRESS] },
+              },
+              data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
             });
           }
         });
