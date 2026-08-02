@@ -4,12 +4,15 @@ import {
   ApiOkResponse,
   ApiOperation,
 } from '@nestjs/swagger';
-import { CreateTransactionRequestDto } from './dto/request-transaction.dto';
+import {
+  CreateTransactionRequestDto,
+  PayCashDto,
+} from './dto/request-transaction.dto';
 import { TransactionService } from './transaction.service';
 
 @Controller('transaction')
 export class TransactionController {
-  constructor(private readonly transactionService: TransactionService) {}
+  constructor(private readonly transactionService: TransactionService) { }
 
   @Post()
   @ApiOperation({
@@ -64,6 +67,17 @@ export class TransactionController {
   })
   webhook(@Body() body: any) {
     return this.transactionService.webhook(body);
+  }
+
+  @Post('/cash')
+  @ApiOperation({
+    summary: 'Thanh toán bằng tiền mặt (lễ tân xác nhận thu tiền)',
+    description:
+      'Lễ tân gọi API này sau khi thu tiền mặt từ bệnh nhân. ' +
+      'Hệ thống sẽ tự động cập nhật trạng thái thanh toán và mở step tiếp theo cho bệnh nhân.',
+  })
+  payCash(@Body() dto: PayCashDto) {
+    return this.transactionService.payCash(dto);
   }
 
   @Get(':id')
