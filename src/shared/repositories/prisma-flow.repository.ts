@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IFlowRepository } from '../interfaces/i-flow.repository';
-import { Flow, Prisma } from '@prisma/client';
+import { Flow, FlowStatusEnum, Prisma } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 const findQuery = {
@@ -36,6 +36,32 @@ const findQuery = {
 @Injectable()
 export class PrismaFlowRepository implements IFlowRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findIsActiveByDate(patient_id: string, date: Date): Promise<Flow[]> {
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const currentDate = formatInTimeZone(date, timeZone, 'yyyy-MM-dd');
+
+    const start = toDate(`${currentDate}T00:00:00`, { timeZone });
+    const end = toDate(`${currentDate}T23:59:59`, { timeZone });
+    return this.prismaService.flow.findMany({
+      where: {
+        status: {
+          in: [FlowStatusEnum.PENDING, FlowStatusEnum.IN_PROGRESS],
+        },
+        booking: {
+          patient_id: patient_id,
+          slot: {
+            shift: {
+              date: {
+                gte: start,
+                lte: end,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   create(
     data: Prisma.FlowUncheckedCreateInput,
     tx?: Prisma.TransactionClient,
@@ -74,7 +100,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     const rawFlow = await this.prismaService.flow.findMany({
       where: {
         status: {
-          in: ['IN_PROGRESS'],
+          in: ['PENDING', 'IN_PROGRESS'],
         },
         booking: {
           patient_id: patient_id,

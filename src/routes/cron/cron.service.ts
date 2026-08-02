@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
 import {
+  BookingStatusEnum,
+  FlowStatusEnum,
   PaymentStatusEnum,
   PrescriptionStatusEnum,
   StepStatusEnum,
@@ -68,6 +70,19 @@ export class CronService {
         },
       });
 
+      await tx.booking.updateMany({
+        where: {
+          flow: {
+            flow_id: {
+              in: flowIds,
+            },
+          },
+        },
+        data: {
+          status: BookingStatusEnum.CANCELLED,
+        },
+      });
+
       return {
         message: 'Cập nhật Flow và Step quá hạn thành công',
         updatedCount: flowResult.count,
@@ -78,49 +93,76 @@ export class CronService {
   @Cron('*/1 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updateTransactionStatus() {
     const currentDate = new Date();
-    currentDate.setMinutes(currentDate.getMinutes() - 10);
+    currentDate.setMinutes(currentDate.getMinutes() - 15); // Quá hạn 15 phút
 
     const expiredTransactions = await this.prismaService.transaction.findMany({
       where: {
-        transDate: {
-          lte: currentDate,
-        },
+        transDate: { lte: currentDate },
         status: 'PENDING',
       },
-      select: {
-        docNo: true,
+      select: { docNo: true },
+    });
+
+    const expiredFlows = await this.prismaService.flow.findMany({
+      where: {
+        status: FlowStatusEnum.PENDING,
+        created_at: { lt: currentDate },
       },
+      include: { booking: true },
     });
 
     const docNos = expiredTransactions.map((t) => t.docNo);
 
-    if (docNos.length === 0) {
+    if (docNos.length === 0 && expiredFlows.length === 0) {
       return {
-        message: 'Không có Transaction nào quá hạn cần cập nhật',
+        message: 'Không có Transaction hoặc Flow nào quá hạn cần cập nhật',
         updatedTransactionCount: 0,
-        updatedStepCount: 0,
+        updatedFlowCount: 0,
       };
     }
 
-    const updatedTransactions = await this.prismaService.transaction.updateMany(
-      {
-        where: {
-          docNo: {
-            in: docNos,
-          },
-        },
-        data: {
-          status: PaymentStatusEnum.CANCELLED,
-        },
-      },
-    );
+    let updatedTransactionCount = 0;
+
+    if (docNos.length > 0) {
+      const updatedTransactions =
+        await this.prismaService.transaction.updateMany({
+          where: { docNo: { in: docNos } },
+          data: { status: PaymentStatusEnum.CANCELLED },
+        });
+      updatedTransactionCount = updatedTransactions.count;
+    }
+
+    if (expiredFlows.length > 0) {
+      for (const flow of expiredFlows) {
+        await this.prismaService.$transaction(async (tx) => {
+          await tx.flow.update({
+            where: { flow_id: flow.flow_id },
+            data: { status: FlowStatusEnum.CANCELLED },
+          });
+
+          if (flow.booking?.slot_id) {
+            await tx.slot.update({
+              where: { slot_id: flow.booking.slot_id },
+              data: { capacity: { increment: 1 } },
+            });
+          }
+
+          if (flow.booking_id) {
+            await tx.booking.update({
+              where: { booking_id: flow.booking_id },
+              data: { status: BookingStatusEnum.CANCELLED },
+            });
+          }
+        });
+      }
+    }
 
     return {
-      message: 'Cập nhật Transaction quá hạn thành công',
-      updatedTransactionCount: updatedTransactions.count,
+      message: 'Cập nhật quá hạn thành công',
+      updatedTransactionCount: updatedTransactionCount,
+      updatedFlowCount: expiredFlows.length,
     };
   }
-
   @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updatePrescriptionExpired() {
     const oneDayAgo = new Date();
