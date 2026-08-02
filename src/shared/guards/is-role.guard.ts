@@ -25,11 +25,13 @@ export class IsRoleGuard implements CanActivate {
 
     const ctx = context.switchToHttp();
     const request = ctx.getRequest();
-
+    if (!request || !request.user) {
+      throw AuthErrors.Unauthenticated;
+    }
     const id = request.user.sub || request.user.id;
 
     if (!id) {
-      throw AuthErrors.Unauthenticated;
+      throw AuthErrors.UserNotFoundById(id);
     }
 
     const existedAccount = await this.accountRepository.findById(id);
