@@ -1,13 +1,18 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../shared/config/prisma.service';
-import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
+import {
+  BulkCreateMedicineDto,
+  CreateMedicineDto,
+} from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
 
 @Injectable()
 export class MedicineService {
-  constructor(private readonly prismaService: PrismaService) {}
-
-
+  constructor(private readonly prismaService: PrismaService) { }
 
   async create(createMedicineDto: CreateMedicineDto) {
     const existing = await this.prismaService.medicine.findUnique({
@@ -15,7 +20,9 @@ export class MedicineService {
     });
 
     if (existing) {
-      throw new ConflictException(`Mã thuốc '${createMedicineDto.medicine_code}' đã tồn tại.`);
+      throw new ConflictException(
+        `Mã thuốc '${createMedicineDto.medicine_code}' đã tồn tại.`,
+      );
     }
 
     return this.prismaService.medicine.create({
@@ -47,7 +54,12 @@ export class MedicineService {
     });
   }
 
-  async findAll(query: { search?: string; is_active?: boolean; page?: number; limit?: number }) {
+  async findAll(query: {
+    search?: string;
+    is_active?: boolean;
+    page?: number;
+    limit?: number;
+  }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
     const skip = (page - 1) * limit;
@@ -55,7 +67,8 @@ export class MedicineService {
     const where: any = {};
 
     if (query.is_active !== undefined) {
-      where.is_active = String(query.is_active) === 'true' || query.is_active === true;
+      where.is_active =
+        String(query.is_active) === 'true' || query.is_active === true;
     }
 
     if (query.search) {
@@ -117,7 +130,9 @@ export class MedicineService {
       distinct: ['active_ingredient'],
     });
 
-    const ingredients = medicines.map((m) => m.active_ingredient).filter(Boolean);
+    const ingredients = medicines
+      .map((m) => m.active_ingredient)
+      .filter(Boolean);
     return { data: ingredients };
   }
 
@@ -133,7 +148,9 @@ export class MedicineService {
       });
 
       if (existing) {
-        throw new ConflictException(`Mã thuốc '${updateMedicineDto.medicine_code}' đã bị sử dụng.`);
+        throw new ConflictException(
+          `Mã thuốc '${updateMedicineDto.medicine_code}' đã bị sử dụng.`,
+        );
       }
     }
 

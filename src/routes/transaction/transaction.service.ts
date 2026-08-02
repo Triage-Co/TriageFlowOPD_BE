@@ -8,7 +8,10 @@ import {
 import { randomInt } from 'crypto';
 import { PayosService } from '../../shared/config/payos.service';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { CreateTransactionRequestDto } from './dto/request-transaction.dto';
+import {
+  CreateTransactionRequestDto,
+  PayCashDto,
+} from './dto/request-transaction.dto';
 import { QueueService } from '../queue/queue.service';
 import { PayOS } from '@payos/node';
 import { PrismaClient } from '@prisma/client';
@@ -77,6 +80,87 @@ export class TransactionService {
       return {
         code: 500,
         message: 'Tạo link thanh toán không thành công',
+        status: 'error',
+        detail: error,
+      };
+    }
+  }
+
+  async payCash(dto: PayCashDto): Promise<ResponseType<any>> {
+    try {
+      const orderCode = parseInt(
+        `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
+      );
+
+      const transaction = await this.TRANSACTION.create({
+        data: {
+          buyerId: dto.clientId,
+          docNo: orderCode,
+          transType: dto.transType,
+          amount: dto.amount,
+          service_order_id: dto.service_order_id,
+          status: 'SUCCESSED',
+        },
+      });
+
+      await this.prismaService.service_Order.update({
+        where: { service_order_id: dto.service_order_id },
+        data: { payment_status: 'SUCCESSED' },
+      });
+
+
+      await this.prismaService.service_Order_Detail.updateMany({
+        where: { service_order_id: dto.service_order_id },
+        data: { status: 'PAID' },
+      });
+
+      const paymentSteps = await this.STEP.findMany({
+        where: {
+          service_order_id: dto.service_order_id,
+          step_type: 'PAYMENT',
+        },
+      });
+
+      for (const step of paymentSteps) {
+        if (step.step_status === 'PENDING') {
+          await this.STEP.update({
+            where: { step_id: step.step_id },
+            data: { step_status: 'IN_PROGRESS' },
+          });
+        }
+        
+        await this.stepService.completeStep(step.step_id);
+
+        if (step.flow_id) {
+          await this.prismaService.flow.updateMany({
+            where: { flow_id: step.flow_id, status: 'PENDING' },
+            data: { status: 'IN_PROGRESS' },
+          });
+        }
+      }
+
+      await this.prismaService.invoice.updateMany({
+        where: { service_order_id: dto.service_order_id },
+        data: {
+          status: 'PAID',
+          payment_date: new Date(),
+          payment_method: 'CASH',
+        },
+      });
+
+      await this.queueService.generateServiceQueueNumber(dto.service_order_id);
+
+      return {
+        code: 200,
+        message: 'Thanh toán tiền mặt thành công',
+        status: 'success',
+        data: transaction,
+      };
+    } catch (error) {
+      this.logger.error('Cash payment error:', error);
+      return {
+        code: 500,
+        message: 'Thanh toán tiền mặt không thành công',
         status: 'error',
         detail: error,
       };
