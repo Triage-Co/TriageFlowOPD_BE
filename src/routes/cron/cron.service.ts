@@ -1,11 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { PaymentStatusEnum, PrescriptionStatusEnum, StepStatusEnum } from '@prisma/client';
+import {
+  PaymentStatusEnum,
+  PrescriptionStatusEnum,
+  StepStatusEnum,
+} from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class CronService {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
+
+  @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updateFlowAndStepExpired() {
     const timeZone = 'Asia/Ho_Chi_Minh';
     const now = new Date();
@@ -68,6 +75,7 @@ export class CronService {
     });
   }
 
+  @Cron('*/1 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updateTransactionStatus() {
     const currentDate = new Date();
     currentDate.setMinutes(currentDate.getMinutes() - 10);
@@ -94,16 +102,18 @@ export class CronService {
       };
     }
 
-    const updatedTransactions = await this.prismaService.transaction.updateMany({
-      where: {
-        docNo: {
-          in: docNos,
+    const updatedTransactions = await this.prismaService.transaction.updateMany(
+      {
+        where: {
+          docNo: {
+            in: docNos,
+          },
+        },
+        data: {
+          status: PaymentStatusEnum.CANCELLED,
         },
       },
-      data: {
-        status: PaymentStatusEnum.CANCELLED,
-      },
-    });
+    );
 
     return {
       message: 'Cập nhật Transaction quá hạn thành công',
@@ -111,21 +121,24 @@ export class CronService {
     };
   }
 
+  @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updatePrescriptionExpired() {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
-    const expiredPrescriptions = await this.prismaService.prescription.findMany({
-      where: {
-        created_at: {
-          lte: oneDayAgo,
+    const expiredPrescriptions = await this.prismaService.prescription.findMany(
+      {
+        where: {
+          created_at: {
+            lte: oneDayAgo,
+          },
+          status: PrescriptionStatusEnum.PENDING,
         },
-        status: PrescriptionStatusEnum.PENDING,
+        select: {
+          prescription_id: true,
+        },
       },
-      select: {
-        prescription_id: true,
-      },
-    });
+    );
 
     const prescriptionIds = expiredPrescriptions.map((p) => p.prescription_id);
 
@@ -153,4 +166,3 @@ export class CronService {
     };
   }
 }
-
