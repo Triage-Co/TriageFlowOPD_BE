@@ -18,7 +18,7 @@ export class CreateBookingRequestDto {
 
 export class UpdateBookingRequestDto extends PartialType(
   CreateBookingRequestDto,
-) {}
+) { }
 
 export class BookingSpecialtyDto {
   @IsUUID()

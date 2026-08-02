@@ -69,7 +69,7 @@ export class BookingService {
     private readonly serviceRepository: IServiceRepository,
     @Inject('IQueueRepository')
     private readonly queueRepository: IQueueRepository,
-  ) {}
+  ) { }
 
   async create(createBookingData: CreateBookingRequestDto) {
     const { patient_id, slot_id } = createBookingData;
@@ -178,7 +178,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
+          'Lỗi tạo giao dịch thanh toán',
         );
       }
 
