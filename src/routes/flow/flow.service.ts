@@ -19,7 +19,7 @@ export class FlowService {
     private readonly serviceOrderRepository: IServiceOrderRepository,
     @Inject('IServiceRepository')
     private readonly serviceRepository: IServiceRepository,
-  ) { }
+  ) {}
 
   private roundRobinTracker = new Map<string, number>();
 
@@ -33,8 +33,11 @@ export class FlowService {
       data: data,
     };
   }
-  async findIsActiveByPatientId(patient_id: string) {
-    const data = await this.flowRepository.findIsActiveByPatientId(patient_id);
+  async findIsActiveByPatientId(patient_id: string, date?: string) {
+    const data = await this.flowRepository.findIsActiveByPatientId(
+      patient_id,
+      date,
+    );
 
     return {
       code: 200,

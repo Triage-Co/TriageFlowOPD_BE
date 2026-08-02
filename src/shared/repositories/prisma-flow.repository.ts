@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IFlowRepository } from '../interfaces/i-flow.repository';
 import { Flow, Prisma } from '@prisma/client';
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 const findQuery = {
   booking: {
@@ -35,7 +35,7 @@ const findQuery = {
 
 @Injectable()
 export class PrismaFlowRepository implements IFlowRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
   create(
     data: Prisma.FlowUncheckedCreateInput,
     tx?: Prisma.TransactionClient,
@@ -46,7 +46,31 @@ export class PrismaFlowRepository implements IFlowRepository {
       data,
     });
   }
-  async findIsActiveByPatientId(patient_id: string): Promise<any> {
+  async findIsActiveByPatientId(
+    patient_id: string,
+    date?: string,
+  ): Promise<any> {
+    let dateFilter = {};
+
+    if (date) {
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const now = new Date(date);
+      const currentDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+
+      const start = toDate(`${currentDate}T00:00:00`, { timeZone });
+      const end = toDate(`${currentDate}T23:59:59`, { timeZone });
+
+      dateFilter = {
+        slot: {
+          shift: {
+            date: {
+              gte: start,
+              lte: end,
+            },
+          },
+        },
+      };
+    }
     const rawFlow = await this.prismaService.flow.findMany({
       where: {
         status: {
@@ -54,6 +78,7 @@ export class PrismaFlowRepository implements IFlowRepository {
         },
         booking: {
           patient_id: patient_id,
+          ...dateFilter,
         },
       },
       include: findQuery,
@@ -106,22 +131,22 @@ export class PrismaFlowRepository implements IFlowRepository {
         service_order_id: step.service_order_id,
         room_info: step.room
           ? {
-            room_name: step.room.room_name,
-            room_id: step.room.room_id,
-          }
+              room_name: step.room.room_name,
+              room_id: step.room.room_id,
+            }
           : null,
         specialty_info:
           step.room && step.room.specialty
             ? {
-              specialty_name: step.room?.specialty.specialty_name,
-              specialty_id: step.room?.specialty.specialty_id,
-            }
+                specialty_name: step.room?.specialty.specialty_name,
+                specialty_id: step.room?.specialty.specialty_id,
+              }
             : null,
         staff_info: step.staff
           ? {
-            staff_id: step.staff.staff_id,
-            full_name: step.staff.full_name || 'N/A',
-          }
+              staff_id: step.staff.staff_id,
+              full_name: step.staff.full_name || 'N/A',
+            }
           : null,
         parent_step_id: step.parent_step_id,
         physicalRoomId: step.physicalRoomId,
@@ -190,22 +215,22 @@ export class PrismaFlowRepository implements IFlowRepository {
         docNo: step.docNo,
         room_info: step.room
           ? {
-            room_name: step.room.room_name,
-            room_id: step.room.room_id,
-          }
+              room_name: step.room.room_name,
+              room_id: step.room.room_id,
+            }
           : null,
         specialty_info:
           step.room && step.room.specialty
             ? {
-              specialty_name: step.room.specialty.specialty_name,
-              specialty_id: step.room.specialty.specialty_id,
-            }
+                specialty_name: step.room.specialty.specialty_name,
+                specialty_id: step.room.specialty.specialty_id,
+              }
             : null,
         staff_info: step.staff
           ? {
-            staff_id: step.staff.staff_id,
-            full_name: step.staff.full_name || 'N/A',
-          }
+              staff_id: step.staff.staff_id,
+              full_name: step.staff.full_name || 'N/A',
+            }
           : null,
         payment_status: step.payment_status,
         parent_step_id: step.parent_step_id,
