@@ -71,7 +71,6 @@ export class BookingService {
     private readonly queueRepository: IQueueRepository,
   ) {}
 
-
   async create(createBookingData: CreateBookingRequestDto) {
     const { patient_id, slot_id } = createBookingData;
 
@@ -84,6 +83,18 @@ export class BookingService {
       throw new NotFoundException({
         message: 'Không tìm thấy bệnh nhân',
         detail: `Không tìm thấy bệnh nhân với id ${patient_id}`,
+      });
+    }
+
+    const flowInProgress = await this.flowRepository.findIsActiveByDate(
+      patient_id,
+      slot.shift.date,
+    );
+
+    if (flowInProgress.length > 0) {
+      throw new BadRequestException({
+        message: 'Bệnh nhân đã đặt khám trong ngày hôm này',
+        detail: `Bênh nhân với id ${patient_id} đang có lịch khám trong ngày hôm nay`,
       });
     }
 
@@ -151,7 +162,6 @@ export class BookingService {
         },
         tx,
       );
-      
 
       const paymentLink = await this.transactionService.create(
         {
@@ -248,7 +258,9 @@ export class BookingService {
     });
 
     if (!fullSlot || !fullSlot.shift) {
-      throw new BadRequestException({ message: 'Không tìm thấy thông tin ca trực' });
+      throw new BadRequestException({
+        message: 'Không tìm thấy thông tin ca trực',
+      });
     }
 
     let stepKhamBenh = await this.prismaService.step.findFirst({
@@ -295,7 +307,9 @@ export class BookingService {
 
     const maxCapacity = Number(fullSlot.max_capacity || 10);
     const index = Number(fullSlot.slot_index || 0);
-    const slotIsBooking = await this.bookingRepository.countBySlotId(slot.slot_id);
+    const slotIsBooking = await this.bookingRepository.countBySlotId(
+      slot.slot_id,
+    );
     const number: number = index * maxCapacity + slotIsBooking;
 
     const queue = await this.queueRepository.create({
@@ -313,9 +327,10 @@ export class BookingService {
       const bookingId = serviceOrder.booking_id;
       const patientId = serviceOrder.booking?.patient_id;
       if (bookingId && patientId) {
-        const existingSession = await this.prismaService.visit_Session.findUnique({
-          where: { booking_id: bookingId },
-        });
+        const existingSession =
+          await this.prismaService.visit_Session.findUnique({
+            where: { booking_id: bookingId },
+          });
         if (!existingSession) {
           await this.prismaService.visit_Session.create({
             data: {

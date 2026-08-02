@@ -8,11 +8,17 @@ import {
   Delete,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { FlowService } from './flow.service';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { UpdateFlowDto } from './dto/update-flow.dto';
-import { ApiBearerAuth, ApiBody, ApiOperation } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -24,7 +30,7 @@ import {
 
 @Controller('flow')
 export class FlowController {
-  constructor(private readonly flowService: FlowService) { }
+  constructor(private readonly flowService: FlowService) {}
 
   @Get('patient/:patient_id/kiosk')
   @ApiBearerAuth()
@@ -42,8 +48,18 @@ export class FlowController {
   @ApiOperation({
     summary: '[KIOSK] Tìm flow đang chạy (IN_PROGRESS) theo Patient ID',
   })
-  async findIsActiveByPatientIdInKiosk(@Param('patient_id') patientId: string) {
-    return this.flowService.findIsActiveByPatientId(patientId);
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description:
+      'Định dạng ngày (VD: 2024-10-25). Bỏ trống nếu muốn lấy tất cả.',
+  })
+  async findIsActiveByPatientIdInKiosk(
+    @Param('patient_id') patientId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.flowService.findIsActiveByPatientId(patientId, date);
   }
 
   @Get('patient/:patient_id')
@@ -62,8 +78,18 @@ export class FlowController {
   @ApiOperation({
     summary: '[AUTH] Tìm flow đang chạy (IN_PROGRESS) theo Patient ID',
   })
-  async findIsActiveByPatientId(@Param('patient_id') patientId: string) {
-    return this.flowService.findIsActiveByPatientId(patientId);
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description:
+      'Định dạng ngày (VD: 2024-10-25). Bỏ trống nếu muốn lấy tất cả.',
+  })
+  async findIsActiveByPatientId(
+    @Param('patient_id') patientId: string,
+    @Query('date') date?: string,
+  ) {
+    return this.flowService.findIsActiveByPatientId(patientId, date);
   }
 
   @Get()
@@ -127,6 +153,9 @@ export class FlowController {
     @Param('flow_id') flowId: string,
     @Param('template_id') templateId: string,
   ) {
-    return await this.flowService.addTemplateToFlowByTeamplateId(flowId, templateId);
+    return await this.flowService.addTemplateToFlowByTeamplateId(
+      flowId,
+      templateId,
+    );
   }
 }
