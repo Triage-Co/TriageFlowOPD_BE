@@ -41,10 +41,10 @@ export class ServiceService {
   }
 
   async findAll(queryReqDto: QueryServiceReqDto) {
-    const { page, limit } = queryReqDto;
+    const { page, limit, service_type } = queryReqDto;
 
     try {
-      const data = await this.serviceRepository.findAll(page, limit);
+      const data = await this.serviceRepository.findAll(page, limit, service_type);
 
       return {
         code: 200,
@@ -55,7 +55,7 @@ export class ServiceService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Lỗi không xác định';
-      throw ServiceErrors.ActionFailed('Cập nhật dịch vụ', errorMessage);
+      throw ServiceErrors.ActionFailed('Lấy danh sách dịch vụ', errorMessage);
     }
   }
 

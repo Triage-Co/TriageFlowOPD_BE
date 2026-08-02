@@ -1,4 +1,4 @@
-import { Prisma, Service, Staff } from '@prisma/client';
+import { Prisma, Service, ServiceTypeEnum, Staff } from '@prisma/client';
 
 export interface IServiceRepository {
   findByCode(code: string): Promise<Service | null>
@@ -14,6 +14,7 @@ export interface IServiceRepository {
   findAll(
     page?: number,
     limit?: number,
+    service_type?: ServiceTypeEnum,
   ): Promise<
     Partial<{
       data: Partial<Service>[];
