@@ -54,3 +54,16 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+/generated/prisma
+.vercel
+
+/init/
+init/*
+/init
+init
+init/data.ts
+
+*.seed.ts
+
+.cursor/rules/codegraph.mdc

@@ -1,0 +1,171 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
+import { StepService } from './step.service';
+import {
+  CreateDependencyReqDto,
+  UpdateDependencyReqDto,
+  CreateParentStepReqDto,
+  CreateSubStepReqDto,
+  FindByIdAndPatientIdReqDto,
+  UpdateStepReqDto,
+  UpdateStepStatusReqDto,
+} from './dto/req-step.dto';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
+import { orGuard } from '../../shared/guards/orGuards';
+import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
+
+@Controller('step')
+@ApiBearerAuth()
+@UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
+export class StepController {
+  constructor(private readonly stepService: StepService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Lấy danh sách các bước mà bệnh nhân chưa thanh toán',
+  })
+  findPendingPaymentStepsByPatientId(@Query('patient_id') patientId: string) {
+    return this.stepService.findPendingPaymentStepsByPatientId(patientId);
+  }
+
+  @Get(':step_id/me')
+  @ApiOperation({
+    summary: 'Tìm step theo step id của account (đăng nhập với account)',
+  })
+  findByIdAndAccountId(@Req() req: any, @Param('step_id') step_id: string) {
+    const id = req.user.id || req.user.sub;
+    return this.stepService.findByIdAndAccountId(id, step_id);
+  }
+
+  @Get(':step_id/patient/:patient_id')
+  @ApiOperation({
+    summary: 'Tìm step theo step id và id của patient [dùng patient id]',
+  })
+  findByIdAndPatientId(
+    @Param('step_id') step_id: string,
+    @Param('patient_id') patient_id: string,
+  ) {
+    return this.stepService.findByIdAndPatientId(step_id, patient_id);
+  }
+
+  @Get(':step_id')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'NURSE',
+    'RECEPTIONIST',
+  )
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Tìm step theo step id của staff',
+  })
+  findById(@Param('step_id') step_id: string) {
+    return this.stepService.findById(step_id);
+  }
+
+  @Post('parent')
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Tạo step cha của admin và doctor',
+  })
+  createParentStep(@Body() createParentStepReqDto: CreateParentStepReqDto) {
+    return this.stepService.createParentStep(createParentStepReqDto);
+  }
+  @Post('sub')
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Tạo step con của admin và doctor',
+  })
+  createSubStep(@Body() createSubStepReqDto: CreateSubStepReqDto) {
+    return this.stepService.createSubStep(createSubStepReqDto);
+  }
+  @Post('dependency')
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Tạo phụ thuộc (waiting_step (step hiện tại), required_step (step cần hoàn thành)) của admin và doctor',
+  })
+  createDependency(@Body() createDependencyReqDto: CreateDependencyReqDto) {
+    return this.stepService.createDependency(createDependencyReqDto);
+  }
+
+  @Patch('dependency')
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Cập nhật phụ thuộc của bước (đổi required_step_id cũ thành mới)',
+  })
+  updateDependency(@Body() updateDependencyReqDto: UpdateDependencyReqDto) {
+    return this.stepService.updateDependency(updateDependencyReqDto);
+  }
+
+  @Patch(':step_id/complete')
+  @roles('ADMIN', 'DOCTOR', 'LAB_TECHNICIAN', 'PHARMACIST', 'NURSE')
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái step của staff',
+  })
+  completeStep(@Param('step_id') stepId: string) {
+    return this.stepService.completeStep(stepId);
+  }
+
+  @Patch(':step_id')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'RECEPTIONIST',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+  )
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Cập nhật thông tin chung của step (nhân viên, phòng, trạng thái thanh toán...)',
+  })
+  updateStep(
+    @Param('step_id') stepId: string,
+    @Body() updateStepReqDto: UpdateStepReqDto,
+  ) {
+    return this.stepService.updateStep(stepId, updateStepReqDto);
+  }
+
+  @Patch(':step_id/status')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'NURSE',
+    'RECEPTIONIST',
+  )
+  @UseGuards(IsRoleGuard)
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái của step (IN_PROGRESS, CANCELLED...)',
+  })
+  updateStepStatus(
+    @Param('step_id') stepId: string,
+    @Body() updateStepStatusReqDto: UpdateStepStatusReqDto,
+  ) {
+    return this.stepService.updateStepStatus(stepId, updateStepStatusReqDto);
+  }
+}

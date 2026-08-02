@@ -1,0 +1,1039 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis]
+}
+
+enum GenderTypeEnum {
+  MALE
+  FEMALE
+}
+
+enum RoleTypeEnum {
+  USER
+  DOCTOR
+  RECEPTIONIST
+  NURSE
+  LAB_TECHNICIAN
+  PHARMACIST
+  ADMIN
+}
+
+enum TransStatusEnum {
+  SUCCESSED
+  CANCELLED
+  PENDING
+}
+
+enum TransTypeEnum {
+  APPOINTMENT_PAYMENT // 11
+  APPOINTMENT_REFUND // 19
+
+  BOOKING_PAYMENT_1 // 21
+  BOOKING_PAYMENT_2 // 22
+  BOOKING_REFUND // 29
+
+  ORDER_PAYMENT // 31
+  ORDER_REFUND // 39
+
+  WALLET_TOP_UP // 41
+  WALLET_WITHDRAW // 42
+}
+
+// 11 - thanh toán cho appointment
+// 19 - hoàn tiền cho appointment
+// 21 - thanh toán cho booking lần 1
+// 22 - thanh toán cho booking lần 2
+// 29 - hoàn tiền cho booking
+// 31 - thanh toán cho order
+// 39 - hoàn tiền cho order
+// 41 - nạp tiền cho wallet
+// 42 - rút tiền cho wallet
+
+enum SlotStatusEnum {
+  AVAILABLE
+  FULL
+  CLOSED
+}
+
+enum BookingStatusEnum {
+  AVAILABLE
+  CANCELLED
+}
+
+enum FlowStatusEnum {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  CANCELLED
+}
+
+enum PaymentStatusEnum {
+  PENDING
+  PROCESSING
+  SUCCESSED
+  EXPIRED
+  CANCELLED
+}
+
+enum QueueStatusEnum {
+  PENDING
+  QUEUED
+  CALLED
+  SERVING
+  FINISHED
+  MISSING
+  CANCELLED
+}
+
+enum StepStatusEnum {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+  CANCELLED
+}
+
+enum ClinicalRoomType {
+  RECEPTION
+  TRIAGE_AREA
+  CLINICAL_ROOM
+  PROCEDURE_ROOM
+  LABORATORY
+  IMAGING_ROOM
+  FUNCTIONAL_EXPLORATION
+  PHARMACY
+  CASHIER
+  EMPTY
+  OTHER
+}
+
+enum StepTypeEnum {
+  REGISTRATION
+  TRIAGE
+  CLINICAL
+  PROCEDURE
+  LAB_TEST
+  IMAGING
+  FUNCTIONAL_EXPLORATION
+  PAYMENT
+  DISPENSING //phân phối thuốc
+  OTHER
+}
+
+enum ServiceTypeEnum {
+  CLINICAL_EXAMINATION
+  PRESCRIPTION
+  DIAGNOSTIC_TEST
+  PROCEDURE
+}
+
+enum InvoiceStatusEnum {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum ServiceOrderStatusEnum {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  PAID
+}
+
+enum ServiceOrderDetailStatusEnum {
+  PENDING
+  PAID
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Account {
+  account_id String         @id @default(uuid()) @db.Uuid
+  avatar     String         @default("https://img.magnific.com/premium-vector/3d-simple-user-icon-isolated_169241-6922.jpg?semt=ais_hybrid&w=740&q=80")
+  user_name  String
+  email      String         @unique
+  role       RoleTypeEnum   @default(USER)
+  gender     GenderTypeEnum @default(MALE)
+  phone      String?        @unique
+  is_banned  Boolean        @default(false)
+  createdAt  DateTime       @default(now()) @db.Timestamptz()
+  updatedAt  DateTime       @default(now()) @updatedAt @db.Timestamptz()
+
+  patients Patient[]
+  staffs   Staff[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@map("account")
+}
+
+model Patient {
+  patient_id          String         @id @default(uuid()) @db.Uuid
+  account_id          String         @db.Uuid
+  medical_coverage_id String?        @unique
+  full_name           String
+  dob                 DateTime?      @db.Timestamptz()
+  gender              GenderTypeEnum @default(MALE)
+  citizen_id          String         @unique
+  createdAt           DateTime       @default(now()) @db.Timestamptz()
+  updatedAt           DateTime       @default(now()) @updatedAt @db.Timestamptz()
+
+  blood_type    String?
+  allergy_notes String?
+
+  account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  bookings       Booking[]
+  patientAnswers Patient_Answer[]
+  visitSessions  Visit_Session[]
+
+  @@index([citizen_id])
+  @@index([account_id])
+  @@map("patient")
+}
+
+model Staff {
+  staff_id         String   @id @db.Uuid
+  full_name        String
+  license_number   String   @default("N/A")
+  experience_years Int      @default(0)
+  specialty_id     String?  @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz()
+  updatedAt        DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  account Account @relation(fields: [staff_id], references: [account_id], onDelete: Cascade)
+
+  specialty     Specialty?      @relation(fields: [specialty_id], references: [specialty_id], onDelete: Cascade)
+  shifts        Shift[]
+  steps         Step[]
+  prescriptions Prescription[]
+  serviceOrders Service_Order[]
+
+  @@index([specialty_id])
+  @@index([full_name])
+  @@map("staff")
+}
+
+model Specialty {
+  specialty_id   String   @id @default(uuid()) @db.Uuid
+  specialty_code String   @unique
+  specialty_name String
+  description    String?
+  createdAt      DateTime @default(now()) @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  staffs             Staff[]
+  triageInformations Triage_Information[]
+  rooms              Room[]
+
+  @@index([specialty_code])
+  @@index([specialty_name])
+  @@map("specialty")
+}
+
+model Slot {
+  slot_id      String         @id @default(uuid()) @db.Uuid
+  slot_index   Int?
+  shift_id     String         @db.Uuid
+  start_time   String
+  end_time     String
+  capacity     Int            @default(10)
+  max_capacity Int            @default(10)
+  status       SlotStatusEnum @default(AVAILABLE)
+  createdAt    DateTime       @default(now()) @db.Timestamptz()
+  updatedAt    DateTime       @default(now()) @updatedAt @db.Timestamptz()
+
+  shift    Shift     @relation(fields: [shift_id], references: [shift_id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([start_time, end_time])
+  @@index([status])
+  @@index([shift_id, start_time, capacity])
+  @@map("slot")
+}
+
+model Shift {
+  shift_id   String   @id @default(uuid()) @db.Uuid
+  staff_id   String   @db.Uuid
+  room_id    String   @db.Uuid
+  date       DateTime @db.Timestamptz()
+  start_time String
+  end_time   String
+
+  createdAt DateTime @default(now()) @db.Timestamptz()
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  slots Slot[]
+
+  staff          Staff         @relation(fields: [staff_id], references: [staff_id], onDelete: Cascade)
+  room           Room          @relation(fields: [room_id], references: [room_id])
+  physicalRoom   PhysicalRoom? @relation(fields: [physicalRoomId], references: [id])
+  physicalRoomId String?       @db.Uuid
+
+  @@index([date, start_time, end_time])
+  @@index([room_id])
+  @@index([room_id, date])
+  @@map("shift")
+}
+
+model Booking {
+  booking_id String            @id @default(uuid()) @db.Uuid
+  patient_id String            @db.Uuid
+  slot_id    String            @db.Uuid
+  status     BookingStatusEnum @default(AVAILABLE)
+  created_at DateTime          @default(now()) @db.Timestamptz()
+  updated_at DateTime          @default(now()) @updatedAt @db.Timestamptz()
+
+  patient Patient @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  slot    Slot    @relation(fields: [slot_id], references: [slot_id], onDelete: Cascade)
+
+  prescriptions Prescription[]
+  visitSession  Visit_Session?
+  serviceOrders Service_Order[]
+  flow          Flow?
+
+  @@index([patient_id, slot_id, status])
+  @@index([patient_id])
+  @@index([slot_id])
+  @@map("booking")
+}
+
+model Flow {
+  flow_id    String         @id @default(uuid()) @db.Uuid
+  booking_id String         @unique @db.Uuid
+  status     FlowStatusEnum @default(PENDING)
+  created_at DateTime       @default(now()) @db.Timestamptz()
+  updated_at DateTime       @default(now()) @updatedAt @db.Timestamptz()
+
+  booking       Booking        @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  steps         Step[]
+  prescriptions Prescription[]
+
+  @@index([booking_id])
+  @@index([status])
+  @@map("flow")
+}
+
+model Room {
+  room_id          String           @id @default(uuid()) @db.Uuid
+  room_name        String
+  room_type        ClinicalRoomType @default(CLINICAL_ROOM)
+  physical_room_id String?          @db.Uuid
+  specialty_id     String?          @db.Uuid
+  shifts           Shift[]
+  created_at       DateTime         @default(now()) @db.Timestamptz()
+  updated_at       DateTime         @default(now()) @updatedAt @db.Timestamptz()
+
+  specialty     Specialty?    @relation(fields: [specialty_id], references: [specialty_id])
+  physical_room PhysicalRoom? @relation(fields: [physical_room_id], references: [id], onDelete: SetNull)
+  steps         Step[]
+
+  @@index([room_name, room_type])
+  @@index([physical_room_id])
+  @@index([specialty_id])
+  @@map("room")
+}
+
+model Step {
+  step_id   String  @id @default(uuid()) @db.Uuid
+  step_name String?
+
+  flow_id          String? @db.Uuid
+  room_id          String? @db.Uuid
+  staff_id         String? @db.Uuid
+  service_order_id String? @db.Uuid
+
+  step_status  StepStatusEnum @default(PENDING)
+  service_code String?
+  step_type    StepTypeEnum?
+
+  created_at DateTime @default(now()) @db.Timestamptz()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  service_order  Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
+  parent_step_id String?        @db.Uuid
+  parent_step    Step?          @relation("StepHierarchy", fields: [parent_step_id], references: [step_id])
+  sub_step       Step[]         @relation("StepHierarchy")
+
+  flow  Flow?  @relation(fields: [flow_id], references: [flow_id])
+  room  Room?  @relation(fields: [room_id], references: [room_id])
+  staff Staff? @relation(fields: [staff_id], references: [staff_id])
+
+  physicalRoomId String?           @db.Uuid
+  physicalRoom   PhysicalRoom?     @relation(fields: [physicalRoomId], references: [id])
+  dependencies   Step_Dependency[] @relation("StepNeedsToWait") //step con (phải đước hoàn thành -> step cha mới hoàn thành)
+  dependedBy     Step_Dependency[] @relation("StepIsDependedOn") //step mình hoàn thành -> step tiếp theo được làm tiếp
+  queues         Queue[]
+
+  @@index([flow_id])
+  @@index([room_id])
+  @@index([staff_id])
+  @@index([step_status])
+  @@map("step")
+}
+
+model Step_Dependency {
+  id String @id @default(uuid()) @db.Uuid
+
+  step_id String @db.Uuid
+
+  depends_on_step_id String @db.Uuid
+
+  step Step @relation("StepNeedsToWait", fields: [step_id], references: [step_id], onDelete: Cascade)
+
+  dependsOnStep Step @relation("StepIsDependedOn", fields: [depends_on_step_id], references: [step_id], onDelete: Cascade)
+
+  @@unique([step_id, depends_on_step_id])
+  @@map("step_dependency")
+}
+
+model Flow_Template {
+  template_id   String @id @default(uuid()) @db.Uuid
+  template_name String
+  steps         Json[] @db.JsonB
+}
+
+model Queue {
+  queue_id     String          @id @default(uuid()) @db.Uuid
+  step_id      String          @db.Uuid
+  queue_number String
+  status       QueueStatusEnum @default(PENDING)
+  created_at   DateTime        @default(now()) @db.Timestamptz()
+  updated_at   DateTime        @default(now()) @updatedAt @db.Timestamptz()
+  step         Step            @relation(fields: [step_id], references: [step_id])
+  moveLogs     Move_Log[]
+
+  @@map("queue")
+}
+
+model Move_Log {
+  log_id      String   @id @default(uuid()) @db.Uuid
+  queue_id    String?  @db.Uuid
+  action_type String?
+  created_at  DateTime @default(now()) @db.Timestamptz()
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz()
+  queue       Queue?   @relation(fields: [queue_id], references: [queue_id], onDelete: Cascade)
+
+  @@map("move_log")
+}
+
+enum PrescriptionStatusEnum {
+  PENDING
+  PROCESSING
+  PREPARED
+  DISPENSED
+  CANCELLED
+  EXPIRED
+}
+
+model Prescription {
+  prescription_id  String                 @id @default(uuid()) @db.Uuid
+  prescription_code String                @unique
+  qr_code          String?
+  service_order_id String?                @unique @db.Uuid
+  visit_session_id String?                @unique @db.Uuid
+  booking_id       String?                @db.Uuid
+  flow_id          String?                @db.Uuid
+  prescribed_by    String?                @db.Uuid
+  diagnosis_note   String?                @db.Text
+  total_amount     Int                    @default(0)
+  status           PrescriptionStatusEnum @default(PENDING)
+  created_at       DateTime               @default(now()) @db.Timestamptz()
+  updated_at       DateTime               @default(now()) @updatedAt @db.Timestamptz()
+
+  serviceOrder        Service_Order?        @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
+  visitSession        Visit_Session?        @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
+  booking             Booking?              @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  flow                Flow?                 @relation(fields: [flow_id], references: [flow_id], onDelete: Cascade)
+  doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
+  prescriptionDetails Prescription_Detail[]
+
+  @@index([prescription_code])
+  @@map("prescription")
+}
+
+model Prescription_Detail {
+  prescription_detail_id String   @id @default(uuid()) @db.Uuid
+  prescription_id        String   @db.Uuid
+  medicine_id            String   @db.Uuid
+  quantity               Int      @default(1)
+  dosage_instruction     String?
+  unit_price             Int      @default(0)
+  sub_total              Int      @default(0)
+  note                   String?
+  created_at             DateTime @default(now()) @db.Timestamptz()
+  updated_at             DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  prescription Prescription @relation(fields: [prescription_id], references: [prescription_id], onDelete: Cascade)
+  medicine     Medicine     @relation(fields: [medicine_id], references: [medicine_id])
+
+  @@map("prescription_detail")
+}
+
+model Medicine {
+  medicine_id         String                @id @default(uuid()) @db.Uuid
+  medicine_code       String                @unique
+  medicine_name       String
+  active_ingredient   String?
+  unit                String?
+  usage_route         String?
+  unit_price          Int                   @default(0)
+  manufacturer        String?
+  description         String?               @db.Text
+  is_active           Boolean               @default(true)
+  prescriptionDetails Prescription_Detail[]
+  created_at          DateTime              @default(now()) @db.Timestamptz()
+  updated_at          DateTime              @default(now()) @updatedAt @db.Timestamptz()
+
+  @@index([medicine_code])
+  @@index([medicine_name])
+  @@map("medicine")
+}
+
+model Service {
+  service_id          String                 @id @default(uuid()) @db.Uuid
+  service_code        String?
+  service_name        String?
+  price               Int
+  service_type        ServiceTypeEnum
+  room_type           ClinicalRoomType?
+  is_active           Boolean                @default(true)
+  serviceOrderDetails Service_Order_Detail[]
+  created_at          DateTime               @default(now()) @db.Timestamptz()
+  updated_at          DateTime               @default(now()) @updatedAt @db.Timestamptz()
+
+  @@index([service_code])
+  @@index([service_type])
+  @@map("service")
+}
+
+model Service_Order_Detail {
+  service_order_detail_id String                       @id @default(uuid()) @db.Uuid
+  name                    String?
+  service_order_id        String?                      @db.Uuid
+  service_id              String?                      @db.Uuid
+  price_at_order          Int?
+  quantity                Int?
+  status                  ServiceOrderDetailStatusEnum @default(PENDING)
+
+  created_at DateTime       @default(now()) @db.Timestamptz()
+  updated_at DateTime       @default(now()) @updatedAt @db.Timestamptz()
+  order      Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
+  service    Service?       @relation(fields: [service_id], references: [service_id])
+
+  @@map("service_order_detail")
+}
+
+model Service_Order {
+  service_order_id   String                 @id @default(uuid()) @db.Uuid
+  booking_id         String?                @db.Uuid
+  name               String?
+  assign_by_staff_id String?                @db.Uuid
+  status             ServiceOrderStatusEnum @default(PENDING)
+  qr_code            String?
+  payment_status     PaymentStatusEnum      @default(PENDING)
+  created_at         DateTime               @default(now()) @db.Timestamptz()
+  updated_at         DateTime               @default(now()) @updatedAt @db.Timestamptz()
+
+  serviceOrderDetails Service_Order_Detail[]
+  steps               Step[]
+  transactions        Transaction[]
+  booking             Booking?               @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
+  staff               Staff?                 @relation(fields: [assign_by_staff_id], references: [staff_id])
+  invoices            Invoice[]
+  prescription        Prescription?
+
+  @@index([booking_id])
+  @@index([assign_by_staff_id])
+  @@map("service_order")
+}
+
+model Invoice {
+  invoice_id       String            @id @default(uuid()) @db.Uuid
+  service_order_id String            @db.Uuid
+  total_amount     Int               @default(0)
+  status           InvoiceStatusEnum @default(PENDING)
+  payment_method   String?
+  payment_date     DateTime?         @db.Timestamptz()
+  created_at       DateTime          @default(now()) @db.Timestamptz()
+  updated_at       DateTime          @default(now()) @updatedAt @db.Timestamptz()
+
+  service_order   Service_Order    @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
+  invoice_details Invoice_Detail[]
+
+  @@map("invoice")
+}
+
+model Invoice_Detail {
+  invoice_detail_id String   @id @default(uuid()) @db.Uuid
+  invoice_id        String   @db.Uuid
+  item_name         String
+  quantity          Int      @default(1)
+  unit_price        Int      @default(0)
+  sub_total         Int      @default(0)
+  created_at        DateTime @default(now()) @db.Timestamptz()
+  updated_at        DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  invoice Invoice @relation(fields: [invoice_id], references: [invoice_id], onDelete: Cascade)
+
+  @@index([invoice_id])
+  @@map("invoice_detail")
+}
+
+model Patient_Answer {
+  patient_answer_id  String   @id @default(uuid()) @db.Uuid
+  patient_id         String?  @db.Uuid
+  citizen_id         String?
+  questionnaire_data Json?    @db.JsonB
+  interview_token    String?  @unique
+  created_at         DateTime @default(now()) @db.Timestamptz()
+  updated_at         DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  patient           Patient?             @relation(fields: [patient_id], references: [patient_id])
+  triageInformation Triage_Information[]
+
+  @@map("patient_answer")
+}
+
+model Triage_Information {
+  triage_information_id String   @id @default(uuid()) @db.Uuid
+  answer_id             String?  @db.Uuid
+  specialty_id          String?  @db.Uuid
+  interview_token       String?  @unique
+  suggested_priority    Int?
+  created_at            DateTime @default(now()) @db.Timestamptz()
+  updated_at            DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  answer    Patient_Answer? @relation(fields: [answer_id], references: [patient_answer_id])
+  specialty Specialty?      @relation(fields: [specialty_id], references: [specialty_id])
+
+  @@map("triage_information")
+}
+
+enum ClinicalDocumentTypeEnum {
+  PRESCRIPTION
+  LAB_TEST
+  IMAGING_TEST
+  PROCEDURE
+  OTHER
+}
+
+model Visit_Session {
+  visit_session_id   String   @id @default(uuid()) @db.Uuid
+  patient_id         String   @db.Uuid
+  visit_date         DateTime @default(now()) @db.Timestamptz()
+  chief_complaint    String?
+  heart_rate         Int?
+  blood_pressure_sys Int?
+  blood_pressure_dia Int?
+  temperature        Float?
+  spo2               Int?
+  diagnosis          String?  @db.Text
+  final_diagnosis    String?
+  hpi                String?  @db.Text
+  pmh                String?  @db.Text
+  pe                 Json?    @db.JsonB
+
+  patient           Patient             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
+  clinicalDocuments Clinical_Document[]
+  booking_id        String?             @unique @db.Uuid
+  booking           Booking?            @relation(fields: [booking_id], references: [booking_id], onDelete: SetNull)
+  prescription      Prescription?
+
+  @@map("visit_session")
+}
+
+model Clinical_Document {
+  clinical_document_id String                   @id @default(uuid()) @db.Uuid
+  visit_session_id     String                   @db.Uuid
+  document_type        ClinicalDocumentTypeEnum
+  payload_data         Json                     @db.JsonB
+  his_reference_id     String?
+
+  visitSession Visit_Session @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
+
+  @@map("clinical_document")
+}
+
+model Triage_Config {
+  triage_config String  @id @default(uuid()) @db.Uuid
+  rule_key      String?
+  rule_value    Json?   @db.JsonB
+
+  @@map("triage_config")
+}
+
+model Flow_Rules_Config {
+  flow_rules_config_id String @id @default(uuid()) @db.Uuid
+  conditions           Json?  @db.JsonB
+  actions_to_generate  Json?  @db.JsonB
+
+  @@map("flow_rules_config")
+}
+
+model Transaction {
+  id               String          @id @default(uuid()) @db.Uuid
+  amount           Int
+  transDate        DateTime        @default(now()) @db.Timestamptz()
+  transType        TransTypeEnum
+  docNo            Int             @unique
+  buyerId          String          @db.Uuid
+  status           TransStatusEnum @default(PENDING)
+  service_order_id String?         @db.Uuid
+  created_at       DateTime        @default(now()) @db.Timestamptz()
+  updated_at       DateTime        @default(now()) @updatedAt @db.Timestamptz()
+
+  serviceOrder Service_Order? @relation(fields: [service_order_id], references: [service_order_id], onDelete: Cascade)
+
+  @@index([docNo, status])
+  @@index([transDate, transType])
+  @@index([buyerId])
+  @@map("transaction")
+}
+
+model Notification {
+  id         String   @id @default(uuid()) @db.Uuid
+  account_id String   @db.Uuid
+  message    String
+  created_at DateTime @default(now()) @db.Timestamptz()
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  @@map("notification")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum BoundaryType {
+  WALL
+  DOOR
+  WINDOW
+  OPEN
+}
+
+enum NodeType {
+  ROOM_ENTRANCE
+  CORRIDOR
+  ELEVATOR
+  STAIRS
+  ESCALATOR
+  EXIT
+  JUNCTION
+}
+
+enum ConnectorType {
+  ELEVATOR
+  STAIRS
+  ESCALATOR
+  RAMP
+}
+
+enum BlockageStatus {
+  ACTIVE
+  SCHEDULED
+  CANCELLED
+  EXPIRED
+}
+
+// ─── Spatial Layout ───────────────────────────────────────────────────────────
+
+model Building {
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  addressLabel   String
+  totalFloors    Int
+  organizationId String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz()
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  floors     Floor[]
+  connectors Connector[]
+
+  @@index([organizationId])
+  @@map("building")
+}
+
+model Floor {
+  id                  String                                  @id @default(uuid()) @db.Uuid
+  buildingId          String                                  @db.Uuid
+  floorNumber         Int
+  floorPlanImageUrl   String?
+  widthMeters         Float?
+  heightMeters        Float?
+  scalePixelsPerMeter Float?
+  // PostGIS Polygon: defines the floor outline; corridors = Floor outline minus Room outlines
+  outlineGeom         Unsupported("geometry(Polygon, 4326)")?
+  createdAt           DateTime                                @default(now()) @db.Timestamptz()
+  updatedAt           DateTime                                @default(now()) @updatedAt @db.Timestamptz()
+
+  building       Building        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  rooms          PhysicalRoom[]
+  nodes          Node[]
+  doors          Door[]
+  placedFeatures PlacedFeature[]
+  areas          Area[]
+  boundaries     Boundary[]
+
+  @@unique([buildingId, floorNumber])
+  @@index([buildingId])
+  @@map("floor")
+}
+
+model PhysicalRoom {
+  id           String                                  @id @default(uuid()) @db.Uuid
+  floorId      String                                  @db.Uuid
+  roomCode     String
+  roomLabel    String
+  heightMeters Float?
+  // PostGIS geometry: Point for centroid, Polygon for room outline
+  centerGeom   Unsupported("geometry(Point, 4326)")?
+  outlineGeom  Unsupported("geometry(Polygon, 4326)")?
+  createdAt    DateTime                                @default(now()) @db.Timestamptz()
+  updatedAt    DateTime                                @default(now()) @updatedAt @db.Timestamptz()
+
+  floor              Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  boundaries         Boundary[]
+  adjacentBoundaries Boundary[]      @relation("AdjacentRoom")
+  pois               Poi[]
+  placedFeatures     PlacedFeature[]
+  doorsAsRoomA       Door[]          @relation("DoorRoomA")
+  doorsAsRoomB       Door[]          @relation("DoorRoomB")
+  shifts             Shift[]
+  steps              Step[]
+  rooms              Room[]
+  areaId             String?         @db.Uuid
+  area               Area?           @relation(fields: [areaId], references: [id])
+
+  @@unique([floorId, roomCode])
+  @@index([floorId])
+  @@map("physical_room")
+}
+
+model Boundary {
+  id             String                                     @id @default(uuid()) @db.Uuid
+  floorId        String                                     @db.Uuid
+  roomId         String?                                    @db.Uuid
+  areaId         String?                                    @db.Uuid
+  seqNo          Int
+  lineGeom       Unsupported("geometry(LineString, 4326)")?
+  boundaryType   BoundaryType
+  adjacentRoomId String?                                    @db.Uuid
+  hasWall        Boolean                                    @default(true)
+  doorId         String?                                    @db.Uuid
+  label          String?
+
+  floor        Floor         @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  room         PhysicalRoom? @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  area         Area?         @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  adjacentRoom PhysicalRoom? @relation("AdjacentRoom", fields: [adjacentRoomId], references: [id])
+  door         Door?         @relation(fields: [doorId], references: [id], onDelete: SetNull)
+
+  @@index([floorId])
+  @@index([roomId])
+  @@index([areaId])
+  @@map("boundary")
+}
+
+model Door {
+  id           String                                @id @default(uuid()) @db.Uuid
+  floorId      String                                @db.Uuid
+  nodeId       String?                               @db.Uuid // routing graph node at this door
+  roomAId      String?                               @db.Uuid
+  roomBId      String?                               @db.Uuid
+  positionGeom Unsupported("geometry(Point, 4326)")?
+  isAccessible Boolean                               @default(true)
+  isEmergency  Boolean                               @default(false)
+  active       Boolean                               @default(true)
+  createdAt    DateTime                              @default(now()) @db.Timestamptz()
+
+  floor      Floor         @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  node       Node?         @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  roomA      PhysicalRoom? @relation("DoorRoomA", fields: [roomAId], references: [id])
+  roomB      PhysicalRoom? @relation("DoorRoomB", fields: [roomBId], references: [id])
+  boundaries Boundary[]
+  areaId     String?       @db.Uuid
+  area       Area?         @relation(fields: [areaId], references: [id])
+
+  @@index([floorId, active])
+  @@index([nodeId])
+  @@map("door")
+}
+
+// ─── Directory (POI) ──────────────────────────────────────────────────────────
+
+model Category {
+  id            String  @id @default(uuid()) @db.Uuid
+  name          String  @unique
+  nameLocalized Json?
+  icon          String?
+  sortOrder     Int     @default(0)
+
+  pois Poi[]
+
+  @@index([sortOrder])
+  @@map("category")
+}
+
+model Poi {
+  id            String   @id @default(uuid()) @db.Uuid
+  roomId        String   @db.Uuid
+  categoryId    String   @db.Uuid
+  name          String
+  nameLocalized Json?
+  description   String?
+  keywords      String[]
+  logoUrl       String?
+  contactInfo   Json?
+  openingHours  Json?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @db.Timestamptz()
+  updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  room     PhysicalRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  category Category     @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([roomId, categoryId])
+  @@index([active])
+  @@map("poi")
+}
+
+// ─── Routing Graph ────────────────────────────────────────────────────────────
+
+model Node {
+  id         String                                @id @default(uuid()) @db.Uuid
+  floorId    String                                @db.Uuid
+  type       NodeType
+  coordsGeom Unsupported("geometry(Point, 4326)")?
+  active     Boolean                               @default(true)
+  metadata   Json?
+  createdAt  DateTime                              @default(now()) @db.Timestamptz()
+
+  floor     Floor               @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  edgesFrom Edge[]              @relation("EdgeFromNode")
+  edgesTo   Edge[]              @relation("EdgeToNode")
+  blockages ScheduledBlockage[]
+  doors     Door[]
+
+  @@index([floorId, active])
+  @@map("node")
+}
+
+model Edge {
+  id          String  @id @default(uuid()) @db.Uuid
+  fromNodeId  String  @db.Uuid
+  toNodeId    String  @db.Uuid
+  distance    Float
+  accessible  Boolean @default(true)
+  isEscalator Boolean @default(false)
+  isElevator  Boolean @default(false)
+  isStairs    Boolean @default(false)
+  active      Boolean @default(true)
+
+  fromNode  Node                @relation("EdgeFromNode", fields: [fromNodeId], references: [id], onDelete: Cascade)
+  toNode    Node                @relation("EdgeToNode", fields: [toNodeId], references: [id], onDelete: Cascade)
+  blockages ScheduledBlockage[]
+
+  @@unique([fromNodeId, toNodeId])
+  @@index([fromNodeId, toNodeId, active])
+  @@map("edge")
+}
+
+model Connector {
+  id           String        @id @default(uuid()) @db.Uuid
+  buildingId   String        @db.Uuid
+  type         ConnectorType
+  name         String
+  active       Boolean       @default(true)
+  servedFloors Int[]
+
+  building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@index([buildingId, active])
+  @@map("connector")
+}
+
+// ─── Spatial Assets ───────────────────────────────────────────────────────────
+
+model FeatureTemplate {
+  id                String  @id @default(uuid()) @db.Uuid
+  name              String  @unique
+  category          String
+  modelUrl          String?
+  icon              String?
+  defaultProperties Json?
+
+  placedFeatures PlacedFeature[]
+
+  @@index([category])
+  @@map("feature_template")
+}
+
+model PlacedFeature {
+  id               String                   @id @default(uuid()) @db.Uuid
+  floorId          String                   @db.Uuid
+  roomId           String?                  @db.Uuid
+  templateId       String                   @db.Uuid
+  geometryGeom     Unsupported("geometry")?
+  customProperties Json?
+
+  floor    Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  room     PhysicalRoom?   @relation(fields: [roomId], references: [id])
+  template FeatureTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  areaId   String?         @db.Uuid
+  area     Area?           @relation(fields: [areaId], references: [id])
+
+  @@index([floorId, templateId])
+  @@map("placed_feature")
+}
+
+model Area {
+  id          String                                  @id @default(uuid()) @db.Uuid
+  floorId     String                                  @db.Uuid
+  areaCode    String
+  areaLabel   String
+  description String?
+  centerGeom  Unsupported("geometry(Point, 4326)")?
+  outlineGeom Unsupported("geometry(Polygon, 4326)")?
+  createdAt   DateTime                                @default(now()) @db.Timestamptz()
+  updatedAt   DateTime                                @default(now()) @updatedAt @db.Timestamptz()
+
+  floor          Floor           @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  boundaries     Boundary[]
+  physicalRooms  PhysicalRoom[]
+  placedFeatures PlacedFeature[]
+  doors          Door[]
+
+  @@unique([floorId, areaCode])
+  @@index([floorId])
+  @@map("area")
+}
+
+// ─── Blockage (independent module) ───────────────────────────────────────────
+
+model ScheduledBlockage {
+  id        String         @id @default(uuid()) @db.Uuid
+  name      String
+  nodeId    String?        @db.Uuid
+  edgeId    String?        @db.Uuid
+  startAt   DateTime       @db.Timestamptz()
+  endAt     DateTime       @db.Timestamptz()
+  recurring Boolean        @default(false)
+  reason    String?
+  status    BlockageStatus @default(SCHEDULED)
+  createdAt DateTime       @default(now()) @db.Timestamptz()
+
+  // Cascade: blockage has no meaning if its target Node/Edge no longer exists
+  node Node? @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  edge Edge? @relation(fields: [edgeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, edgeId, status])
+  @@index([startAt, endAt])
+  @@map("scheduled_blockage")
+}
