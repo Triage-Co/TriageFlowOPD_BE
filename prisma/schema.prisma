@@ -207,6 +207,7 @@ model Staff {
   specialty     Specialty?      @relation(fields: [specialty_id], references: [specialty_id], onDelete: Cascade)
   shifts        Shift[]
   steps         Step[]
+  prescriptions Prescription[]
   serviceOrders Service_Order[]
 
   @@index([specialty_id])
@@ -417,42 +418,76 @@ model Move_Log {
   @@map("move_log")
 }
 
+enum PrescriptionStatusEnum {
+  PENDING
+  PROCESSING
+  PREPARED
+  DISPENSED
+  CANCELLED
+  EXPIRED
+}
+
 model Prescription {
-  prescription_id     String                @id @default(uuid()) @db.Uuid
-  booking_id          String?               @db.Uuid
-  flow_id             String?               @db.Uuid
-  prescribed_by       String?               @db.Uuid
-  created_at          DateTime              @default(now()) @db.Timestamptz()
-  updated_at          DateTime              @default(now()) @updatedAt @db.Timestamptz()
+  prescription_id  String                 @id @default(uuid()) @db.Uuid
+  prescription_code String                @unique
+  qr_code          String?
+  service_order_id String?                @unique @db.Uuid
+  visit_session_id String?                @unique @db.Uuid
+  booking_id       String?                @db.Uuid
+  flow_id          String?                @db.Uuid
+  prescribed_by    String?                @db.Uuid
+  diagnosis_note   String?                @db.Text
+  total_amount     Int                    @default(0)
+  status           PrescriptionStatusEnum @default(PENDING)
+  created_at       DateTime               @default(now()) @db.Timestamptz()
+  updated_at       DateTime               @default(now()) @updatedAt @db.Timestamptz()
+
+  serviceOrder        Service_Order?        @relation(fields: [service_order_id], references: [service_order_id], onDelete: SetNull)
+  visitSession        Visit_Session?        @relation(fields: [visit_session_id], references: [visit_session_id], onDelete: Cascade)
   booking             Booking?              @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   flow                Flow?                 @relation(fields: [flow_id], references: [flow_id], onDelete: Cascade)
+  doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
   prescriptionDetails Prescription_Detail[]
 
+  @@index([prescription_code])
   @@map("prescription")
 }
 
 model Prescription_Detail {
   prescription_detail_id String   @id @default(uuid()) @db.Uuid
-  prescription_id        String?  @db.Uuid
-  medicine_id            String?  @db.Uuid
+  prescription_id        String   @db.Uuid
+  medicine_id            String   @db.Uuid
+  quantity               Int      @default(1)
   dosage_instruction     String?
+  unit_price             Int      @default(0)
+  sub_total              Int      @default(0)
+  note                   String?
   created_at             DateTime @default(now()) @db.Timestamptz()
   updated_at             DateTime @default(now()) @updatedAt @db.Timestamptz()
 
-  prescription Prescription? @relation(fields: [prescription_id], references: [prescription_id])
-  medicine     Medicine?     @relation(fields: [medicine_id], references: [medicine_id])
+  prescription Prescription @relation(fields: [prescription_id], references: [prescription_id], onDelete: Cascade)
+  medicine     Medicine     @relation(fields: [medicine_id], references: [medicine_id])
 
   @@map("prescription_detail")
 }
 
 model Medicine {
   medicine_id         String                @id @default(uuid()) @db.Uuid
-  medicine_name       String?
+  medicine_code       String                @unique
+  medicine_name       String
+  active_ingredient   String?
   unit                String?
+  usage_route         String?
+  unit_price          Int                   @default(0)
+  manufacturer        String?
+  description         String?               @db.Text
+  is_active           Boolean               @default(true)
   prescriptionDetails Prescription_Detail[]
   created_at          DateTime              @default(now()) @db.Timestamptz()
   updated_at          DateTime              @default(now()) @updatedAt @db.Timestamptz()
 
+  @@index([medicine_code])
+  @@index([medicine_name])
   @@map("medicine")
 }
 
@@ -505,6 +540,7 @@ model Service_Order {
   booking             Booking?               @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   staff               Staff?                 @relation(fields: [assign_by_staff_id], references: [staff_id])
   invoices            Invoice[]
+  prescription        Prescription?
 
   @@index([booking_id])
   @@index([assign_by_staff_id])
@@ -601,6 +637,7 @@ model Visit_Session {
   clinicalDocuments Clinical_Document[]
   booking_id        String?             @unique @db.Uuid
   booking           Booking?            @relation(fields: [booking_id], references: [booking_id], onDelete: SetNull)
+  prescription      Prescription?
 
   @@map("visit_session")
 }
