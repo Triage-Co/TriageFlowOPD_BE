@@ -21,7 +21,6 @@ export class ExamPackageService {
 
   async findAll() {
     const packages = await this.prisma.exam_Package.findMany({
-      include: { template: true },
       orderBy: { created_at: 'desc' }
     });
     return {
