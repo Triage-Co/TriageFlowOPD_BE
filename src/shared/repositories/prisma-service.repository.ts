@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IStaffRepository } from '../interfaces/i-staff.repository';
-import { Prisma, RoleTypeEnum, Service } from '@prisma/client';
+import { Prisma, RoleTypeEnum, Service, ServiceTypeEnum } from '@prisma/client';
 import { IServiceOrderRepository } from '../interfaces/i-service-order.repository';
 import { IServiceRepository } from '../interfaces/i-service.repository';
 
@@ -50,6 +50,7 @@ export class PrismaServiceRepository implements IServiceRepository {
   async findAll(
     page?: number,
     limit?: number,
+    service_type?: ServiceTypeEnum,
   ): Promise<
     Partial<{
       data: Partial<Service>[];
@@ -59,14 +60,22 @@ export class PrismaServiceRepository implements IServiceRepository {
     const parsedPage = Number(page);
     const parsedLimit = Number(limit);
     const isPanigation = parsedPage > 0 && parsedLimit > 0 ? true : false;
-    const take = isPanigation ? parsedLimit : 1;
-    const skip = isPanigation ? (parsedPage - 1) * parsedLimit : 1;
 
-    const dataQuery = this.prismaService.service.findMany({
-      skip: skip,
-      take: take,
-    });
-    const countQuery = this.prismaService.service.count();
+    const where: Prisma.ServiceWhereInput = service_type
+      ? { service_type }
+      : {};
+
+    const findOptions: Prisma.ServiceFindManyArgs = {
+      where,
+    };
+
+    if (isPanigation) {
+      findOptions.skip = (parsedPage - 1) * parsedLimit;
+      findOptions.take = parsedLimit;
+    }
+
+    const dataQuery = this.prismaService.service.findMany(findOptions);
+    const countQuery = this.prismaService.service.count({ where });
     const [data, total] = await this.prismaService.$transaction([
       dataQuery,
       countQuery,
@@ -76,8 +85,8 @@ export class PrismaServiceRepository implements IServiceRepository {
       meta: {
         total,
         page: isPanigation ? parsedPage : 1,
-        limit: isPanigation ? parsedLimit : 1,
-        totalPages: isPanigation ? total / parsedLimit : 1,
+        limit: isPanigation ? parsedLimit : total,
+        totalPages: isPanigation ? Math.ceil(total / parsedLimit) : 1,
       },
     };
   }

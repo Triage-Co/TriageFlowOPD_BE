@@ -20,8 +20,7 @@ import { roles } from '../../../shared/decorator/role.decorator';
 @ApiTags('Medicine')
 @Controller('medicine')
 export class MedicineController {
-  constructor(private readonly medicineService: MedicineService) {}
-
+  constructor(private readonly medicineService: MedicineService) { }
 
   @Post('bulk')
   @roles('PHARMACIST', 'ADMIN')
