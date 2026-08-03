@@ -7,6 +7,7 @@ import {
 import {
   BookingSpecialtyDto,
   CreateBookingRequestDto,
+  CreateBookingWithPackageDto,
 } from './dto/request-booking.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
 import {
@@ -445,5 +446,141 @@ export class BookingService {
     };
 
     return await this.create(createBookingData);
+  }
+
+
+  async createBookingWithPackage(dto: CreateBookingWithPackageDto) {
+    const { patient_id, slot_id, package_id, return_url, cancel_url } = dto;
+
+    const [patient, slot] = await Promise.all([
+      this.patientRepository.findOne(patient_id),
+      this.SlotRepository.findOne(slot_id),
+    ]);
+
+    if (!patient) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy bệnh nhân',
+        detail: `Không tìm thấy bệnh nhân với id ${patient_id}`,
+      });
+    }
+
+    if (!slot) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy slot',
+        detail: `Không tìm thấy slot với id ${slot_id}`,
+      });
+    }
+
+    if (slot.capacity <= 0) {
+      throw new BadRequestException({
+        message: 'Hết slot trong khung giờ',
+        detail: `Không còn slot trong khung giờ ${slot.start_time}-${slot.end_time}`,
+      });
+    }
+
+    const flowInProgress = await this.flowRepository.findIsActiveByDate(
+      patient_id,
+      slot.shift.date,
+    );
+
+    if (flowInProgress.length > 0) {
+      throw new BadRequestException({
+        message: 'Bệnh nhân đã đặt khám trong ngày hôm này',
+        detail: `Bênh nhân với id ${patient_id} đang có lịch khám trong ngày hôm nay`,
+      });
+    }
+
+    const examPackage = await this.prismaService.exam_Package.findUnique({
+      where: { package_id },
+    });
+
+    if (!examPackage) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy gói khám',
+        detail: `Không tìm thấy gói khám với id ${package_id}`,
+      });
+    }
+
+    const packagePrice = examPackage.price || 0;
+
+    const rs = await this.prismaService.$transaction(async (tx) => {
+      const booking = await this.bookingRepository.create(
+        { patient_id, slot_id },
+        tx,
+      );
+
+      await this.SlotRepository.update(
+        slot_id,
+        { capacity: { decrement: 1 } },
+        tx,
+      );
+
+      const serviceOrder = await tx.service_Order.create({
+        data: {
+          booking_id: booking.booking_id,
+          name: `Thanh toán gói: ${examPackage.package_name}`,
+          status: 'PENDING',
+          payment_status: 'PENDING',
+          package_id: package_id,
+        },
+      });
+
+      const invoice = await tx.invoice.create({
+        data: {
+          service_order_id: serviceOrder.service_order_id,
+          status: 'PENDING',
+          total_amount: packagePrice,
+        },
+      });
+
+      await tx.invoice_Detail.create({
+        data: {
+          invoice_id: invoice.invoice_id,
+          item_name: examPackage.package_name,
+          quantity: 1,
+          unit_price: packagePrice,
+          sub_total: packagePrice,
+        },
+      });
+
+      const paymentLink = await this.transactionService.create(
+        {
+          cancelUrl: cancel_url || 'https://triageflow.me',
+          returnUrl: return_url || 'https://triageflow.me',
+          transType: TransTypeEnum.BOOKING_PAYMENT_1,
+          amount: packagePrice > 0 ? packagePrice : 1000,
+          clientId: patient_id,
+          service_order_id: serviceOrder.service_order_id,
+        },
+        tx,
+      );
+
+      if (!paymentLink || !('data' in paymentLink)) {
+        throw new BadRequestException(
+          (paymentLink?.detail as any)?.error?.desc ||
+            'Lỗi tạo giao dịch thanh toán',
+        );
+      }
+
+      await tx.service_Order.update({
+        where: { service_order_id: serviceOrder.service_order_id },
+        data: { qr_code: paymentLink.data.qrCode },
+      });
+
+      return { booking, serviceOrder, paymentLink };
+    });
+
+    return {
+      code: 200,
+      message: 'Tạo đơn gói khám thành công. Vui lòng thanh toán để tạo lịch khám.',
+      status: 'success',
+      data: {
+        booking_id: rs.booking.booking_id,
+        service_order_id: rs.serviceOrder.service_order_id,
+        package_name: examPackage.package_name,
+        amount: packagePrice,
+        payment: rs.paymentLink,
+      },
+    };
   }
 }
