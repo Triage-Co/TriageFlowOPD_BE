@@ -127,5 +127,39 @@ export class RoomService {
       status: 'success',
     };
   }
-}
 
+  async getSlotsByRoomId(roomId: string, dateStr?: string) {
+    const room = await this.roomRepository.findById(roomId);
+    if (!room) {
+      throw RoomErrors.RoomNotFoundById(roomId);
+    }
+
+    const whereCondition: any = {
+      shift: {
+        room_id: roomId,
+      }
+    };
+
+    if (dateStr) {
+      whereCondition.shift.date = new Date(`${dateStr}T00:00:00Z`);
+    }
+
+    const slots = await this.prismaService.slot.findMany({
+      where: whereCondition,
+      include: {
+        shift: true,
+      },
+      orderBy: [
+        { shift: { date: 'asc' } },
+        { start_time: 'asc' }
+      ]
+    });
+
+    return {
+      code: 200,
+      message: 'Thành công',
+      status: 'success',
+      data: slots,
+    };
+  }
+}
