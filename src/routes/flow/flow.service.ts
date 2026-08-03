@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { TemplateStepDto } from '../template/dto/create-template.dto';
@@ -73,6 +73,78 @@ export class FlowService {
     };
   }
 
+  /**
+   * Tự động tạo Flow từ Service_Order của gói khám sau khi thanh toán xong.
+   * Điều kiện: service_order phải có package_id và chưa có flow_id.
+   */
+  async createFlowFromServiceOrder(serviceOrderId: string) {
+    const serviceOrder = await this.prismaService.service_Order.findUnique({
+      where: { service_order_id: serviceOrderId },
+      include: {
+        package: {
+          include: { template: true },
+        },
+        booking: true,
+      },
+    });
+
+    if (!serviceOrder) {
+      throw new NotFoundException(`Không tìm thấy service order: ${serviceOrderId}`);
+    }
+
+    if (!serviceOrder.package_id || !serviceOrder.package) {
+      return null;
+    }
+
+    if (serviceOrder.flow_id) {
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Flow đã được tạo trước đó',
+        flow_id: serviceOrder.flow_id,
+      };
+    }
+
+    if (!serviceOrder.booking_id) {
+      throw new BadRequestException(`Service order ${serviceOrderId} không có booking_id`);
+    }
+
+    const existingFlow = await this.prismaService.flow.findUnique({
+      where: { booking_id: serviceOrder.booking_id },
+    });
+
+    if (existingFlow) {
+      await this.prismaService.service_Order.update({
+        where: { service_order_id: serviceOrderId },
+        data: { flow_id: existingFlow.flow_id },
+      });
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Booking đã có Flow, đã liên kết service_order với flow hiện tại',
+        flow_id: existingFlow.flow_id,
+      };
+    }
+
+    const newFlow = await this.prismaService.flow.create({
+      data: {
+        booking_id: serviceOrder.booking_id,
+        status: 'PENDING',
+      },
+    });
+
+    await this.prismaService.service_Order.update({
+      where: { service_order_id: serviceOrderId },
+      data: { flow_id: newFlow.flow_id },
+    });
+
+    const templateSteps = serviceOrder.package.template.steps as unknown as TemplateStepDto[];
+
+    // Truyền cờ isPrePaidPackage = true để không tạo thêm đơn thanh toán lẻ cho các bước
+    return this.addTemplateToFlow(newFlow.flow_id, templateSteps, true, serviceOrderId);
+  }
+
+
   async addTemplateToFlowByTeamplateId(flowId: string, templateId: string) {
     const template = await this.prismaService.flow_Template.findUnique({
       where: { template_id: templateId },
@@ -88,7 +160,12 @@ export class FlowService {
     return this.addTemplateToFlow(flowId, templateSteps);
   }
 
-  async addTemplateToFlow(flowId: string, templateSteps: TemplateStepDto[]) {
+  async addTemplateToFlow(
+    flowId: string, 
+    templateSteps: TemplateStepDto[], 
+    isPrePaidPackage: boolean = false, 
+    packageServiceOrderId: string | null = null
+  ) {
     const existingFlow = await this.prismaService.flow.findUnique({
       where: { flow_id: flowId },
       include: {
@@ -111,106 +188,115 @@ export class FlowService {
     });
 
     if (!existingFlow) {
-      throw new NotFoundException(
-        'Không tìm thấy Flow hiện tại của bệnh nhân.',
-      );
+      throw new NotFoundException('Không tìm thấy Flow hiện tại của bệnh nhân.');
     }
 
     const specialtyId = existingFlow.booking.slot.shift.room.specialty_id;
 
     return this.prismaService.$transaction(
       async (tx) => {
-        const extractPaidSteps = (steps: TemplateStepDto[]) => {
-          const paidSteps: TemplateStepDto[] = [];
-          for (const step of steps) {
-            if (step.requires_payment && step.service_code) {
-              paidSteps.push(step);
+        // Nếu không phải gói khám trọn gói, mới tạo các đơn thanh toán riêng lẻ cho từng dịch vụ
+        if (!isPrePaidPackage) {
+          const extractPaidSteps = (steps: TemplateStepDto[]) => {
+            const paidSteps: TemplateStepDto[] = [];
+            for (const step of steps) {
+              if (step.requires_payment && step.service_code) {
+                paidSteps.push(step);
+              }
+              if (step.sub_steps && step.sub_steps.length > 0) {
+                paidSteps.push(...extractPaidSteps(step.sub_steps));
+              }
             }
-            if (step.sub_steps && step.sub_steps.length > 0) {
-              paidSteps.push(...extractPaidSteps(step.sub_steps));
+            return paidSteps;
+          };
+
+          const stepsNeedingPayment = extractPaidSteps(templateSteps);
+
+          if (stepsNeedingPayment.length > 0) {
+            const serviceCodes = stepsNeedingPayment.map((s) => s.service_code);
+
+            const services = await tx.service.findMany({
+              where: { service_code: { in: serviceCodes } },
+            });
+            const servicesMap = new Map(services.map((s) => [s.service_code, s]));
+
+            for (const step of stepsNeedingPayment) {
+              const svc = servicesMap.get(step.service_code);
+              if (!svc) throw new Error(`Không tìm thấy dịch vụ với mã: ${step.service_code}`);
+
+              const createdServiceOrder = await tx.service_Order.create({
+                data: {
+                  booking_id: existingFlow.booking_id,
+                  name: 'Thanh toán: ' + (step.step_name || svc.service_name),
+                  status: 'PENDING',
+                },
+              });
+
+              const createdInvoice = await tx.invoice.create({
+                data: {
+                  service_order_id: createdServiceOrder.service_order_id,
+                  status: 'PENDING',
+                  total_amount: svc.price,
+                },
+              });
+
+              await tx.service_Order_Detail.create({
+                data: {
+                  service_order_id: createdServiceOrder.service_order_id,
+                  service_id: svc.service_id,
+                  price_at_order: svc.price,
+                  quantity: 1,
+                  status: 'PENDING',
+                },
+              });
+
+              await tx.invoice_Detail.create({
+                data: {
+                  invoice_id: createdInvoice.invoice_id,
+                  item_name: svc.service_name || 'Dịch vụ y tế',
+                  quantity: 1,
+                  unit_price: svc.price,
+                  sub_total: svc.price,
+                },
+              });
+
+              (step as any).service_order_id = createdServiceOrder.service_order_id;
+
+              const stepKey = step.template_id;
+              const paymentStepId = `payment_${stepKey}_${Date.now()}`;
+              const paymentStepDto: TemplateStepDto = {
+                template_id: paymentStepId,
+                service_code: '',
+                step_name: `Thanh toán: ${step.step_name}`,
+                step_type: 'PAYMENT' as any,
+                room_type: 'CASHIER' as any,
+                requires_payment: false,
+                depends_on: step.depends_on ? [...step.depends_on] : [],
+                sub_steps: [],
+              };
+              (paymentStepDto as any).service_order_id = createdServiceOrder.service_order_id;
+
+              if (!step.depends_on) {
+                step.depends_on = [];
+              }
+              step.depends_on.push(paymentStepId);
+
+              templateSteps.unshift(paymentStepDto);
             }
           }
-          return paidSteps;
-        };
-
-        const stepsNeedingPayment = extractPaidSteps(templateSteps);
-
-        if (stepsNeedingPayment.length > 0) {
-          const serviceCodes = stepsNeedingPayment.map((s) => s.service_code);
-
-          const services = await tx.service.findMany({
-            where: { service_code: { in: serviceCodes } },
-          });
-          const servicesMap = new Map(services.map((s) => [s.service_code, s]));
-
-          for (const step of stepsNeedingPayment) {
-            const svc = servicesMap.get(step.service_code);
-            if (!svc)
-              throw new Error(
-                `Không tìm thấy dịch vụ với mã: ${step.service_code}`,
-              );
-
-            const createdServiceOrder = await tx.service_Order.create({
-              data: {
-                booking_id: existingFlow.booking_id,
-                name: 'Thanh toán: ' + (step.step_name || svc.service_name),
-                status: 'PENDING',
-              },
-            });
-
-            const createdInvoice = await tx.invoice.create({
-              data: {
-                service_order_id: createdServiceOrder.service_order_id,
-                status: 'PENDING',
-                total_amount: svc.price,
-              },
-            });
-
-            await tx.service_Order_Detail.create({
-              data: {
-                service_order_id: createdServiceOrder.service_order_id,
-                service_id: svc.service_id,
-                price_at_order: svc.price,
-                quantity: 1,
-                status: 'PENDING',
-              },
-            });
-
-            await tx.invoice_Detail.create({
-              data: {
-                invoice_id: createdInvoice.invoice_id,
-                item_name: svc.service_name || 'Dịch vụ y tế',
-                quantity: 1,
-                unit_price: svc.price,
-                sub_total: svc.price,
-              },
-            });
-
-            (step as any).service_order_id =
-              createdServiceOrder.service_order_id;
-
-            const stepKey = step.template_id;
-            const paymentStepId = `payment_${stepKey}_${Date.now()}`;
-            const paymentStepDto: TemplateStepDto = {
-              template_id: paymentStepId,
-              service_code: '',
-              step_name: `Thanh toán: ${step.step_name}`,
-              step_type: 'PAYMENT' as any,
-              room_type: 'CASHIER' as any,
-              requires_payment: false,
-              depends_on: step.depends_on ? [...step.depends_on] : [],
-              sub_steps: [],
-            };
-            (paymentStepDto as any).service_order_id =
-              createdServiceOrder.service_order_id;
-
-            // Yêu cầu bước có phí phải phụ thuộc vào bước THANH TOÁN này
-            if (!step.depends_on) {
-              step.depends_on = [];
+        } else {
+          // Đối với gói khám trọn gói, gán service_order_id của gói cho toàn bộ steps
+          // (nếu cần tracking xem step này thuộc đơn gói nào)
+          const applyPackageOrderToSteps = (steps: TemplateStepDto[]) => {
+            for (const step of steps) {
+              (step as any).service_order_id = packageServiceOrderId;
+              if (step.sub_steps && step.sub_steps.length > 0) {
+                applyPackageOrderToSteps(step.sub_steps);
+              }
             }
-            step.depends_on.push(paymentStepId);
-
-            templateSteps.unshift(paymentStepDto); // Đẩy vào đầu danh sách
+          };
+          if (packageServiceOrderId) {
+            applyPackageOrderToSteps(templateSteps);
           }
         }
 
@@ -372,6 +458,11 @@ export class FlowService {
             });
           }
         }
+        
+        await tx.flow.update({
+          where: { flow_id: flowId },
+          data: { status: 'IN_PROGRESS' }
+        });
 
         return {
           code: 200,

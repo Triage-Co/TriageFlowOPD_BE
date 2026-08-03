@@ -316,6 +316,7 @@ model Flow {
   booking       Booking        @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   steps         Step[]
   prescriptions Prescription[]
+  serviceOrder  Service_Order? // Đơn gói khám đã tạo ra Flow này (nếu có)
 
   @@index([booking_id])
   @@index([status])
@@ -399,6 +400,26 @@ model Flow_Template {
   template_id   String @id @default(uuid()) @db.Uuid
   template_name String
   steps         Json[] @db.JsonB
+
+  examPackages  Exam_Package[] 
+}
+
+model Exam_Package {
+  package_id    String   @id @default(uuid()) @db.Uuid
+  package_name  String
+  description   String?  @db.Text
+  price         Int      @default(0)
+  is_active     Boolean  @default(true)
+  template_id   String   @db.Uuid
+  created_at    DateTime @default(now()) @db.Timestamptz()
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  template      Flow_Template   @relation(fields: [template_id], references: [template_id])
+  serviceOrders Service_Order[] // các đơn khám mua gói này
+
+  @@index([template_id])
+  @@index([is_active])
+  @@map("exam_package")
 }
 
 model Queue {
@@ -503,7 +524,7 @@ model Service {
   service_code        String?
   service_name        String?
   price               Int
-  service_type        ServiceTypeEnum
+  service_type        ServiceTypeEnum?
   room_type           ClinicalRoomType?
   is_active           Boolean                @default(true)
   serviceOrderDetails Service_Order_Detail[]
@@ -540,6 +561,8 @@ model Service_Order {
   status             ServiceOrderStatusEnum @default(PENDING)
   qr_code            String?
   payment_status     PaymentStatusEnum      @default(PENDING)
+  package_id         String?                @db.Uuid
+  flow_id            String?                @unique @db.Uuid
   created_at         DateTime               @default(now()) @db.Timestamptz()
   updated_at         DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
@@ -550,9 +573,12 @@ model Service_Order {
   staff               Staff?                 @relation(fields: [assign_by_staff_id], references: [staff_id])
   invoices            Invoice[]
   prescription        Prescription?
+  package             Exam_Package?          @relation(fields: [package_id], references: [package_id], onDelete: SetNull)
+  flow                Flow?                  @relation(fields: [flow_id], references: [flow_id], onDelete: SetNull)
 
   @@index([booking_id])
   @@index([assign_by_staff_id])
+  @@index([package_id])
   @@map("service_order")
 }
 
