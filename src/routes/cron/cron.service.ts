@@ -26,8 +26,14 @@ export class CronService {
     return this.prismaService.$transaction(async (tx) => {
       const expiredFlows = await tx.flow.findMany({
         where: {
-          created_at: {
-            lt: startOfDay,
+          booking: {
+            slot: {
+              shift: {
+                date: {
+                  lt: startOfDay,
+                },
+              },
+            },
           },
           status: {
             in: ['PENDING', 'IN_PROGRESS'],

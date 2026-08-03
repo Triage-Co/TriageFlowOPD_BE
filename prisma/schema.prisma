@@ -524,7 +524,7 @@ model Service {
   service_code        String?
   service_name        String?
   price               Int
-  service_type        ServiceTypeEnum
+  service_type        ServiceTypeEnum?
   room_type           ClinicalRoomType?
   is_active           Boolean                @default(true)
   serviceOrderDetails Service_Order_Detail[]

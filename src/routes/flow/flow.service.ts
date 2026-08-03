@@ -458,6 +458,11 @@ export class FlowService {
             });
           }
         }
+        
+        await tx.flow.update({
+          where: { flow_id: flowId },
+          data: { status: 'IN_PROGRESS' }
+        });
 
         return {
           code: 200,
