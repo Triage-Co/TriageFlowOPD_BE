@@ -213,7 +213,7 @@ export class CronService {
       updatedFlowCount: expiredFlows.length,
     };
   }
-  @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  // @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updatePrescriptionExpired() {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
