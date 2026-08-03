@@ -158,4 +158,20 @@ export class FlowController {
       templateId,
     );
   }
+
+  @Post('/create-from-package/:service_order_id')
+  @ApiBearerAuth()
+  @roles('ADMIN', 'RECEPTIONIST')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiOperation({
+    summary:
+      '[ADMIN - RECEPTIONIST] Tạo Flow từ đơn gói khám đã thanh toán (trigger thủ công)',
+    description:
+      'Dùng khi webhook bị lỗi hoặc cần tạo Flow thủ công sau khi đơn gói khám đã được thanh toán.',
+  })
+  async createFlowFromPackage(
+    @Param('service_order_id') serviceOrderId: string,
+  ) {
+    return await this.flowService.createFlowFromServiceOrder(serviceOrderId);
+  }
 }

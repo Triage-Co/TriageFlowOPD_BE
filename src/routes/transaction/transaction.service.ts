@@ -18,6 +18,7 @@ import { PrismaClient } from '@prisma/client';
 import { ResponseType } from '../../shared/types/response.type';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import { StepService } from '../step/step.service';
+import { FlowService } from '../flow/flow.service';
 
 @Injectable()
 export class TransactionService {
@@ -34,6 +35,7 @@ export class TransactionService {
     @Inject('IStepRepository')
     private readonly stepRepository: IStepRepository,
     private readonly stepService: StepService,
+    private readonly flowService: FlowService,
   ) {
     this.payosClient = this.payosService.getClient();
     this.TRANSACTION = this.prismaService.transaction;
@@ -113,6 +115,21 @@ export class TransactionService {
         where: { service_order_id: dto.service_order_id },
         data: { status: 'PAID' },
       });
+
+      // Hook: Nếu là đơn gói khám (có package_id), tự động tạo Flow
+      const createdFlowResult = await this.flowService.createFlowFromServiceOrder(
+        dto.service_order_id,
+      );
+
+      // Nếu là đơn gói khám thì dừng ở đây (không cần xử lý PAYMENT steps bên trong)
+      if (createdFlowResult !== null) {
+        return {
+          code: 200,
+          message: 'Thanh toán gói khám thành công, Flow đã được tạo',
+          status: 'success',
+          data: { transaction, flow: createdFlowResult },
+        };
+      }
 
       const paymentSteps = await this.STEP.findMany({
         where: {
@@ -198,44 +215,53 @@ export class TransactionService {
           data: { status: 'PAID' },
         });
 
-        const paymentSteps = await this.STEP.findMany({
-          where: {
-            service_order_id: transaction.service_order_id,
-            step_type: 'PAYMENT',
-          },
-        });
+        // Hook: Nếu là đơn gói khám (có package_id), tự động tạo Flow
+        const createdFlowResult =
+          await this.flowService.createFlowFromServiceOrder(
+            transaction.service_order_id,
+          );
 
-        for (const step of paymentSteps) {
-          if (step.step_status === 'PENDING') {
-            await this.STEP.update({
-              where: { step_id: step.step_id },
-              data: { step_status: 'IN_PROGRESS' },
-            });
-          }
-          await this.stepService.completeStep(step.step_id);
+        // Nếu là đơn gói khám thì skip xử lý PAYMENT steps bên trong
+        if (createdFlowResult === null) {
+          const paymentSteps = await this.STEP.findMany({
+            where: {
+              service_order_id: transaction.service_order_id,
+              step_type: 'PAYMENT',
+            },
+          });
 
-          if (step.flow_id) {
-            await this.prismaService.flow.updateMany({
-              where: {
-                flow_id: step.flow_id,
-                status: 'PENDING',
-              },
-              data: { status: 'IN_PROGRESS' },
-            });
+          for (const step of paymentSteps) {
+            if (step.step_status === 'PENDING') {
+              await this.STEP.update({
+                where: { step_id: step.step_id },
+                data: { step_status: 'IN_PROGRESS' },
+              });
+            }
+            await this.stepService.completeStep(step.step_id);
+
+            if (step.flow_id) {
+              await this.prismaService.flow.updateMany({
+                where: {
+                  flow_id: step.flow_id,
+                  status: 'PENDING',
+                },
+                data: { status: 'IN_PROGRESS' },
+              });
+            }
           }
+
+          await this.prismaService.invoice.updateMany({
+            where: { service_order_id: transaction.service_order_id },
+            data: {
+              status: 'PAID',
+              payment_date: new Date(),
+            },
+          });
+
+          await this.queueService.generateServiceQueueNumber(
+            transaction.service_order_id,
+          );
         }
-
-        await this.prismaService.invoice.updateMany({
-          where: { service_order_id: transaction.service_order_id },
-          data: {
-            status: 'PAID',
-            payment_date: new Date(),
-          },
-        });
-
-        await this.queueService.generateServiceQueueNumber(
-          transaction.service_order_id,
-        );
       }
 
       return {
