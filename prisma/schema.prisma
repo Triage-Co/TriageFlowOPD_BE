@@ -307,11 +307,12 @@ model Booking {
 }
 
 model Flow {
-  flow_id    String         @id @default(uuid()) @db.Uuid
-  booking_id String         @unique @db.Uuid
-  status     FlowStatusEnum @default(PENDING)
-  created_at DateTime       @default(now()) @db.Timestamptz()
-  updated_at DateTime       @default(now()) @updatedAt @db.Timestamptz()
+  flow_id     String         @id @default(uuid()) @db.Uuid
+  booking_id  String         @unique @db.Uuid
+  status      FlowStatusEnum @default(PENDING)
+  ticket_code String?        @unique
+  created_at  DateTime       @default(now()) @db.Timestamptz()
+  updated_at  DateTime       @default(now()) @updatedAt @db.Timestamptz()
 
   booking       Booking        @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   steps         Step[]
@@ -319,6 +320,7 @@ model Flow {
 
   @@index([booking_id])
   @@index([status])
+  @@index([ticket_code])
   @@map("flow")
 }
 
@@ -503,7 +505,7 @@ model Service {
   service_code        String?
   service_name        String?
   price               Int
-  service_type        ServiceTypeEnum
+  service_type        ServiceTypeEnum?
   room_type           ClinicalRoomType?
   is_active           Boolean                @default(true)
   serviceOrderDetails Service_Order_Detail[]

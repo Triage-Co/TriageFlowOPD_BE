@@ -22,6 +22,8 @@ import {
   TransTypeEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
+import { randomInt } from 'crypto';
+import { format } from 'date-fns';
 import { TransactionService } from '../transaction/transaction.service';
 import type { INotificationRepository } from '../../shared/interfaces/i-notification.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
@@ -70,6 +72,12 @@ export class BookingService {
     @Inject('IQueueRepository')
     private readonly queueRepository: IQueueRepository,
   ) { }
+
+  private generateTicketCode(): string {
+    const dateStr = format(new Date(), 'yyyyMMdd');
+    const randomNum = randomInt(1000, 9999);
+    return `V-${dateStr}-${randomNum}`;
+  }
 
   async create(createBookingData: CreateBookingRequestDto) {
     const { patient_id, slot_id } = createBookingData;
@@ -135,10 +143,12 @@ export class BookingService {
         tx,
       );
 
+      const ticketCode = this.generateTicketCode();
       const flow = await this.flowRepository.create(
         {
           booking_id: booking.booking_id,
           status: FlowStatusEnum.PENDING,
+          ticket_code: ticketCode,
         },
         tx,
       );
@@ -205,7 +215,7 @@ export class BookingService {
         },
         tx,
       );
-      return { serviceOrder, step_1, booking, paymentLink };
+      return { serviceOrder, step_1, booking, paymentLink, flow };
     });
 
     return {
@@ -215,6 +225,7 @@ export class BookingService {
       data: {
         step_id: rs.step_1.step_id,
         booking_id: rs.booking.booking_id,
+        ticket_code: rs.flow.ticket_code,
         payment: rs.paymentLink,
       },
     };
