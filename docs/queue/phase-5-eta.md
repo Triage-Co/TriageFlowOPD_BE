@@ -17,7 +17,10 @@ async recordServiceDuration(roomId: string, stepType: StepTypeEnum, durationSec:
 ```
 
 - Gọi từ `callNextPatient` (phase 4) tại bước kết thúc lượt SERVING: `durationSec = finished_at - serving_started_at`. `stepType` từ `step.step_type`, null → dùng `OTHER`.
-- Bỏ qua outlier: `durationSec < 30` (bấm nhầm) hoặc `> 7200` (quên đóng) → không cập nhật.
+- Bỏ qua outlier theo ngưỡng per `step_type` (có thể cấu hình thêm sau, hiện hard-code hợp lý):
+  - Mặc định: `durationSec < 30` (bấm nhầm) hoặc `> 7200` (quên đóng) → không cập nhật.
+  - `PROCEDURE` / `FUNCTIONAL_EXPLORATION`: `> 14400` (4h, ca thủ thuật dài hơn).
+  - Nếu cần fine-tune: thêm `min_valid_sec`/`max_valid_sec` vào `Room_Service_Stat` (optional, default null = dùng hard-code).
 - Công thức EMA, α = 0.3:
 
 ```text

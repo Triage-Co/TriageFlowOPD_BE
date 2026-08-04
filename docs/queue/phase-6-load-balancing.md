@@ -13,7 +13,7 @@ const REBALANCEABLE_STEP_TYPES = [LAB_TEST, IMAGING, PROCEDURE, FUNCTIONAL_EXPLO
 
 Phòng khám lâm sàng (CLINICAL — bệnh nhân đặt lịch với bác sĩ/chuyên khoa cụ thể) **không bao giờ** bị điều phối. Mọi hàm trong phase này phải check điều kiện này.
 
-Nhóm phòng tương đương được xác định bằng bảng `Room_Service` (phase 1): các phòng cùng làm được `service` của step đó (match qua `step.service_code` → `Service` → `Room_Service.room_id`).
+Nhóm phòng tương đương được xác định bằng bảng `Room_Service` (phase 1 đã seed cơ bản): các phòng cùng làm được `service` của step đó (match qua `step.service_code` → `Service` → `Room_Service.room_id`).
 
 ## 1. Chọn phòng least-ETA lúc enqueue (Lớp 1)
 
@@ -46,6 +46,7 @@ async detectAndSuggest(): Promise<{ created: number }>
    c. Chọn ứng viên từ phòng max: duyệt từ CUỐI danh sách computeQueueOrder (ưu tiên thấp nhất trước),
       lọc: status = QUEUED, không is_pinned, không CALLED/SERVING, step_type thuộc REBALANCEABLE,
       service của step nằm trong mapping của phòng đích, CHƯA có suggestion PENDING nào cho queue đó.
+      **Atomic check**: query suggestion PENDING WHERE queue_id nằm TRONG transaction để tránh cron + enqueue trigger tạo duplicate.
    d. Số lượng chuyển: k nhỏ nhất sao cho sau khi chuyển k người, gap ước tính <= ngưỡng
       (mỗi người chuyển: nguồn -expectedDuration(nguồn), đích +expectedDuration(đích)). Giới hạn k <= 3/lần chạy.
    e. Tạo Queue_Rebalance_Suggestion: from_room, to_room (phòng min ETA), eta_gain_sec = gap hiện tại,
@@ -76,11 +77,11 @@ Guard: ADMIN hoặc staff phòng nguồn HOẶC phòng đích (`assertCanManageR
 ```text
 1. Validate: status = PENDING, chưa hết hạn; queue entry vẫn QUEUED (đã bị gọi/hủy → BadRequest 'Gợi ý không còn hiệu lực').
 2. Update step.room_id = to_room_id; staff_id của step: set null (phòng mới tự phân staff theo shift khi gọi).
-3. Update queue: room_id = to_room_id, queue_number = số mới theo phòng đích (logic đánh số của enqueueStep),
+3. Update queue: room_id = to_room_id, queue_number = số mới theo phòng đích (dùng `generateQueueNumberForRoom(toRoomId, tx)` đã extract ở phase 3),
    GIỮ NGUYÊN enqueued_at, base_priority, applied_rules, queue_type (bảo toàn aging).
 4. Suggestion: status = CONFIRMED, confirmed_by = user.account_id.
 5. Move_Log: action_type 'REBALANCED', actor_account_id, payload { from_room_id, to_room_id, suggestion_id, old_queue_number, new_queue_number }.
-6. Notification cho bệnh nhân (bảng Notification: account_id của patient, message tiếng Việt nêu phòng mới + số mới).
+6. Notification cho bệnh nhân (bảng Notification: account_id của patient qua `Patient.account_id`, message tiếng Việt nêu phòng mới + số mới). Lưu ý: chỉ ghi DB, FE cần poll hoặc dùng WS event để hiển thị.
 7. Sau commit: emitQueueUpdate cho CẢ 2 phòng.
 ```
 

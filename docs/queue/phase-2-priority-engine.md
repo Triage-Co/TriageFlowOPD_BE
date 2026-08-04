@@ -61,13 +61,16 @@ interface OrderedQueueEntry {
 async computeQueueOrder(roomId: string): Promise<OrderedQueueEntry[]>
 ```
 
-Input là các bản ghi `Queue` của phòng với `status` thuộc `[PENDING, QUEUED, MISSING?]` — chỉ lấy `PENDING`/`QUEUED` (MISSING không xếp hàng cho tới khi recall). KHÔNG lấy `CALLED`/`SERVING`/`FINISHED`/`CANCELLED`.
+Input là các bản ghi `Queue` của phòng với `status` thuộc `[PENDING, QUEUED]` — chỉ lấy `PENDING`/`QUEUED`. `MISSING` KHÔNG tham gia xếp hàng cho tới khi recall (chuyển về `QUEUED`). KHÔNG lấy `CALLED`/`SERVING`/`FINISHED`/`CANCELLED`.
 
 Thuật toán (viết thành pure function `orderEntries(entries, rules, now)` export riêng để test):
 
 ```text
-1. effectiveScore = base_priority + agingRate * số_phút_chờ(now - enqueued_at)
+1. agingBonus = agingRate * số_phút_chờ(now - enqueued_at)
+   Nếu rule AGING có max_aging > 0: agingBonus = min(agingBonus, max_aging)
+   effectiveScore = base_priority + agingBonus
    agingRate: từ rule AGING active có scope khớp phòng (scoped đè global); mặc định 0 nếu không có rule.
+   max_aging: từ cùng rule AGING; mặc định 0 (không giới hạn) nếu không có rule.
 
 2. Chia 3 nhóm:
    - PINNED:     is_pinned = true                          → sort theo pinned_at ASC (pin trước đứng trước)
@@ -75,10 +78,12 @@ Thuật toán (viết thành pure function `orderEntries(entries, rules, now)` e
    - REGULAR:    còn lại                                    → sort theo effectiveScore DESC, tie: enqueued_at ASC
 
 3. Merge REGULAR và INTERLEAVE theo tỉ lệ interleave_ratio (mặc định 1:1, đọc từ params rule
-   RETURNING_INTERLEAVE nếu có): lấy 1 REGULAR rồi 1 INTERLEAVE, lặp; nhóm nào hết thì lấy nốt nhóm kia.
+   RETURNING_INTERLEAVE nếu có): `interleave_ratio: N` = lấy N REGULAR rồi 1 INTERLEAVE, lặp;
+   nhóm nào hết thì lấy nốt nhóm kia. Hiện chỉ hỗ trợ N=1.
 
 4. Áp hold_positions: duyệt danh sách merged; entry có hold_positions = n mà đang ở index < n
-   → dời xuống đúng index n (các entry khác dồn lên). Duyệt theo thứ tự index tăng dần, xử lý từng entry một.
+   → dời xuống đúng index n (các entry khác dồn lên).
+   Thứ tự xử lý: duyệt theo hold_positions GIẢM DẦN (entry bị hold nhiều nhất trước) để tránh cascade shift.
 
 5. Prepend nhóm PINNED lên đầu (pinned bỏ qua interleave và hold).
 
@@ -94,6 +99,7 @@ Tie-break cuối cùng luôn deterministic: `enqueued_at ASC`, rồi `queue_numb
 
 - Thêm `QueuePriorityService` vào `providers` + `exports` của `src/routes/queue/queue.module.ts`.
 - Service inject `PrismaService` (import từ `src/shared/config/prisma.service` — theo pattern của `queue.service.ts`).
+- Thêm method `clearRulesCache(): void` (public) — xóa cache in-memory rules, sẽ được gọi từ admin service (phase 7) khi mutation rule.
 
 ## 4. Unit test
 
@@ -102,11 +108,13 @@ Tạo `src/routes/queue/queue-priority.service.spec.ts` test 2 pure function (KH
 - `matchConditions`: mỗi operator 1 case; field null không khớp; conditions rỗng luôn khớp; field lạ không khớp.
 - `orderEntries`:
   - Score cao đứng trước; tie-break theo enqueued_at.
-  - Aging: entry chờ lâu vượt entry weight cao hơn khi đủ phút.
-  - Pinned luôn đứng đầu, 2 pinned giữ thứ tự pinned_at.
-  - Interleave 1-1: [R1,R2,R3] + [I1,I2] → R1,I1,R2,I2,R3.
-  - hold_positions=3 với hàng 5 người: entry bị hold không đứng trên index 3.
-  - Hàng rỗng, hàng chỉ có interleave, hàng chỉ có pinned.
+   - Aging: entry chờ lâu vượt entry weight cao hơn khi đủ phút.
+   - Aging cap: entry chờ rất lâu không vượt qua max_aging (ví dụ 15 điểm).
+   - Pinned luôn đứng đầu, 2 pinned giữ thứ tự pinned_at.
+   - Interleave 1-1: [R1,R2,R3] + [I1,I2] → R1,I1,R2,I2,R3.
+   - hold_positions=3 với hàng 5 người: entry bị hold không đứng trên index 3.
+   - 2 entry có hold khác nhau (n=3 và n=5): xử lý đúng theo thứ tự giảm dần, không cascade.
+   - Hàng rỗng, hàng chỉ có interleave, hàng chỉ có pinned.
 
 ## Tiêu chí hoàn thành
 

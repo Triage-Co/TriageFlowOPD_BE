@@ -20,16 +20,18 @@ PATCH  /queue/admin/rules/:ruleId
 DELETE /queue/admin/rules/:ruleId    (soft: set is_active = false; KHÔNG hard delete để giữ applied_rules audit)
 ```
 
+Lưu ý soft-delete: khi admin tạo rule mới có cùng `rule_code` với rule đã bị tắt → **không tạo mới mà re-activate** (set `is_active = true` + update các field khác). Bắt lỗi P2002 khi POST: thay vì throw, check xem rule đã tồn tại nhưng `is_active = false` → upsert re-activate.
+
 DTO validation (class-validator, file `src/routes/queue/dto/admin-rule.dto.ts`):
 
 - `rule_code`: bắt buộc khi POST, regex `^[A-Z0-9_]+$`, unique (bắt lỗi P2002 → BadRequest tiếng Việt).
 - `rule_type`: enum `QueueRuleTypeEnum`.
-- `weight`: int -100..100. `aging_rate`: float 0..10.
+- `weight`: int -100..100. `aging_rate`: float 0..10. `max_aging`: float 0..100 (0 = không giới hạn).
 - `conditions`: validate cấu trúc bằng hàm thủ công — mỗi key phải thuộc danh sách field hỗ trợ (xem phase 1: `age, gender, queue_type, suggested_priority, temperature, heart_rate, spo2, blood_pressure_sys, appointment_on_time, missed_count`), mỗi value object chỉ chứa operator hợp lệ (`eq/neq/gt/gte/lt/lte/in`). Sai → `BadRequestException` nêu rõ key lỗi.
 - `params`: validate theo `rule_type` (vd MISSED_TURN phải có `hold_positions` int > 0; REBALANCE phải có `eta_gap_minutes` > 0).
 - `room_type`: enum `ClinicalRoomType` nullable; `specialty_id`: uuid nullable, phải tồn tại.
 
-Sau mỗi mutation: invalidate cache rules trong `QueuePriorityService` (thêm method `clearRulesCache()` public, gọi từ admin service).
+Sau mỗi mutation: invalidate cache rules trong `QueuePriorityService` (gọi `clearRulesCache()` đã define ở phase 2).
 
 ## 2. CRUD Room-Service mapping
 
@@ -88,9 +90,12 @@ Response per phòng có hoạt động hôm nay (hoặc mọi phòng có queue e
 }
 ```
 
-Ghi chú triển khai:
+Ghi chú triển khai (**batch loading để tránh N+1**):
 
-- 1 query groupBy `queue` theo `room_id` + `status` cho các count; 1 query aggregate cho avg/max wait; ghép với ETA per room (gọi `computeEtaForRoom` cho từng phòng có người chờ — chấp nhận N queries vì số phòng hữu hạn; nếu chậm, chỉ tính ETA cho phòng `waiting_count > 0`).
+- **1 query groupBy** `queue` theo `room_id` + `status` cho các count (WHERE `created_at >= đầu ngày`).
+- **1 query aggregate** cho avg/max wait (entries hôm nay).
+- **1 query load tất cả `Room_Service_Stat`** — pass vào ETA computation in-memory thay vì gọi `getExpectedDurationSec` từng phòng.
+- **1 query load tất cả queue entries** đang PENDING/QUEUED của ngày, group by `room_id` in-memory → tính ETA per room mà không gọi `computeQueueOrder` từng phòng (hoặc chỉ gọi cho phòng có `waiting_count > 0`).
 - `avg_wait_minutes_today`: entries hôm nay có `serving_started_at != null`.
 - Ngưỡng congestion_level hard-code 15/30 phút (có thể đọc từ rule REBALANCE params nếu tiện).
 

@@ -17,19 +17,22 @@ async enqueueStep(stepId: string, queueType: QueueTypeEnum, tx?: Prisma.Transact
 
 Logic:
 
-1. Load step kèm `room` (lấy `room_type`, `specialty_id`), `flow.booking.patient`, `flow.booking.slot.shift`, `flow.booking.visitSession`; lấy `Triage_Information.suggested_priority` mới nhất theo patient (join qua `Patient_Answer` hoặc `interview_token` — nếu không truy được thì null, không throw).
-2. Nếu step đã có queue entry active (status không phải FINISHED/CANCELLED) → return entry đó (idempotent, thay cho check `step.queues.length > 0` hiện tại).
-3. Nếu `step.room_id` null → throw `BadRequestException` message tiếng Việt.
-4. Sinh `queue_number`: giữ logic hiện tại (count queue của phòng trong ngày + 1, xem `generateServiceQueueNumber` hiện tại) — bọc trong transaction để tránh race.
-5. Gọi `evaluateRulesForEntry` với input build từ dữ liệu trên. `appointmentOnTime`: booking có slot và thời điểm enqueue trong khoảng `[slot.start_time - 30 phút, slot.end_time]` của ngày `shift.date` (slot `start_time`/`end_time` là string "HH:mm", `shift.date` là ngày — parse với timezone `Asia/Ho_Chi_Minh`, dùng `date-fns-tz` đã có trong dependencies).
-6. Tạo `Queue` với đầy đủ field mới: `room_id = step.room_id`, `queue_type`, `base_priority`, `applied_rules`, `enqueued_at = now()`, `status = QUEUED`.
-7. Emit `queueGateway.emitQueueUpdate(roomId, payload)` — payload từ `getRoomDisplayPayload` (nếu đang trong transaction, emit sau khi commit; đơn giản nhất: emit ở caller sau transaction hoặc fire-and-forget sau await).
+1. **Feature flag check**: đọc `process.env.QUEUE_ENGINE_ENABLED`. Nếu `'false'` → tạo Queue record cơ bản (chỉ `step_id`, `queue_number`, `room_id`, `status = QUEUED`) mà KHÔNG evaluate rules / set `base_priority` / `applied_rules`. Return ngay.
+2. Load step kèm `room` (lấy `room_type`, `specialty_id`), `flow.booking.patient`, `flow.booking.slot.shift`, `flow.booking.visitSession`.
+3. Lấy `Triage_Information.suggested_priority` mới nhất theo patient — dùng helper riêng `getLatestTriagePriority(patientId): Promise<number | null>`: query `Triage_Information` JOIN `Patient_Answer` WHERE `patient_answer.patient_id = patientId` ORDER BY `created_at DESC` LIMIT 1. Nếu không truy được → null, không throw.
+4. **Idempotent check**: query `Queue` WHERE `step_id = stepId` AND `status NOT IN (FINISHED, CANCELLED)`. Nếu có → return entry đó NGAY mà không tạo mới. **QUAN TRỌNG**: check này phải nằm TRONG transaction (dùng `tx` nếu truyền vào, hoặc tạo transaction mới) để tránh race condition với `generateServiceQueueNumber` gọi song song.
+5. Nếu `step.room_id` null → throw `BadRequestException` message tiếng Việt.
+6. Sinh `queue_number` bằng method riêng `generateQueueNumberForRoom(roomId, tx)`: count queue của phòng trong ngày + 1 (extract từ logic `generateServiceQueueNumber` hiện tại). Method này được export để phase 6 (confirm rebalance) tái sử dụng.
+7. Gọi `evaluateRulesForEntry` với input build từ dữ liệu trên.
+   - `appointmentOnTime`: booking có slot và thời điểm enqueue trong khoảng `[slot.start_time - 30 phút, slot.end_time]` của ngày `shift.date`. Extract thành pure function `isAppointmentOnTime(slotStartTime: string, slotEndTime: string, shiftDate: Date, checkTime: Date): boolean` — dùng `date-fns-tz` parse timezone `Asia/Ho_Chi_Minh`. Viết unit test cho hàm này (trong `queue.service.spec.ts`).
+8. Tạo `Queue` với đầy đủ field mới: `room_id = step.room_id`, `queue_type`, `base_priority`, `applied_rules`, `enqueued_at = now()`, `status = QUEUED`.
+9. Emit `queueGateway.emitQueueUpdate(roomId, payload)` — payload từ `getRoomDisplayPayload` (nếu đang trong transaction, emit sau khi commit; đơn giản nhất: emit ở caller sau transaction hoặc fire-and-forget sau await).
 
 ## 2. Điểm enqueue 1 — sau thanh toán (walk-in / dịch vụ)
 
 Refactor `generateServiceQueueNumber(serviceOrderId)` trong `queue.service.ts` (được gọi từ `src/routes/transaction/transaction.service.ts` dòng ~168 và ~261 — GIỮ NGUYÊN signature để không sửa transaction.service):
 
-- Với mỗi step đủ điều kiện (đã thanh toán, có room, chưa có queue) → gọi `enqueueStep(step.step_id, queueType)`.
+- Với mỗi step đủ điều kiện (đã thanh toán, có room, chưa có queue) → gọi `enqueueStep(step.step_id, queueType)`. `enqueueStep` idempotent check sẽ skip nếu đã có entry → **KHÔNG duplicate Queue record**.
 - `queueType`: `APPOINTMENT` nếu flow có booking với slot hợp lệ, ngược lại `NEW`.
 
 ## 3. Điểm enqueue 2 — check-in tại phòng
@@ -59,17 +62,18 @@ Body: { step_id: string, to_room_id: string, staff_id?: string }
 ```
 
 - Update `step.room_id = to_room_id` (+ `staff_id` nếu truyền), hủy queue entry active cũ nếu có (`status = CANCELLED`), gọi `enqueueStep(step_id, QueueTypeEnum.TRANSFER)`.
-- Ghi `Move_Log` (`action_type: 'REBALANCED'`? — KHÔNG, dùng `action_type: 'TRANSFERRED'`, thêm giá trị này vào quy ước) với `payload { from_room_id, to_room_id }`.
+- Ghi `Move_Log` với `action_type: 'TRANSFERRED'` (chuyển phòng thủ công, KHÔNG phải `REBALANCED` — `REBALANCED` dành cho load balancing tự động ở phase 6), `payload { from_room_id, to_room_id }`.
 - Emit WS cho cả 2 phòng.
-- Guard: tạm dùng `IsAuthGuard` (phân quyền chi tiết làm ở phase 4, nhất quán chuẩn guard tại đó).
+- Guard: tạm dùng `IsAuthGuard` (phân quyền chi tiết làm ở phase 4, chạy liên tục nên không có khoảng trống bảo mật).
 
 ## 6. Display payload dùng thứ tự engine
 
 Sửa `getRoomDisplayPayload` trong `queue.service.ts`:
 
-- `upcoming_patients`: thay query `step.findMany + orderBy created_at` bằng `computeQueueOrder(roomId)` (lấy 5 entry đầu). Giữ nguyên shape `{ queue_number, patient_name }`, THÊM field mới không phá FE: `queue_type`, `priority_reasons` (mảng `reasons` từ engine).
+- `upcoming_patients`: thay query `step.findMany + orderBy created_at` bằng `computeQueueOrder(roomId)` (lấy 5 entry đầu). Giữ nguyên shape `{ queue_number, patient_name }`, THÊM field mới không phá FE: `queue_type`, `priority_reasons` (mảng `reasons` từ engine). **TV display không cần guard** (public endpoint).
 - `current_patient`: dựa trên queue entry `status = SERVING` hoặc `CALLED` của phòng (fallback logic cũ theo step IN_PROGRESS nếu không có).
-- Xóa bản duplicate `getRoomDisplayPayload` trong `ticket.service.ts` (dòng ~432) — thay bằng gọi `queueService.getRoomDisplayPayload`. Lưu ý bản của ticket cho phép `staffId` rỗng — hợp nhất: param `staffId` optional, chỉ filter khi có giá trị.
+- Xóa bản duplicate `getRoomDisplayPayload` trong `ticket.service.ts` (dòng ~432) — thay bằng gọi `queueService.getRoomDisplayPayload`. Hợp nhất: param `staffId` optional, chỉ filter khi có giá trị. Dùng `forwardRef` trong TicketModule import QueueModule nếu gặp circular dependency.
+- Param `staffId` giữ optional: TV payload truyền null, staff view truyền staffId.
 
 ## Tiêu chí hoàn thành
 

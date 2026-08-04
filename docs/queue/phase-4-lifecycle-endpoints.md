@@ -15,7 +15,7 @@
 Tạo helper/guard kiểm tra: user hiện tại được thao tác trên phòng `roomId` khi thỏa MỘT trong:
 
 - `role === ADMIN`, HOẶC
-- Staff có `Shift` tại phòng đó hôm nay (`shift.staff_id = user.id AND shift.room_id = roomId AND shift.date = hôm nay` — so sánh ngày theo timezone `Asia/Ho_Chi_Minh`), HOẶC
+- Staff có `Shift` tại phòng đó hôm nay (`shift.staff_id = user.id AND shift.room_id = roomId AND shift.date = hôm nay` — so sánh ngày: trích date từ `Shift.date` (Timestamptz) bằng `date-fns-tz` với timezone `Asia/Ho_Chi_Minh`, so với ngày hiện tại cùng timezone), HOẶC
 - Là staff được gán trực tiếp trên step đang thao tác (`step.staff_id = user.id`).
 
 Cách triển khai gọn: guard `IsAuthGuard` + check nghiệp vụ trong service (method private `assertCanManageRoom(user, roomId, stepId?)` throw `ForbiddenException`). Tham khảo cách `ticket.service.ts` check ownership với `currentUser` (dòng ~337) và decorator/cách lấy user hiện tại trong các controller có sẵn (tìm `@Req()` hoặc custom decorator trong `src/routes/auth/`).
@@ -27,19 +27,22 @@ DTO mới (sửa `src/routes/queue/dto/create-queue.dto.ts`): `step_id` trở th
 Logic mới trong `callNextPatient`:
 
 1. `assertCanManageRoom`.
-2. Kết thúc lượt đang phục vụ (nếu có): queue entry `status = SERVING` của phòng → `status = FINISHED`, `finished_at = now()`; step tương ứng → `COMPLETED` (giữ hành vi hiện tại). Ghi `Move_Log` `action_type: 'FINISHED'`.
+2. Xử lý lượt đang phục vụ (nếu có): kiểm tra queue entry `status = SERVING` của phòng:
+   - Nếu `step.step_status === COMPLETED` (bác sĩ đã hoàn thành khám/kê đơn trong lượt) → `status = FINISHED`, `finished_at = now()`. Ghi `Move_Log` `action_type: 'FINISHED'`.
+   - Nếu `step.step_status !== COMPLETED` (bác sĩ gọi lượt mới khi bệnh nhân trước chưa hoàn thành/không có mặt) → **tự động chuyển thành `MISSING`**, `missed_at = now()`, `missed_count += 1`, `step.step_status = PENDING`. Ghi `Move_Log` `action_type: 'MISSED'` (lý do: "Tự động đánh dấu vắng mặt khi gọi lượt tiếp theo").
 3. Chọn người tiếp theo:
    - Nếu body có `step_id` → gọi đích danh (validate step thuộc phòng, có queue entry active).
    - Nếu không → `computeQueueOrder(roomId)[0]`; hàng rỗng → `BadRequestException('Hàng chờ trống')`.
-4. Update queue entry: `status = CALLED` → ngay `SERVING` (một bước, vì hệ thống chưa có xác nhận có mặt riêng: set cả `called_at = now()` và `serving_started_at = now()`); step → `IN_PROGRESS`. Ghi `Move_Log` `action_type: 'CALLED'`.
-5. Emit `emitQueueUpdate`, trả về display payload (giữ shape response hiện tại).
+4. **Optimistic locking**: dùng update với condition `status IN ['PENDING', 'QUEUED']` trên queue entry được chọn.
+5. Update queue entry: `status = SERVING`, set cả `called_at = now()` và `serving_started_at = now()`; step → `IN_PROGRESS`. Ghi `Move_Log` `action_type: 'CALLED'`.
+6. Emit `emitQueueUpdate`, trả về display payload.
 
 Toàn bộ trong `prisma.$transaction`.
 
 ## 3. Manual override — `POST /queue/:queueId/override`
 
 ```
-Body: { action: 'PIN_TOP' | 'MOVE_TO_POSITION', position?: number, reason?: string }
+Body: { action: 'PIN_TOP' | 'MOVE_TO_POSITION' | 'UNPIN', position?: number, reason?: string }
 ```
 
 - `PIN_TOP`: set `is_pinned = true, pinned_at = now()`. (Use case #2 priority.md — chèn next-in-line.)
@@ -82,13 +85,13 @@ Trả về danh sách đầy đủ từ `computeQueueOrder`:
 }
 ```
 
-Guard: `assertCanManageRoom`.
+Guard: `assertCanManageRoom`. Endpoint này dành cho **staff view** (full data, guarded).
+
+TV display sử dụng `getRoomDisplayPayload` (phase 3) — **không cần guard** (public endpoint).
 
 ## 6. Cron trong `src/routes/cron/cron.service.ts`
 
-- **Auto-MISSING**: mỗi 5 phút — entry `CALLED`/`SERVING` quá 15 phút không `finished` VÀ step không IN_PROGRESS... (cẩn thận: SERVING hợp lệ có thể kéo dài; chỉ auto-miss entry `CALLED` chưa sang SERVING nếu phase này gộp CALLED→SERVING một bước thì bỏ qua job này — thay bằng: entry MISSING quá 60 phút không recall → `CANCELLED`).
-  - Cụ thể triển khai: entry `MISSING` có `missed_at < now - 60 phút` → `status = CANCELLED`, step giữ nguyên. Ghi Move_Log.
-- **Đóng cuối ngày**: 23h50 hằng ngày (`@Cron('50 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })`) — mọi queue entry của ngày còn `QUEUED/CALLED/SERVING/MISSING` → `CANCELLED` (khớp với cron `updateFlowAndStepExpired` hiện chạy 23h59 đánh ABANDONED flow).
+- **Đóng cuối ngày**: 23h50 hằng ngày (`@Cron('50 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })`) — mọi queue entry của ngày còn `QUEUED/CALLED/SERVING/MISSING` → `CANCELLED` (khớp với cron `updateFlowAndStepExpired` hiện chạy 23h59 đánh ABANDONED flow). Các lượt `MISSING` sẽ giữ trạng thái trong suốt cả ngày cho đến mốc 23h50 này.
 
 ## 7. Swagger
 

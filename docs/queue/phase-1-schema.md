@@ -99,6 +99,7 @@ model Queue_Priority_Rule {
   conditions  Json?             @db.JsonB // xem spec conditions bên dưới
   weight      Int               @default(0) // điểm cộng vào base_priority khi khớp
   aging_rate  Float             @default(0) // điểm/phút chờ (thường chỉ dùng cho rule AGING)
+  max_aging   Float             @default(0) // giới hạn tối đa điểm aging (0 = không giới hạn)
   params      Json?             @db.JsonB // tham số riêng theo rule_type, xem bên dưới
   room_type   ClinicalRoomType? // null = global; có giá trị = chỉ áp cho phòng loại này
   specialty_id String?          @db.Uuid  // null = global; có giá trị = chỉ áp cho chuyên khoa này
@@ -106,7 +107,7 @@ model Queue_Priority_Rule {
   created_at  DateTime          @default(now()) @db.Timestamptz()
   updated_at  DateTime          @default(now()) @updatedAt @db.Timestamptz()
 
-  specialty Specialty? @relation(fields: [specialty_id], references: [specialty_id])
+  specialty Specialty? @relation(fields: [specialty_id], references: [specialty_id], onDelete: SetNull)
 
   @@index([rule_type, is_active])
   @@map("queue_priority_rule")
@@ -136,8 +137,8 @@ Fields hỗ trợ (engine resolve ở phase 2): `age` (từ `Patient.dob`), `gen
 ### Spec `params` JSON theo `rule_type`
 
 - `MISSED_TURN`: `{ "hold_positions": 3 }` — lùi sau n người khi recall.
-- `RETURNING` / `QUICK_TASK`: `{ "interleave_ratio": 1 }` — 1 số thường : 1 số nhóm này.
-- `AGING`: không cần params, dùng cột `aging_rate`.
+- `RETURNING` / `QUICK_TASK`: `{ "interleave_ratio": 1 }` — `interleave_ratio: N` nghĩa là N số thường rồi 1 số nhóm interleave. Hiện chỉ hỗ trợ `1` (1:1).
+- `AGING`: không cần params, dùng cột `aging_rate` và `max_aging` (mặc định `max_aging = 15` — giới hạn điểm aging tối đa, 0 = không giới hạn).
 - `REBALANCE` (dùng ở phase 6): `{ "eta_gap_minutes": 15, "enabled": true, "suggestion_ttl_minutes": 10 }`.
 
 ## 4. Model mới `Room_Service_Stat` (dữ liệu ETA — phase 5 dùng)
@@ -217,7 +218,7 @@ Thêm các cột:
   payload          Json?   @db.JsonB // { from_position, to_position, from_room_id, to_room_id, ... }
 ```
 
-Giữ nguyên `action_type String?` — quy ước giá trị (dùng thống nhất từ phase 4): `CALLED`, `PINNED_TOP`, `MOVED_POSITION`, `MISSED`, `RECALLED`, `REBALANCED`, `FINISHED`.
+Giữ nguyên `action_type String?` — quy ước giá trị (dùng thống nhất từ phase 3/4): `CALLED`, `PINNED_TOP`, `MOVED_POSITION`, `MISSED`, `RECALLED`, `TRANSFERRED` (chuyển phòng thủ công), `REBALANCED` (load balancing), `FINISHED`.
 
 ## 8. Seed rules mặc định
 
@@ -235,25 +236,54 @@ Tạo `prisma/queue-rules.seed.ts` theo pattern của `prisma/room.seed.ts` (Pri
 | `QUICK_TASK_INTERLEAVE` | QUICK_TASK | 0 | params `{"interleave_ratio": 1}` | Việc nhanh |
 | `TRANSFER_PRIORITY` | TRANSFER | 8 | `{"queue_type": {"in": ["TRANSFER"]}}` | Chuyển hội chẩn: cao hơn khách mới, thấp hơn nhi cấp |
 | `MISSED_TURN_HOLD` | MISSED_TURN | 0 | params `{"hold_positions": 3}` | Lỡ lượt lùi 3 người |
-| `AGING_DEFAULT` | AGING | 0 | `aging_rate = 0.2` | +0.2 điểm/phút chờ (~1 bậc weight sau 5 phút) |
+| `AGING_DEFAULT` | AGING | 0 | `aging_rate = 0.2`, `max_aging = 15` | +0.2 điểm/phút chờ, tối đa +15 điểm (cap sau 75 phút) |
 | `REBALANCE_DEFAULT` | REBALANCE | 0 | params `{"eta_gap_minutes": 15, "enabled": true, "suggestion_ttl_minutes": 10}` | Config load balancing |
 
 Tất cả seed với `room_type = null`, `specialty_id = null` (global), `is_active = true`.
 
-## 9. Các bước thực hiện
+## 9. Seed Room_Service mapping cơ bản
+
+Trong cùng file `prisma/queue-rules.seed.ts` (hoặc file riêng `prisma/room-service.seed.ts`), seed mapping giữa các phòng và service cho các loại phòng rebalanceable (xét nghiệm, chẩn đoán hình ảnh, thủ thuật):
+
+- Query tất cả `Room` có `room_type` thuộc `[LABORATORY, IMAGING_ROOM, PROCEDURE_ROOM, FUNCTIONAL_EXPLORATION]`.
+- Query tất cả `Service` có `room_type` tương ứng.
+- Upsert `Room_Service` cho mỗi cặp (room, service) khớp `room_type`. VD: phòng `LABORATORY` → service có `room_type = LABORATORY`.
+- Idempotent: dùng `upsert` theo `@@unique([room_id, service_id])`.
+
+## 10. Backfill `Queue.room_id` cho dữ liệu cũ
+
+Sau `db push`, chạy raw SQL hoặc Prisma script để backfill:
+
+```sql
+UPDATE queue q
+SET room_id = s.room_id
+FROM step s
+WHERE q.step_id = s.step_id
+  AND q.room_id IS NULL
+  AND s.room_id IS NOT NULL;
+```
+
+Chạy trong seed script hoặc bằng `prisma.$executeRawUnsafe`. Entry không có `room_id` sau backfill (vì step cũng null) sẽ bị engine bỏ qua — chấp nhận.
+
+## 11. Các bước thực hiện
 
 1. Sửa `prisma/schema.prisma` như trên (enums → Queue → models mới → Move_Log → relations ngược trên Room/Service/Specialty).
 2. `npx prisma format` để chuẩn hóa và bắt lỗi relation.
 3. `npx prisma db push` (KHÔNG dùng `migrate dev` — project không dùng migrations). Nếu db push cảnh báo mất dữ liệu ở cột đã có, dừng lại xem xét — các thay đổi trên chỉ THÊM cột/bảng nên không được phép có destructive change.
 4. `npx prisma generate` (db push thường tự chạy, xác nhận lại).
-5. Viết + chạy `npx ts-node prisma/queue-rules.seed.ts`, chạy 2 lần để xác nhận idempotent.
-6. `npm run build` pass.
+5. Chạy backfill `Queue.room_id` (mục 10).
+6. Viết + chạy `npx ts-node prisma/queue-rules.seed.ts`, chạy 2 lần để xác nhận idempotent.
+7. Viết + chạy seed Room_Service (mục 9).
+8. `npm run build` pass.
 
 ## Tiêu chí hoàn thành
 
 - [ ] `npx prisma format` + `npx prisma db push` thành công, không destructive change.
 - [ ] Bảng mới tồn tại trong DB: `queue_priority_rule`, `room_service_stat`, `room_service`, `queue_rebalance_suggestion`; bảng `queue`, `move_log` có cột mới.
-- [ ] Seed chạy 2 lần không lỗi, đủ 12 rule.
+- [ ] `Queue_Priority_Rule` có cột `max_aging` (Float, default 0).
+- [ ] Seed chạy 2 lần không lỗi, đủ 12 rule, `AGING_DEFAULT` có `max_aging = 15`.
+- [ ] Room_Service seed chạy thành công, mapping đủ các phòng rebalanceable.
+- [ ] Backfill `Queue.room_id` đã chạy cho entry cũ.
 - [ ] `npm run build` pass (code hiện tại không compile lỗi vì chỉ thêm field optional/default).
 
 ## Không được làm

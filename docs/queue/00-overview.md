@@ -20,15 +20,18 @@ Nâng cấp hệ thống hàng chờ OPD từ FIFO đơn thuần (sort theo `ste
 | Quyết định | Lựa chọn |
 | --- | --- |
 | Mô hình sắp xếp | **Hybrid**: score (weight + aging) quyết định thứ tự nền + lớp override cấu trúc (pin-top, hold n vị trí, interleave 1-1) |
+| Aging cap | Aging bonus có giới hạn tối đa (`max_aging` trên rule AGING, mặc định 15). Tránh người chờ rất lâu vượt qua emergency override |
 | ETA | **Hybrid EMA**: timestamps thực tế → EMA theo (room, step_type), fallback `default_duration_sec` do admin cấu hình khi `sample_count < 5` |
 | Scope rule | Global + override theo `ClinicalRoomType` / `specialty_id` (rule cụ thể hơn đè rule global) |
 | Heatmap | REST snapshot, FE tự polling (KHÔNG cần WebSocket, KHÔNG cần bảng thống kê lịch sử) |
-| Call-next | Auto: hệ thống tự chọn người đứng đầu theo engine; vẫn nhận `step_id` optional để gọi đích danh |
+| Call-next | Auto: hệ thống tự chọn người đứng đầu theo engine; vẫn nhận `step_id` optional để gọi đích danh. **Optimistic locking**: dùng `SELECT ... FOR UPDATE` trên queue entry khi call-next để tránh 2 staff gọi cùng lúc |
 | Load balancing scope | Cả 2 lớp: chọn phòng ít tải nhất lúc enqueue + re-balance khi nghẽn |
 | Load balancing mode | **Bán tự động**: hệ thống sinh suggestion, staff/admin confirm mới chuyển thật |
 | Metric nghẽn | Chênh lệch **ETA** giữa các phòng cùng nhóm > ngưỡng X phút (admin cấu hình, mặc định 15) |
 | Nhóm phòng tương đương | Bảng mapping **`Room_Service`** (admin khai báo phòng nào làm được service nào) |
 | Khi chuyển phòng | Cấp `queue_number` mới ở phòng đích, **giữ nguyên `enqueued_at` + `base_priority`** (không mất aging) |
+| Feature flag | Env var `QUEUE_ENGINE_ENABLED` (default `true`). Khi `false`, `enqueueStep` chỉ tạo Queue record cơ bản (FIFO) mà không evaluate rules / compute order |
+| TV / Kiosk access | TV display (`getRoomDisplayPayload`) **không cần guard** (public). Kiosk KHÔNG được đọc hàng chờ staff view |
 
 ## 3. Sơ đồ kiến trúc
 
@@ -116,3 +119,6 @@ return { code: 200, status: 'success', message: 'Thông báo tiếng Việt', da
 4. Message người dùng bằng tiếng Việt, code + comment bằng tiếng Anh (comment chỉ khi giải thích intent không hiển nhiên).
 5. Sau mỗi phase: `npm run build` và `npm run lint` phải pass. Không viết unit test trừ khi phase yêu cầu.
 6. Không sửa các tính năng ngoài scope (booking, payment, navigation, map...) trừ các điểm hook được chỉ định rõ trong từng phase.
+7. **`Move_Log.action_type` quy ước giá trị**: `CALLED`, `PINNED_TOP`, `MOVED_POSITION`, `MISSED`, `RECALLED`, `TRANSFERRED` (bác sĩ chỉ định chuyển phòng thủ công), `REBALANCED` (load balancing tự động), `FINISHED`.
+8. **Backfill dữ liệu cũ**: sau khi push schema phase 1, chạy script backfill `Queue.room_id` từ `Step.room_id` cho các entry đã tồn tại. Entry cũ không có `room_id` sẽ bị engine bỏ qua.
+9. **Logging**: mỗi enqueue, call-next, override, rebalance log ở level `info` với structured payload. Rule evaluation log ở level `debug`.
