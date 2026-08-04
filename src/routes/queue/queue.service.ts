@@ -17,11 +17,13 @@ import {
   QueueTypeEnum,
   RoleTypeEnum,
   StepStatusEnum,
+  StepTypeEnum,
 } from '@prisma/client';
 import { toZonedTime } from 'date-fns-tz';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
 import { QueuePriorityService } from './queue-priority.service';
+import { EntryEtaInfo, QueueEtaService } from './queue-eta.service';
 
 export function isAppointmentOnTime(
   slotStartTime: string,
@@ -61,6 +63,7 @@ export class QueueService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queuePriorityService: QueuePriorityService,
+    private readonly queueEtaService: QueueEtaService,
 
     @Inject(forwardRef(() => QueueGateway))
     private readonly queueGateway: QueueGateway,
@@ -354,6 +357,19 @@ export class QueueService {
               actor_account_id: user?.id ?? null,
             },
           });
+
+          if (currentlyServing.serving_started_at) {
+            const durationSec = Math.round(
+              (now.getTime() - new Date(currentlyServing.serving_started_at).getTime()) / 1000,
+            );
+            this.queueEtaService
+              .recordServiceDuration(
+                roomId,
+                currentlyServing.step?.step_type ?? null,
+                durationSec,
+              )
+              .catch((err) => this.logger.warn(`Failed recording service duration: ${err.message}`));
+          }
         } else {
           // Patient did not show up before calling next -> auto mark MISSING
           await tx.queue.update({
@@ -483,6 +499,11 @@ export class QueueService {
       : currentQueue?.step?.staff;
 
     const upcomingOrder = await this.queuePriorityService.computeQueueOrder(roomId);
+    const roomEta = await this.queueEtaService.computeEtaForRoom(roomId);
+    const etaMap = new Map<string, EntryEtaInfo>();
+    for (const e of roomEta.entries) {
+      etaMap.set(e.queueId, e);
+    }
 
     return {
       room_info: {
@@ -496,12 +517,16 @@ export class QueueService {
             patient_name: (currentQueue.step as any)?.flow?.booking?.patient?.full_name || '---',
           }
         : null,
-      upcoming_patients: upcomingOrder.slice(0, 5).map((entry) => ({
-        queue_number: entry.queue.queue_number,
-        patient_name: (entry.queue as any).step?.flow?.booking?.patient?.full_name || '---',
-        queue_type: entry.queue.queue_type,
-        priority_reasons: entry.reasons,
-      })),
+      upcoming_patients: upcomingOrder.slice(0, 5).map((entry) => {
+        const etaInfo = etaMap.get(entry.queue.queue_id);
+        return {
+          queue_number: entry.queue.queue_number,
+          patient_name: (entry.queue as any).step?.flow?.booking?.patient?.full_name || '---',
+          queue_type: entry.queue.queue_type,
+          priority_reasons: entry.reasons,
+          eta_minutes: etaInfo ? Math.round(etaInfo.etaSec / 60) : 0,
+        };
+      }),
       timestamp: new Date().toISOString(),
     };
   }
@@ -764,6 +789,12 @@ export class QueueService {
       },
     });
 
+    const roomEta = await this.queueEtaService.computeEtaForRoom(roomId);
+    const etaMap = new Map<string, EntryEtaInfo>();
+    for (const e of roomEta.entries) {
+      etaMap.set(e.queueId, e);
+    }
+
     const waitingOrder = await this.queuePriorityService.computeQueueOrder(roomId);
 
     const missingEntries = await this.prisma.queue.findMany({
@@ -797,6 +828,7 @@ export class QueueService {
       message: 'Lấy danh sách hàng chờ phòng khám thành công.',
       data: {
         room_id: roomId,
+        expected_service_minutes: Math.round(roomEta.expectedDurationSec / 60),
         serving: servingQueue
           ? {
               queue_id: servingQueue.queue_id,
@@ -810,6 +842,9 @@ export class QueueService {
             ? new Date(entry.queue.enqueued_at)
             : new Date(entry.queue.created_at);
           const waitedMinutes = Math.floor(Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000);
+          const etaInfo = etaMap.get(entry.queue.queue_id);
+          const etaMinutes = etaInfo ? Math.round(etaInfo.etaSec / 60) : 0;
+
           return {
             position: entry.position,
             queue_id: entry.queue.queue_id,
@@ -821,6 +856,8 @@ export class QueueService {
             is_pinned: entry.queue.is_pinned,
             enqueued_at: entry.queue.enqueued_at,
             waited_minutes: waitedMinutes,
+            eta_minutes: etaMinutes,
+            eta_time: etaInfo?.etaTime || null,
           };
         }),
         missing: missingEntries.map((m) => ({
@@ -831,5 +868,17 @@ export class QueueService {
         })),
       },
     };
+  }
+
+  async computeRoomEta(roomId: string) {
+    return await this.queueEtaService.computeEtaForRoom(roomId);
+  }
+
+  async updateRoomDefaultDurationSec(
+    roomId: string,
+    stepType: StepTypeEnum,
+    defaultDurationSec: number,
+  ) {
+    return await this.queueEtaService.updateDefaultDurationSec(roomId, stepType, defaultDurationSec);
   }
 }

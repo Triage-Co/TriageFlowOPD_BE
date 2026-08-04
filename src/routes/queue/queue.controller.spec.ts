@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { QueueController } from './queue.controller';
 import { QueueService } from './queue.service';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 
 describe('QueueController', () => {
   let controller: QueueController;
@@ -12,6 +14,7 @@ describe('QueueController', () => {
     markQueueMissed: jest.fn(),
     recallQueue: jest.fn(),
     getRoomQueueView: jest.fn(),
+    updateRoomDefaultDurationSec: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -23,7 +26,12 @@ describe('QueueController', () => {
           useValue: mockQueueService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(IsAuthGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(IsRoleGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<QueueController>(QueueController);
   });

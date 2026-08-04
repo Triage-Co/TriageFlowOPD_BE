@@ -5,13 +5,22 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { CallPatientDto, OverrideQueueDto, TransferQueueDto } from './dto/create-queue.dto';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
+import { RoleTypeEnum } from '@prisma/client';
+import {
+  CallPatientDto,
+  OverrideQueueDto,
+  TransferQueueDto,
+  UpdateRoomStatDto,
+} from './dto/create-queue.dto';
 import { QueueService } from './queue.service';
 
 @ApiTags('Queue')
@@ -106,5 +115,28 @@ export class QueueController {
   async getRoomQueueView(@Param('roomId') roomId: string, @Req() req: any) {
     const user = this.getUser(req);
     return await this.queueService.getRoomQueueView(roomId, user);
+  }
+
+  @Patch('admin/room-stats/:roomId')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin cấu hình thời gian phục vụ mặc định cho phòng khám' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thời gian mặc định thành công.' })
+  async updateRoomDefaultDurationSec(
+    @Param('roomId') roomId: string,
+    @Body() body: UpdateRoomStatDto,
+  ) {
+    const updated = await this.queueService.updateRoomDefaultDurationSec(
+      roomId,
+      body.step_type,
+      body.default_duration_sec,
+    );
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Cập nhật cấu hình thời gian mặc định thành công.',
+      data: updated,
+    };
   }
 }

@@ -10,10 +10,11 @@ import { PrismaService } from '../../shared/config/prisma.service';
 import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
 import { NavigationService } from '../navigation/core/navigation.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
+import { QueueService } from '../queue/queue.service';
 import { TicketNavigateDto } from './dto/ticket-navigate.dto';
 import { TicketCheckInDto } from './dto/ticket-check-in.dto';
 import { RouteLocationType } from '../navigation/core/dto/get-route.dto';
-import { StepStatusEnum } from '@prisma/client';
+import { QueueStatusEnum, QueueTypeEnum, StepStatusEnum } from '@prisma/client';
 
 @Injectable()
 export class TicketService {
@@ -27,6 +28,9 @@ export class TicketService {
 
     @Inject(forwardRef(() => QueueGateway))
     private readonly queueGateway: QueueGateway,
+
+    @Inject(forwardRef(() => QueueService))
+    private readonly queueService: QueueService,
   ) {}
 
   /**
@@ -80,6 +84,31 @@ export class TicketService {
       flow.steps.find((s) => s.step_status === StepStatusEnum.PENDING) ||
       null;
 
+    let queueInfo: any = null;
+
+    if (currentStep && currentStep.room_id) {
+      const activeQueue = await this.prisma.queue.findFirst({
+        where: {
+          step_id: currentStep.step_id,
+          status: { notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED] },
+        },
+      });
+
+      if (activeQueue) {
+        const roomEta = await this.queueService.computeRoomEta(currentStep.room_id);
+        const entryEta = roomEta.entries.find((e) => e.queueId === activeQueue.queue_id);
+
+        queueInfo = {
+          queue_number: activeQueue.queue_number,
+          position: entryEta ? entryEta.position : 0,
+          waiting_ahead: entryEta ? entryEta.position : 0,
+          eta_minutes: entryEta ? Math.round(entryEta.etaSec / 60) : 0,
+          eta_time: entryEta?.etaTime || null,
+          queue_status: activeQueue.status,
+        };
+      }
+    }
+
     return {
       code: 200,
       status: 'success',
@@ -107,6 +136,7 @@ export class TicketService {
               staff_name: currentStep.staff?.full_name || 'Đang cập nhật',
             }
           : null,
+        queue_info: queueInfo,
         progress_summary: {
           total: totalSteps,
           completed: completedSteps,
