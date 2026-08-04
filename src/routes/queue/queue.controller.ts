@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -22,11 +23,15 @@ import {
   UpdateRoomStatDto,
 } from './dto/create-queue.dto';
 import { QueueService } from './queue.service';
+import { QueueRebalanceService } from './queue-rebalance.service';
 
 @ApiTags('Queue')
 @Controller('queue')
 export class QueueController {
-  constructor(private readonly queueService: QueueService) {}
+  constructor(
+    private readonly queueService: QueueService,
+    private readonly queueRebalanceService: QueueRebalanceService,
+  ) {}
 
   private getUser(req: any) {
     const u = req?.user;
@@ -138,5 +143,46 @@ export class QueueController {
       message: 'Cập nhật cấu hình thời gian mặc định thành công.',
       data: updated,
     };
+  }
+
+  @Get('rebalance/suggestions')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xem các gợi ý điều phối chuyển phòng (PENDING)' })
+  @ApiResponse({ status: 200, description: 'Danh sách gợi ý điều phối.' })
+  async getPendingRebalanceSuggestions(
+    @Query('room_id') roomId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueRebalanceService.getPendingSuggestions(roomId, user);
+  }
+
+  @Post('rebalance/suggestions/:id/confirm')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Xác nhận thực thi gợi ý chuyển phòng khám' })
+  @ApiResponse({ status: 200, description: 'Đã chuyển bệnh nhân sang phòng mới thành công.' })
+  async confirmRebalanceSuggestion(
+    @Param('id') suggestionId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueRebalanceService.confirmSuggestion(suggestionId, user);
+  }
+
+  @Post('rebalance/suggestions/:id/reject')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Từ chối gợi ý chuyển phòng khám' })
+  @ApiResponse({ status: 200, description: 'Đã từ chối gợi ý.' })
+  async rejectRebalanceSuggestion(
+    @Param('id') suggestionId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueRebalanceService.rejectSuggestion(suggestionId, user);
   }
 }

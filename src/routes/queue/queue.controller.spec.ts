@@ -4,6 +4,8 @@ import { QueueService } from './queue.service';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 
+import { QueueRebalanceService } from './queue-rebalance.service';
+
 describe('QueueController', () => {
   let controller: QueueController;
 
@@ -17,6 +19,12 @@ describe('QueueController', () => {
     updateRoomDefaultDurationSec: jest.fn(),
   };
 
+  const mockQueueRebalanceService = {
+    getPendingSuggestions: jest.fn(),
+    confirmSuggestion: jest.fn(),
+    rejectSuggestion: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [QueueController],
@@ -24,6 +32,10 @@ describe('QueueController', () => {
         {
           provide: QueueService,
           useValue: mockQueueService,
+        },
+        {
+          provide: QueueRebalanceService,
+          useValue: mockQueueRebalanceService,
         },
       ],
     })

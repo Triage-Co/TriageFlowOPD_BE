@@ -59,4 +59,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitQueueUpdate(roomId: string, data: any) {
     this.server.to(`room_${roomId}`).emit('onQueueUpdate', data);
   }
+
+  emitRebalanceSuggestion(fromRoomId: string, toRoomId: string, suggestionData: any) {
+    this.server.to(`room_${fromRoomId}`).emit('onRebalanceSuggestion', suggestionData);
+    this.server.to(`room_${toRoomId}`).emit('onRebalanceSuggestion', suggestionData);
+  }
 }

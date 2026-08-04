@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueRebalanceService } from '../queue/queue-rebalance.service';
 import {
   BookingStatusEnum,
   FlowStatusEnum,
@@ -14,7 +15,12 @@ import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class CronService {
-  constructor(private readonly prismaService: PrismaService) {}
+  private readonly logger = new Logger(CronService.name);
+
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly queueRebalanceService: QueueRebalanceService,
+  ) {}
 
   @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updateFlowAndStepExpired() {
@@ -298,5 +304,14 @@ export class CronService {
         status: 'CANCELLED',
       },
     });
+  }
+
+  @Cron('*/2 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async handleRebalanceDetector() {
+    try {
+      await this.queueRebalanceService.detectAndSuggest();
+    } catch (err: any) {
+      this.logger.warn(`Failed handleRebalanceDetector cron: ${err.message}`);
+    }
   }
 }
