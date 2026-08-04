@@ -42,6 +42,15 @@ export class RoomController {
     return this.roomService.findOne(id);
   }
 
+  @Get(':id/slots')
+  @ApiOperation({ summary: 'Lấy danh sách các slot (khung giờ khám) của một phòng. Có thể lọc theo ngày (YYYY-MM-DD)' })
+  getSlotsByRoomId(
+    @Param('id') id: string,
+    @Query('date') date?: string
+  ) {
+    return this.roomService.getSlotsByRoomId(id, date);
+  }
+
   @Patch(':id')
   @ApiOperation({
     summary: 'Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room',
