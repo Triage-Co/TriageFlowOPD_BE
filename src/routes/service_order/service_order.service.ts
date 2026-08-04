@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CreateServiceOrderReqDto,
   QueryServiceOrderReqDto,
@@ -6,7 +6,13 @@ import {
 } from './dto/req-service_order.dto';
 import { ServiceOrderErrors } from '../../shared/exceptions/service_order.exceptions';
 import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
-import { ClinicalRoomType, ServiceOrderStatusEnum, Step, StepTypeEnum } from '@prisma/client';
+import {
+  ClinicalRoomType,
+  ServiceOrderStatusEnum,
+  Step,
+  StepTypeEnum,
+  TransTypeEnum,
+} from '@prisma/client';
 import type { IBookingRepository } from '../../shared/interfaces/i-booking.repository';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import type { ISpecialtyRepository } from '../../shared/interfaces/i-specialty.repository';
@@ -18,6 +24,7 @@ import type { IInvoiceDetailRepository } from '../../shared/interfaces/i-invoice
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueEtaService } from '../queue/queue-eta.service';
 import { REBALANCEABLE_STEP_TYPES } from '../queue/queue.constants';
+import { TransactionService } from '../transaction/transaction.service';
 
 /** Map ClinicalRoomType → StepTypeEnum for rebalanceable CLS/procedure rooms. */
 const ROOM_TYPE_TO_STEP_TYPE: Partial<Record<ClinicalRoomType, StepTypeEnum>> = {
@@ -32,6 +39,7 @@ export class ServiceOrderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queueEtaService: QueueEtaService,
+    private readonly transactionService: TransactionService,
 
     @Inject('IServiceOrderRepository')
     private readonly serviceOrderRepository: IServiceOrderRepository,
@@ -125,6 +133,29 @@ export class ServiceOrderService {
           unit_price: service.price,
           sub_total: service.price,
         });
+
+        const paymentLink = await this.transactionService.create({
+          cancelUrl: 'https://triageflow.me/api-docs',
+          returnUrl: 'https://triageflow.me/api-docs',
+          transType: TransTypeEnum.ORDER_PAYMENT,
+          amount: service.price || 0,
+          clientId: booking.patient_id,
+          service_order_id: serviceOrder.service_order_id,
+        });
+
+        if (!paymentLink || !('data' in paymentLink)) {
+          throw new BadRequestException(
+            (paymentLink?.detail as any)?.error?.desc ||
+              'Lỗi tạo giao dịch thanh toán',
+          );
+        }
+
+        await this.serviceOrderRepository.update(
+          serviceOrder.service_order_id,
+          {
+            qr_code: paymentLink.data.qrCode,
+          },
+        );
       }
 
       let room: any = null;
@@ -172,7 +203,9 @@ export class ServiceOrderService {
         }
 
         if (!room) {
-          room = await this.roomRepository.findBestRoomByRoomType(service.room_type);
+          room = await this.roomRepository.findBestRoomByRoomType(
+            service.room_type,
+          );
         }
 
         if (!room) {
