@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -14,13 +15,17 @@ import {
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
-import { StepStatusEnum } from '@prisma/client';
+import { QueueTypeEnum, StepStatusEnum, StepTypeEnum } from '@prisma/client';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
+import { QueueService } from '../queue/queue.service';
 
 @Injectable()
 export class StepService {
   constructor(
     @Inject('IStepRepository') private readonly stepRepository: IStepRepository,
+
+    @Inject(forwardRef(() => QueueService))
+    private readonly queueService: QueueService,
   ) {}
 
   async createParentStep(createParentStepReqDto: CreateParentStepReqDto) {

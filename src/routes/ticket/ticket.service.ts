@@ -233,7 +233,8 @@ export class TicketService {
 
     const totalAmount = serviceOrders.reduce((sum, order) => {
       const orderTotal = order.serviceOrderDetails.reduce(
-        (acc, detail) => acc + (detail.price_at_order || 0) * (detail.quantity || 1),
+        (acc, detail) =>
+          acc + (detail.price_at_order || 0) * (detail.quantity || 1),
         0,
       );
       return sum + orderTotal;
@@ -270,10 +271,7 @@ export class TicketService {
 
     const prescriptions = await this.prisma.prescription.findMany({
       where: {
-        OR: [
-          { booking_id: flow.booking_id },
-          { flow_id: flow.flow_id },
-        ],
+        OR: [{ booking_id: flow.booking_id }, { flow_id: flow.flow_id }],
       },
       include: {
         doctor: {
@@ -316,7 +314,9 @@ export class TicketService {
         steps: {
           where: {
             room_id: dto.room_id,
-            step_status: { in: [StepStatusEnum.PENDING, StepStatusEnum.IN_PROGRESS] },
+            step_status: {
+              in: [StepStatusEnum.PENDING, StepStatusEnum.IN_PROGRESS],
+            },
           },
           include: {
             queues: true,
@@ -348,7 +348,8 @@ export class TicketService {
     if (!flow.steps || flow.steps.length === 0) {
       throw new BadRequestException({
         message: 'Check-in không hợp lệ',
-        detail: 'Bệnh nhân không có bước khám nào đang chờ hoặc thực hiện tại phòng này',
+        detail:
+          'Bệnh nhân không có bước khám nào đang chờ hoặc thực hiện tại phòng này',
       });
     }
 
@@ -369,7 +370,10 @@ export class TicketService {
     // Broadcast queue update if room_id is active
     if (step.room_id) {
       try {
-        const displayPayload = await this.getRoomDisplayPayload(step.room_id, step.staff_id || '');
+        const displayPayload = await this.getRoomDisplayPayload(
+          step.room_id,
+          step.staff_id || '',
+        );
         this.queueGateway.emitQueueUpdate(step.room_id, displayPayload);
       } catch (err) {
         // Socket broadcast errors should not block check-in response
