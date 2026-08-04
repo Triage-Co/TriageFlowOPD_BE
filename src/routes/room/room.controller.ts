@@ -28,7 +28,10 @@ export class RoomController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách các phòng logic (hỗ trợ phân trang, sắp xếp và lấy kèm roomCode từ physical room)' })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách các phòng logic (hỗ trợ phân trang, sắp xếp và lấy kèm roomCode từ physical room)',
+  })
   findAll(@Query() query: QueryRoomReqDto) {
     return this.roomService.findAll(query);
   }
@@ -49,7 +52,9 @@ export class RoomController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room' })
+  @ApiOperation({
+    summary: 'Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room',
+  })
   update(
     @Param('id') id: string,
     @Body() updateRoomRequestDto: UpdateRoomRequestDto,
@@ -63,4 +68,3 @@ export class RoomController {
     return this.roomService.remove(id);
   }
 }
-

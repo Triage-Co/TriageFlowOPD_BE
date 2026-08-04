@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  forwardRef,
   Inject,
   Injectable,
   NotFoundException,
@@ -16,6 +17,7 @@ import {
   PaymentStatusEnum,
   PrismaClient,
   QueueStatusEnum,
+  QueueTypeEnum,
   ServiceOrderDetailStatusEnum,
   ServiceOrderStatusEnum,
   StepStatusEnum,
@@ -23,6 +25,8 @@ import {
   TransTypeEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
+import { randomInt } from 'crypto';
+import { format } from 'date-fns';
 import { TransactionService } from '../transaction/transaction.service';
 import type { INotificationRepository } from '../../shared/interfaces/i-notification.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
@@ -37,7 +41,7 @@ import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-
 import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 import type { IRoomRepository } from '../../shared/interfaces/i-room.repository';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
-import type { IQueueRepository } from '../../shared/interfaces/i-queue.repository';
+import { QueueService } from '../queue/queue.service';
 
 @Injectable()
 export class BookingService {
@@ -68,9 +72,16 @@ export class BookingService {
     private readonly serviceOrderRepository: IServiceOrderRepository,
     @Inject('IServiceRepository')
     private readonly serviceRepository: IServiceRepository,
-    @Inject('IQueueRepository')
-    private readonly queueRepository: IQueueRepository,
-  ) { }
+
+    @Inject(forwardRef(() => QueueService))
+    private readonly queueService: QueueService,
+  ) {}
+
+  private generateTicketCode(): string {
+    const dateStr = format(new Date(), 'yyyyMMdd');
+    const randomNum = randomInt(1000, 9999);
+    return `V-${dateStr}-${randomNum}`;
+  }
 
   async create(createBookingData: CreateBookingRequestDto) {
     const { patient_id, slot_id } = createBookingData;
@@ -136,10 +147,12 @@ export class BookingService {
         tx,
       );
 
+      const ticketCode = this.generateTicketCode();
       const flow = await this.flowRepository.create(
         {
           booking_id: booking.booking_id,
           status: FlowStatusEnum.PENDING,
+          ticket_code: ticketCode,
         },
         tx,
       );
@@ -179,7 +192,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-          'Lỗi tạo giao dịch thanh toán',
+            'Lỗi tạo giao dịch thanh toán',
         );
       }
 
@@ -206,7 +219,7 @@ export class BookingService {
         },
         tx,
       );
-      return { serviceOrder, step_1, booking, paymentLink };
+      return { serviceOrder, step_1, booking, paymentLink, flow };
     });
 
     return {
@@ -216,6 +229,7 @@ export class BookingService {
       data: {
         step_id: rs.step_1.step_id,
         booking_id: rs.booking.booking_id,
+        ticket_code: rs.flow.ticket_code,
         payment: rs.paymentLink,
       },
     };
@@ -275,18 +289,25 @@ export class BookingService {
       },
     });
 
-    if (stepKhamBenh && stepKhamBenh.queues.length > 0) {
-      return {
-        code: 200,
-        message: 'Bạn đã có số khám bệnh',
-        status: 'success',
-        data: {
-          slot: slot,
-          room: stepKhamBenh.room,
-          specialty: stepKhamBenh.room?.specialty_id,
-          queue: stepKhamBenh.queues[0],
-        },
-      };
+    if (stepKhamBenh) {
+      const activeQueue = (stepKhamBenh.queues || []).find(
+        (q) =>
+          q.status !== QueueStatusEnum.FINISHED &&
+          q.status !== QueueStatusEnum.CANCELLED,
+      );
+      if (activeQueue?.room_id) {
+        return {
+          code: 200,
+          message: 'Bạn đã có số khám bệnh',
+          status: 'success',
+          data: {
+            slot: slot,
+            room: stepKhamBenh.room,
+            specialty: stepKhamBenh.room?.specialty_id,
+            queue: activeQueue,
+          },
+        };
+      }
     }
 
     if (!stepKhamBenh) {
@@ -304,20 +325,26 @@ export class BookingService {
           queues: true,
         },
       });
+    } else if (!stepKhamBenh.room_id) {
+      stepKhamBenh = await this.prismaService.step.update({
+        where: { step_id: stepKhamBenh.step_id },
+        data: {
+          room_id: fullSlot.shift.room_id,
+          staff_id: fullSlot.shift.staff_id,
+        },
+        include: {
+          room: true,
+          queues: true,
+        },
+      });
     }
 
-    const maxCapacity = Number(fullSlot.max_capacity || 10);
-    const index = Number(fullSlot.slot_index || 0);
-    const slotIsBooking = await this.bookingRepository.countBySlotId(
-      slot.slot_id,
+    const queue = await this.queueService.enqueueStep(
+      stepKhamBenh.step_id,
+      QueueTypeEnum.APPOINTMENT,
+      undefined,
+      { forceType: true },
     );
-    const number: number = index * maxCapacity + slotIsBooking;
-
-    const queue = await this.queueRepository.create({
-      queue_number: `A-${number}`,
-      step_id: stepKhamBenh.step_id,
-      status: QueueStatusEnum.QUEUED,
-    });
 
     if (step.flow_id) {
       await this.prismaService.flow.update({
@@ -448,7 +475,6 @@ export class BookingService {
     return await this.create(createBookingData);
   }
 
-
   async createBookingWithPackage(dto: CreateBookingWithPackageDto) {
     const { patient_id, slot_id, package_id, return_url, cancel_url } = dto;
 
@@ -572,7 +598,8 @@ export class BookingService {
 
     return {
       code: 200,
-      message: 'Tạo đơn gói khám thành công. Vui lòng thanh toán để tạo lịch khám.',
+      message:
+        'Tạo đơn gói khám thành công. Vui lòng thanh toán để tạo lịch khám.',
       status: 'success',
       data: {
         booking_id: rs.booking.booking_id,

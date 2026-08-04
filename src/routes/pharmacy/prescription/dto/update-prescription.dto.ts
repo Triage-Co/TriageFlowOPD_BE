@@ -9,7 +9,11 @@ export class UpdatePrescriptionDto {
   @IsOptional()
   diagnosis_note?: string;
 
-  @ApiPropertyOptional({ type: [PrescriptionDetailItemDto], description: 'Danh sách chi tiết thuốc mới (nếu muốn thay thế toàn bộ danh sách)' })
+  @ApiPropertyOptional({
+    type: [PrescriptionDetailItemDto],
+    description:
+      'Danh sách chi tiết thuốc mới (nếu muốn thay thế toàn bộ danh sách)',
+  })
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })

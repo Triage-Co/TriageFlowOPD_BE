@@ -7,6 +7,7 @@ import {
 import { ServiceOrderErrors } from '../../shared/exceptions/service_order.exceptions';
 import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
 import {
+  ClinicalRoomType,
   ServiceOrderStatusEnum,
   Step,
   StepTypeEnum,
@@ -20,11 +21,26 @@ import type { IServiceOrderDetailRepository } from '../../shared/interfaces/i-se
 import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 import type { IInvoiceRepository } from '../../shared/interfaces/i-invoice.repository';
 import type { IInvoiceDetailRepository } from '../../shared/interfaces/i-invoice-detail.repository';
+import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueEtaService } from '../queue/queue-eta.service';
+import { REBALANCEABLE_STEP_TYPES } from '../queue/queue.constants';
 import { TransactionService } from '../transaction/transaction.service';
+
+/** Map ClinicalRoomType → StepTypeEnum for rebalanceable CLS/procedure rooms. */
+const ROOM_TYPE_TO_STEP_TYPE: Partial<Record<ClinicalRoomType, StepTypeEnum>> = {
+  [ClinicalRoomType.LABORATORY]: StepTypeEnum.LAB_TEST,
+  [ClinicalRoomType.IMAGING_ROOM]: StepTypeEnum.IMAGING,
+  [ClinicalRoomType.PROCEDURE_ROOM]: StepTypeEnum.PROCEDURE,
+  [ClinicalRoomType.FUNCTIONAL_EXPLORATION]: StepTypeEnum.FUNCTIONAL_EXPLORATION,
+};
 
 @Injectable()
 export class ServiceOrderService {
   constructor(
+    private readonly prisma: PrismaService,
+    private readonly queueEtaService: QueueEtaService,
+    private readonly transactionService: TransactionService,
+
     @Inject('IServiceOrderRepository')
     private readonly serviceOrderRepository: IServiceOrderRepository,
     @Inject('IServiceOrderDetailRepository')
@@ -43,7 +59,6 @@ export class ServiceOrderService {
     private readonly specialtyRepository: ISpecialtyRepository,
     @Inject('IRoomRepository')
     private readonly roomRepository: IRoomRepository,
-    private readonly transactionService: TransactionService,
   ) {}
 
   async create(createServiceOrderReqDto: CreateServiceOrderReqDto) {
@@ -156,9 +171,43 @@ export class ServiceOrderService {
         }
         stepStaffId = null;
       } else if (service.room_type) {
-        room = await this.roomRepository.findBestRoomByRoomType(
-          service.room_type,
-        );
+        const mappedStepType = ROOM_TYPE_TO_STEP_TYPE[service.room_type];
+        const isRebalanceable =
+          !!mappedStepType && REBALANCEABLE_STEP_TYPES.includes(mappedStepType);
+
+        if (isRebalanceable) {
+          const roomServices = await this.prisma.room_Service.findMany({
+            where: {
+              service_id: service.service_id,
+              is_active: true,
+            },
+            include: { room: true },
+          });
+
+          if (roomServices.length >= 1) {
+            let minEtaRoom: any = null;
+            let minEtaSec = Infinity;
+
+            for (const rs of roomServices) {
+              const etaResult = await this.queueEtaService.computeEtaForRoom(rs.room_id);
+              if (etaResult.totalWaitingSec < minEtaSec) {
+                minEtaSec = etaResult.totalWaitingSec;
+                minEtaRoom = rs.room;
+              }
+            }
+
+            if (minEtaRoom) {
+              room = minEtaRoom;
+            }
+          }
+        }
+
+        if (!room) {
+          room = await this.roomRepository.findBestRoomByRoomType(
+            service.room_type,
+          );
+        }
+
         if (!room) {
           throw new NotFoundException({
             message: 'Không tìm thấy phòng phù hợp cho loại dịch vụ này',
@@ -179,7 +228,7 @@ export class ServiceOrderService {
         if (!room) {
           throw new NotFoundException({
             message: 'Không tìm thấy phòng với chuyên khoa cần khám',
-            detail: `Không tìm thấy room với chuyên khoa cần khám`,
+            detail: `Không tìm thấy phòng với chuyên khoa cần khám`,
           });
         }
       }
@@ -190,9 +239,21 @@ export class ServiceOrderService {
             room.shifts && room.shifts.length > 0 ? room.shifts[0].staff : null;
           stepStaffId = staff?.staff_id;
         }
+
+        const targetStepType =
+          service.room_type === ClinicalRoomType.LABORATORY
+            ? StepTypeEnum.LAB_TEST
+            : service.room_type === ClinicalRoomType.IMAGING_ROOM
+            ? StepTypeEnum.IMAGING
+            : service.room_type === ClinicalRoomType.PROCEDURE_ROOM
+            ? StepTypeEnum.PROCEDURE
+            : service.room_type === ClinicalRoomType.FUNCTIONAL_EXPLORATION
+            ? StepTypeEnum.FUNCTIONAL_EXPLORATION
+            : StepTypeEnum.CLINICAL;
+
         const step = await this.stepRepository.createParentStep({
           flow_id: flow.flow_id,
-          step_type: StepTypeEnum.CLINICAL,
+          step_type: targetStepType,
           step_name: `${service.service_name}`,
           service_code: service_code,
           room_id: room.room_id,

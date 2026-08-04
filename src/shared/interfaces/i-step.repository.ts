@@ -44,7 +44,9 @@ export interface IStepRepository {
     patientId: string,
   ): Promise<Step | null>;
   findPendingPaymentStepsByPatientId(patientId: string): Promise<Step[]>;
-  findClinicalStepByServiceOrderId(serviceOrderId: string): Promise<Step | null>;
+  findClinicalStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null>;
   findPaymentStepByServiceOrderId(serviceOrderId: string): Promise<Step | null>;
   getById(id: string): Promise<StepWithBookingAndSlot | null>;
 }

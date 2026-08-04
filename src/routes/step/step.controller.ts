@@ -111,8 +111,7 @@ export class StepController {
   @roles('ADMIN', 'DOCTOR')
   @UseGuards(IsRoleGuard)
   @ApiOperation({
-    summary:
-      'Cập nhật phụ thuộc của bước (đổi required_step_id cũ thành mới)',
+    summary: 'Cập nhật phụ thuộc của bước (đổi required_step_id cũ thành mới)',
   })
   updateDependency(@Body() updateDependencyReqDto: UpdateDependencyReqDto) {
     return this.stepService.updateDependency(updateDependencyReqDto);

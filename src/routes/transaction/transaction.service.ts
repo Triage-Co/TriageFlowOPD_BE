@@ -45,7 +45,7 @@ export class TransactionService {
 
   async create(
     createTransactionRequestDto: CreateTransactionRequestDto,
-    tx?: any
+    tx?: any,
   ): Promise<ResponseType<any>> {
     try {
       const db = tx || this.prismaService;
@@ -110,16 +110,14 @@ export class TransactionService {
         data: { payment_status: 'SUCCESSED' },
       });
 
-
       await this.prismaService.service_Order_Detail.updateMany({
         where: { service_order_id: dto.service_order_id },
         data: { status: 'PAID' },
       });
 
       // Hook: Nếu là đơn gói khám (có package_id), tự động tạo Flow
-      const createdFlowResult = await this.flowService.createFlowFromServiceOrder(
-        dto.service_order_id,
-      );
+      const createdFlowResult =
+        await this.flowService.createFlowFromServiceOrder(dto.service_order_id);
 
       // Nếu là đơn gói khám thì dừng ở đây (không cần xử lý PAYMENT steps bên trong)
       if (createdFlowResult !== null) {
@@ -145,7 +143,7 @@ export class TransactionService {
             data: { step_status: 'IN_PROGRESS' },
           });
         }
-        
+
         await this.stepService.completeStep(step.step_id);
 
         if (step.flow_id) {

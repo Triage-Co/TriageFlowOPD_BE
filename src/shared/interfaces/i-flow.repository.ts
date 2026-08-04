@@ -3,8 +3,9 @@ import { Flow, Prisma } from '@prisma/client';
 export interface IFlowRepository {
   findAll(): Promise<any>;
   findByFlowId(flow_id: string): Promise<any>;
+  findByTicketCode(ticket_code: string): Promise<any>;
   findAllByPatientId(patient_id: string): Promise<any>;
-  findIsActiveByPatientId(account_id: string, date?: String): Promise<any>;
+  findIsActiveByPatientId(account_id: string, date?: string): Promise<any>;
   findIsActiveByDate(patient_id: string, date: Date): Promise<Flow[]>;
   create(
     data: Prisma.FlowUncheckedCreateInput,

@@ -46,7 +46,8 @@ export class CreateServiceReqDto {
     name: 'service_type',
     enum: ServiceTypeEnum,
     example: ServiceTypeEnum.CLINICAL_EXAMINATION,
-    description: 'Loại dịch vụ (CLINICAL_EXAMINATION, PRESCRIPTION, DIAGNOSTIC_TEST, PROCEDURE)',
+    description:
+      'Loại dịch vụ (CLINICAL_EXAMINATION, PRESCRIPTION, DIAGNOSTIC_TEST, PROCEDURE)',
   })
   service_type: ServiceTypeEnum;
 
@@ -55,7 +56,8 @@ export class CreateServiceReqDto {
   @ApiPropertyOptional({
     name: 'room_type',
     enum: ClinicalRoomType,
-    description: 'Loại phòng cho dịch vụ (tuỳ chọn, dùng cho cận lâm sàng/thủ thuật)',
+    description:
+      'Loại phòng cho dịch vụ (tuỳ chọn, dùng cho cận lâm sàng/thủ thuật)',
   })
   room_type?: ClinicalRoomType;
 }
@@ -103,4 +105,3 @@ export class QueryServiceReqDto {
   @IsEnum(ServiceTypeEnum)
   service_type?: ServiceTypeEnum;
 }
-

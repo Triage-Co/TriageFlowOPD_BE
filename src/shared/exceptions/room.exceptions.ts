@@ -27,4 +27,3 @@ export const RoomErrors = {
   ProviderError: (action: string, detail: string) =>
     new RoomException(HttpStatus.BAD_REQUEST, `Lỗi ${action}`, detail),
 };
-

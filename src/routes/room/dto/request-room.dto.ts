@@ -1,7 +1,15 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { ClinicalRoomType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Min, ValidateIf } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateRoomRequestDto {
   @IsString()
@@ -19,7 +27,9 @@ export class CreateRoomRequestDto {
   room_type: ClinicalRoomType;
 
   @IsOptional()
-  @ValidateIf((o) => o.physical_room_id !== null && o.physical_room_id !== undefined)
+  @ValidateIf(
+    (o) => o.physical_room_id !== null && o.physical_room_id !== undefined,
+  )
   @IsUUID()
   @ApiPropertyOptional({
     example: '082650f9-be60-48c3-8039-f6d48ad11144',
@@ -64,7 +74,8 @@ export class QueryRoomReqDto {
   @ApiPropertyOptional({
     name: 'sortBy',
     example: 'created_at',
-    description: 'Trường dùng để sắp xếp (room_name, room_type, created_at, updated_at)',
+    description:
+      'Trường dùng để sắp xếp (room_name, room_type, created_at, updated_at)',
   })
   @IsOptional()
   @IsString()
@@ -98,4 +109,3 @@ export class QueryRoomReqDto {
   @IsString()
   search?: string;
 }
-

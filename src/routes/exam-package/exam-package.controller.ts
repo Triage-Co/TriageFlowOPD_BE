@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ExamPackageService } from './exam-package.service';
 import { CreateExamPackageDto } from './dto/create-exam-package.dto';
 import { UpdateExamPackageDto } from './dto/update-exam-package.dto';
@@ -29,7 +37,10 @@ export class ExamPackageController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Cập nhật thông tin gói khám' })
-  update(@Param('id') id: string, @Body() updateExamPackageDto: UpdateExamPackageDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateExamPackageDto: UpdateExamPackageDto,
+  ) {
     return this.examPackageService.update(id, updateExamPackageDto);
   }
 

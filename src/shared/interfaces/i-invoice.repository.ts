@@ -16,8 +16,5 @@ export interface IInvoiceRepository {
 
   findByServiceOrderId(serviceOrderId: string): Promise<Invoice | null>;
 
-  delete(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Invoice>;
+  delete(id: string, tx?: Prisma.TransactionClient): Promise<Invoice>;
 }

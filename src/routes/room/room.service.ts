@@ -137,7 +137,7 @@ export class RoomService {
     const whereCondition: any = {
       shift: {
         room_id: roomId,
-      }
+      },
     };
 
     if (dateStr) {
@@ -149,10 +149,7 @@ export class RoomService {
       include: {
         shift: true,
       },
-      orderBy: [
-        { shift: { date: 'asc' } },
-        { start_time: 'asc' }
-      ]
+      orderBy: [{ shift: { date: 'asc' } }, { start_time: 'asc' }],
     });
 
     return {

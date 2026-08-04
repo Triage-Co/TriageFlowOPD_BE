@@ -58,7 +58,7 @@ export class PatientController {
     summary: '[USER] lấy tất bệnh nhân',
   })
   getMyPatients(@Req() req: any) {
-    const id = req.user.sub || req.user.id
+    const id = req.user.sub || req.user.id;
     return this.patientService.getMyPatients(id);
   }
 
