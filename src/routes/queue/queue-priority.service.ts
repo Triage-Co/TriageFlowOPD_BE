@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   ClinicalRoomType,
   GenderTypeEnum,
+  Prisma,
   Queue,
   Queue_Priority_Rule,
   QueueRuleTypeEnum,
@@ -182,11 +183,26 @@ export function orderEntries(
     .filter((e) => !isInterleave(e.queue))
     .sort(comparator);
 
-  // 3. Merge REGULAR and INTERLEAVE according to interleave_ratio (1:1 default)
+  // 3. Merge REGULAR and INTERLEAVE according to interleave_ratio (default 1)
+  const interleaveRules = rules.filter(
+    (r) =>
+      r.is_active &&
+      (r.rule_type === QueueRuleTypeEnum.RETURNING ||
+        r.rule_type === QueueRuleTypeEnum.QUICK_TASK),
+  );
+  const scopedInterleave =
+    interleaveRules.find(
+      (r) =>
+        (r.room_type && r.room_type === roomContext?.room_type) ||
+        (r.specialty_id && r.specialty_id === roomContext?.specialty_id),
+    ) || interleaveRules.find((r) => !r.room_type && !r.specialty_id);
+
+  const rawRatio = Number((scopedInterleave?.params as any)?.interleave_ratio);
+  const ratio = Number.isFinite(rawRatio) && rawRatio >= 1 ? Math.floor(rawRatio) : 1;
+
   const merged: (typeof evaluated)[0][] = [];
   let regIdx = 0;
   let intIdx = 0;
-  const ratio = 1;
 
   while (regIdx < regularList.length || intIdx < interleaveList.length) {
     for (let r = 0; r < ratio && regIdx < regularList.length; r++) {
@@ -364,15 +380,19 @@ export class QueuePriorityService {
     return { basePriority, appliedRules };
   }
 
-  async computeQueueOrder(roomId: string): Promise<OrderedQueueEntry[]> {
+  async computeQueueOrder(
+    roomId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<OrderedQueueEntry[]> {
+    const db = tx || this.prisma;
     const rules = await this.getActiveRules();
 
-    const room = await this.prisma.room.findUnique({
+    const room = await db.room.findUnique({
       where: { room_id: roomId },
       select: { room_type: true, specialty_id: true },
     });
 
-    const entries = await this.prisma.queue.findMany({
+    const entries = await db.queue.findMany({
       where: {
         room_id: roomId,
         status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },

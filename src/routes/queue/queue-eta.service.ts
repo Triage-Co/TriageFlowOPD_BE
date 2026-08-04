@@ -113,39 +113,41 @@ export class QueueEtaService {
     }
 
     try {
-      const existingStat = await this.prisma.room_Service_Stat.findUnique({
-        where: {
-          room_id_step_type: {
+      await this.prisma.$transaction(async (tx) => {
+        const existingStat = await tx.room_Service_Stat.findUnique({
+          where: {
+            room_id_step_type: {
+              room_id: roomId,
+              step_type: type,
+            },
+          },
+        });
+
+        const newEma = calculateEma(
+          existingStat?.ema_duration_sec ?? null,
+          existingStat?.sample_count ?? 0,
+          durationSec,
+        );
+
+        await tx.room_Service_Stat.upsert({
+          where: {
+            room_id_step_type: {
+              room_id: roomId,
+              step_type: type,
+            },
+          },
+          update: {
+            ema_duration_sec: newEma,
+            sample_count: { increment: 1 },
+          },
+          create: {
             room_id: roomId,
             step_type: type,
+            ema_duration_sec: newEma,
+            sample_count: 1,
+            default_duration_sec: 900,
           },
-        },
-      });
-
-      const newEma = calculateEma(
-        existingStat?.ema_duration_sec ?? null,
-        existingStat?.sample_count ?? 0,
-        durationSec,
-      );
-
-      await this.prisma.room_Service_Stat.upsert({
-        where: {
-          room_id_step_type: {
-            room_id: roomId,
-            step_type: type,
-          },
-        },
-        update: {
-          ema_duration_sec: newEma,
-          sample_count: { increment: 1 },
-        },
-        create: {
-          room_id: roomId,
-          step_type: type,
-          ema_duration_sec: newEma,
-          sample_count: 1,
-          default_duration_sec: 900,
-        },
+        });
       });
     } catch (err: any) {
       this.logger.warn(`Failed to record service duration: ${err.message}`);

@@ -19,11 +19,25 @@ import {
   StepStatusEnum,
   StepTypeEnum,
 } from '@prisma/client';
-import { toZonedTime } from 'date-fns-tz';
+import { toZonedTime, formatInTimeZone, toDate } from 'date-fns-tz';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
 import { QueuePriorityService } from './queue-priority.service';
 import { EntryEtaInfo, QueueEtaService } from './queue-eta.service';
+import { QueueRebalanceService } from './queue-rebalance.service';
+import { REBALANCEABLE_STEP_TYPES } from './queue.constants';
+
+const VN_TZ = 'Asia/Ho_Chi_Minh';
+
+export function getStartOfDayVn(now: Date = new Date()): Date {
+  const todayDateString = formatInTimeZone(now, VN_TZ, 'yyyy-MM-dd');
+  return toDate(`${todayDateString}T00:00:00`, { timeZone: VN_TZ });
+}
+
+export function getEndOfDayVn(now: Date = new Date()): Date {
+  const todayDateString = formatInTimeZone(now, VN_TZ, 'yyyy-MM-dd');
+  return toDate(`${todayDateString}T23:59:59.999`, { timeZone: VN_TZ });
+}
 
 export function isAppointmentOnTime(
   slotStartTime: string,
@@ -67,6 +81,9 @@ export class QueueService {
 
     @Inject(forwardRef(() => QueueGateway))
     private readonly queueGateway: QueueGateway,
+
+    @Inject(forwardRef(() => QueueRebalanceService))
+    private readonly queueRebalanceService: QueueRebalanceService,
   ) {}
 
   async assertCanManageRoom(
@@ -74,7 +91,12 @@ export class QueueService {
     roomId: string,
     stepId?: string,
   ): Promise<void> {
-    if (user.role === RoleTypeEnum.ADMIN) {
+    // Load role from Account (JWT role is usually "authenticated", not RoleTypeEnum)
+    const account = await this.prisma.account.findUnique({
+      where: { account_id: user.id },
+      select: { role: true },
+    });
+    if (account?.role === RoleTypeEnum.ADMIN) {
       return;
     }
 
@@ -88,14 +110,8 @@ export class QueueService {
       }
     }
 
-    const today = new Date();
-    const zonedToday = toZonedTime(today, 'Asia/Ho_Chi_Minh');
-
-    const startOfDay = new Date(zonedToday);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(zonedToday);
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = getStartOfDayVn();
+    const endOfDay = getEndOfDayVn();
 
     const shift = await this.prisma.shift.findFirst({
       where: {
@@ -141,15 +157,13 @@ export class QueueService {
     tx?: Prisma.TransactionClient,
   ): Promise<string> {
     const client = tx || this.prisma;
-    const now = new Date();
-    const zonedNow = toZonedTime(now, 'Asia/Ho_Chi_Minh');
-    zonedNow.setHours(0, 0, 0, 0);
+    const startOfDay = getStartOfDayVn();
 
     const count = await client.queue.count({
       where: {
         room_id: roomId,
         created_at: {
-          gte: zonedNow,
+          gte: startOfDay,
         },
       },
     });
@@ -340,6 +354,21 @@ export class QueueService {
         .catch((err) =>
           this.logger.warn(`Failed to emit WS update for room ${result.room_id}: ${err.message}`),
         );
+
+      // Fire-and-forget rebalance detector for CLS/procedure queues
+      this.prisma.step
+        .findUnique({
+          where: { step_id: result.step_id },
+          select: { step_type: true },
+        })
+        .then((step) => {
+          if (step?.step_type && REBALANCEABLE_STEP_TYPES.includes(step.step_type)) {
+            return this.queueRebalanceService.detectAndSuggest();
+          }
+        })
+        .catch((err) =>
+          this.logger.warn(`Post-enqueue rebalance failed: ${err?.message || err}`),
+        );
     }
 
     return result;
@@ -400,7 +429,7 @@ export class QueueService {
       await this.assertCanManageRoom(user, roomId, stepId);
     }
 
-    const displayPayload = await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       // 1. Process currently serving patient if any
       const currentlyServing = await tx.queue.findFirst({
         where: {
@@ -470,7 +499,7 @@ export class QueueService {
         }
       }
 
-      // 2. Pick next patient
+      // 2. Pick next patient (order read uses same tx client)
       let nextQueueId: string | undefined;
 
       if (stepId) {
@@ -486,7 +515,7 @@ export class QueueService {
         }
         nextQueueId = stepQueue.queue_id;
       } else {
-        const order = await this.queuePriorityService.computeQueueOrder(roomId);
+        const order = await this.queuePriorityService.computeQueueOrder(roomId, tx);
         if (!order || order.length === 0) {
           throw new BadRequestException('Hàng chờ trống.');
         }
@@ -531,10 +560,9 @@ export class QueueService {
           },
         });
       }
-
-      return await this.getRoomDisplayPayload(roomId, staffId);
     });
 
+    const displayPayload = await this.getRoomDisplayPayload(roomId, staffId);
     this.queueGateway.emitQueueUpdate(roomId, displayPayload);
 
     return {
@@ -629,7 +657,7 @@ export class QueueService {
       (q) => q.status !== QueueStatusEnum.FINISHED && q.status !== QueueStatusEnum.CANCELLED,
     );
 
-    await this.prisma.$transaction(async (tx) => {
+    const newQueue = await this.prisma.$transaction(async (tx) => {
       if (activeQueue) {
         await tx.queue.update({
           where: { queue_id: activeQueue.queue_id },
@@ -655,9 +683,9 @@ export class QueueService {
           },
         });
       }
-    });
 
-    const newQueue = await this.enqueueStep(stepId, QueueTypeEnum.TRANSFER);
+      return this.enqueueStep(stepId, QueueTypeEnum.TRANSFER, tx);
+    });
 
     if (fromRoomId) {
       const fromPayload = await this.getRoomDisplayPayload(fromRoomId);
@@ -700,7 +728,7 @@ export class QueueService {
       actionType = 'PINNED_TOP';
     } else if (dto.action === 'UNPIN') {
       updateData = { is_pinned: false, pinned_at: null };
-      actionType = 'MOVED_POSITION';
+      actionType = 'UNPINNED';
     } else if (dto.action === 'MOVE_TO_POSITION') {
       const pos = dto.position ?? 0;
       if (pos > fromPos && fromPos !== -1) {
@@ -749,6 +777,23 @@ export class QueueService {
     }
 
     await this.assertCanManageRoom(user, queue.room_id);
+
+    const allowedStatuses: QueueStatusEnum[] = [
+      QueueStatusEnum.CALLED,
+      QueueStatusEnum.SERVING,
+    ];
+    let canMiss = allowedStatuses.includes(queue.status);
+
+    if (!canMiss && queue.status === QueueStatusEnum.QUEUED) {
+      const order = await this.queuePriorityService.computeQueueOrder(queue.room_id);
+      canMiss = order[0]?.queue.queue_id === queueId;
+    }
+
+    if (!canMiss) {
+      throw new BadRequestException(
+        'Chỉ được đánh dấu vắng mặt khi đang gọi/phục vụ hoặc đang đứng đầu hàng chờ.',
+      );
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const q = await tx.queue.update({

@@ -439,22 +439,14 @@ export class QueueAdminService {
     const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone });
 
-    // 1. Fetch all rooms
-    const rooms = await this.prisma.room.findMany({
-      include: {
-        specialty: true,
-        physical_room: true,
-      },
-    });
-
-    // 2. Fetch all queue entries created today
+    // 1. Fetch today's queues first, then only rooms with activity
     const todayQueues = await this.prisma.queue.findMany({
       where: {
         created_at: { gte: startOfDay },
+        room_id: { not: null },
       },
     });
 
-    // Group queues by room_id in memory
     const roomQueuesMap = new Map<string, typeof todayQueues>();
     for (const q of todayQueues) {
       if (!q.room_id) continue;
@@ -462,6 +454,18 @@ export class QueueAdminService {
       list.push(q);
       roomQueuesMap.set(q.room_id, list);
     }
+
+    const activeRoomIds = [...roomQueuesMap.keys()];
+    const rooms =
+      activeRoomIds.length === 0
+        ? []
+        : await this.prisma.room.findMany({
+            where: { room_id: { in: activeRoomIds } },
+            include: {
+              specialty: true,
+              physical_room: true,
+            },
+          });
 
     let totalWaitingAll = 0;
     let busiestRoomId: string | null = null;
@@ -518,8 +522,14 @@ export class QueueAdminService {
 
       totalWaitingAll += waitingCount;
 
-      // Compute ETA for room
-      const etaResult = await this.queueEtaService.computeEtaForRoom(room.room_id);
+      let etaResult = {
+        totalWaitingSec: 0,
+        expectedDurationSec: 900,
+      };
+      if (waitingCount > 0 || servingCount > 0) {
+        etaResult = await this.queueEtaService.computeEtaForRoom(room.room_id);
+      }
+
       const etaFullQueueMinutes = Math.round(etaResult.totalWaitingSec / 60);
 
       if (etaResult.totalWaitingSec > maxWaitingSecAll) {

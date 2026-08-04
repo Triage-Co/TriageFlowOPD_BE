@@ -95,17 +95,34 @@ export class TicketService {
       });
 
       if (activeQueue) {
-        const roomEta = await this.queueService.computeRoomEta(currentStep.room_id);
-        const entryEta = roomEta.entries.find((e) => e.queueId === activeQueue.queue_id);
+        const isWaiting =
+          activeQueue.status === QueueStatusEnum.QUEUED ||
+          activeQueue.status === QueueStatusEnum.PENDING;
 
-        queueInfo = {
-          queue_number: activeQueue.queue_number,
-          position: entryEta ? entryEta.position : 0,
-          waiting_ahead: entryEta ? entryEta.position : 0,
-          eta_minutes: entryEta ? Math.round(entryEta.etaSec / 60) : 0,
-          eta_time: entryEta?.etaTime || null,
-          queue_status: activeQueue.status,
-        };
+        if (isWaiting) {
+          const roomEta = await this.queueService.computeRoomEta(currentStep.room_id);
+          const entryEta = roomEta.entries.find(
+            (e) => e.queueId === activeQueue.queue_id,
+          );
+
+          queueInfo = {
+            queue_number: activeQueue.queue_number,
+            position: entryEta ? entryEta.position : null,
+            waiting_ahead: entryEta ? entryEta.position : null,
+            eta_minutes: entryEta ? Math.round(entryEta.etaSec / 60) : null,
+            eta_time: entryEta?.etaTime || null,
+            queue_status: activeQueue.status,
+          };
+        } else {
+          queueInfo = {
+            queue_number: activeQueue.queue_number,
+            position: null,
+            waiting_ahead: null,
+            eta_minutes: null,
+            eta_time: null,
+            queue_status: activeQueue.status,
+          };
+        }
       }
     }
 

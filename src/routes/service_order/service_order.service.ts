@@ -17,6 +17,15 @@ import type { IInvoiceRepository } from '../../shared/interfaces/i-invoice.repos
 import type { IInvoiceDetailRepository } from '../../shared/interfaces/i-invoice-detail.repository';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueEtaService } from '../queue/queue-eta.service';
+import { REBALANCEABLE_STEP_TYPES } from '../queue/queue.constants';
+
+/** Map ClinicalRoomType → StepTypeEnum for rebalanceable CLS/procedure rooms. */
+const ROOM_TYPE_TO_STEP_TYPE: Partial<Record<ClinicalRoomType, StepTypeEnum>> = {
+  [ClinicalRoomType.LABORATORY]: StepTypeEnum.LAB_TEST,
+  [ClinicalRoomType.IMAGING_ROOM]: StepTypeEnum.IMAGING,
+  [ClinicalRoomType.PROCEDURE_ROOM]: StepTypeEnum.PROCEDURE,
+  [ClinicalRoomType.FUNCTIONAL_EXPLORATION]: StepTypeEnum.FUNCTIONAL_EXPLORATION,
+};
 
 @Injectable()
 export class ServiceOrderService {
@@ -131,15 +140,9 @@ export class ServiceOrderService {
         }
         stepStaffId = null;
       } else if (service.room_type) {
-        const rebalanceableRoomTypes: ClinicalRoomType[] = [
-          ClinicalRoomType.LABORATORY,
-          ClinicalRoomType.IMAGING_ROOM,
-          ClinicalRoomType.PROCEDURE_ROOM,
-          ClinicalRoomType.FUNCTIONAL_EXPLORATION,
-        ];
-
+        const mappedStepType = ROOM_TYPE_TO_STEP_TYPE[service.room_type];
         const isRebalanceable =
-          service.room_type && rebalanceableRoomTypes.includes(service.room_type);
+          !!mappedStepType && REBALANCEABLE_STEP_TYPES.includes(mappedStepType);
 
         if (isRebalanceable) {
           const roomServices = await this.prisma.room_Service.findMany({
