@@ -17,11 +17,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import {
-  LineStringGeomDto,
-  PointGeomDto,
-  PolygonGeomDto,
-} from './geojson.dto';
+import { LineStringGeomDto, PointGeomDto, PolygonGeomDto } from './geojson.dto';
 
 export class CreateRoomBatchItemDto {
   @IsString()

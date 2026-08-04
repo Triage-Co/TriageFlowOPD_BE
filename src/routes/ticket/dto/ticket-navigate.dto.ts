@@ -7,14 +7,16 @@ export class TicketNavigateDto {
   @ApiProperty({
     enum: RouteLocationType,
     example: RouteLocationType.ROOM,
-    description: 'Loại địa điểm xuất phát hiện tại của bệnh nhân: ROOM, POI hoặc NODE',
+    description:
+      'Loại địa điểm xuất phát hiện tại của bệnh nhân: ROOM, POI hoặc NODE',
   })
   startType: RouteLocationType;
 
   @IsUUID('4', { message: 'startId phải là định dạng UUID' })
   @ApiProperty({
     example: 'a6b32cb3-1a22-42da-91ef-f6089bd608d0',
-    description: 'ID tương ứng với điểm xuất phát hiện tại (roomId, poiId hoặc nodeId)',
+    description:
+      'ID tương ứng với điểm xuất phát hiện tại (roomId, poiId hoặc nodeId)',
   })
   startId: string;
 }

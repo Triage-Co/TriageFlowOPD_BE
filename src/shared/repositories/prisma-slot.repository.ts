@@ -28,7 +28,7 @@ export class PrismaSlotRepository implements ISlotRepository {
     const targetDate = formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd');
     const targetTime = formatInTimeZone(new Date(), timeZone, 'HH:mm');
     const startOfToday = toDate(`${targetDate}T00:00:00`, { timeZone });
-    
+
     const data = await this.prismaService.slot.findFirst({
       where: {
         slot_id: slotId,

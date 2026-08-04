@@ -16,7 +16,8 @@ export class ServiceEntity {
 
   @ApiProperty({
     enum: ServiceTypeEnum,
-    description: 'Loại dịch vụ (Clinical_examination, prescription, Diagnostic_test, Procedure)',
+    description:
+      'Loại dịch vụ (Clinical_examination, prescription, Diagnostic_test, Procedure)',
   })
   service_type: ServiceTypeEnum;
 
@@ -37,4 +38,3 @@ export class ServiceEntity {
 }
 
 export class Service extends ServiceEntity {}
-

@@ -110,6 +110,6 @@ import { ExamPackageModule } from './routes/exam-package/exam-package.module';
     PharmacyModule,
     TicketModule,
     ExamPackageModule,
-  ]
+  ],
 })
-export class AppModule { }
+export class AppModule {}

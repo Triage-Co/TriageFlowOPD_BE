@@ -27,7 +27,7 @@ import {
 @ApiTags('Service Order')
 @Controller('service-order')
 export class ServiceOrderController {
-  constructor(private readonly serviceOrderService: ServiceOrderService) { }
+  constructor(private readonly serviceOrderService: ServiceOrderService) {}
 
   @Post()
   @ApiOperation({

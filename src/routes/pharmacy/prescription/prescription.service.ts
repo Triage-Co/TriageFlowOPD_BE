@@ -8,7 +8,13 @@ import {
 import { PrismaService } from '../../../shared/config/prisma.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
-import { PaymentStatusEnum, PrescriptionStatusEnum, ServiceOrderStatusEnum, TransStatusEnum, TransTypeEnum } from '@prisma/client';
+import {
+  PaymentStatusEnum,
+  PrescriptionStatusEnum,
+  ServiceOrderStatusEnum,
+  TransStatusEnum,
+  TransTypeEnum,
+} from '@prisma/client';
 import { randomInt } from 'crypto';
 import { format } from 'date-fns';
 
@@ -22,8 +28,17 @@ export class PrescriptionService {
     return `RX-${dateStr}-${randomNum}`;
   }
 
-  async create(createPrescriptionDto: CreatePrescriptionDto, defaultStaffId?: string) {
-    const { visit_session_id, service_order_id, prescribed_by, diagnosis_note, details } = createPrescriptionDto;
+  async create(
+    createPrescriptionDto: CreatePrescriptionDto,
+    defaultStaffId?: string,
+  ) {
+    const {
+      visit_session_id,
+      service_order_id,
+      prescribed_by,
+      diagnosis_note,
+      details,
+    } = createPrescriptionDto;
 
     let bookingId: string | undefined = undefined;
 
@@ -35,23 +50,30 @@ export class PrescriptionService {
       });
 
       if (!visitSession) {
-        throw new NotFoundException(`Không tìm thấy phiên khám bệnh với ID: ${visit_session_id}`);
+        throw new NotFoundException(
+          `Không tìm thấy phiên khám bệnh với ID: ${visit_session_id}`,
+        );
       }
 
       // 2. Kiểm tra xem phiên khám đã có đơn thuốc chưa
-      const existingPrescription = await this.prismaService.prescription.findUnique({
-        where: { visit_session_id },
-      });
+      const existingPrescription =
+        await this.prismaService.prescription.findUnique({
+          where: { visit_session_id },
+        });
 
       if (existingPrescription) {
-        throw new ConflictException(`Phiên khám '${visit_session_id}' đã có đơn thuốc được kê.`);
+        throw new ConflictException(
+          `Phiên khám '${visit_session_id}' đã có đơn thuốc được kê.`,
+        );
       }
 
       bookingId = visitSession.booking_id ?? undefined;
     }
 
     if (!details || details.length === 0) {
-      throw new BadRequestException('Đơn thuốc phải bao gồm ít nhất một loại thuốc.');
+      throw new BadRequestException(
+        'Đơn thuốc phải bao gồm ít nhất một loại thuốc.',
+      );
     }
 
     // 3. Lấy thông tin các thuốc từ DB để xác thực và lấy giá tiền chuẩn
@@ -67,10 +89,14 @@ export class PrescriptionService {
     for (const item of details) {
       const med = medicineMap.get(item.medicine_id);
       if (!med) {
-        throw new NotFoundException(`Không tìm thấy loại thuốc với ID: ${item.medicine_id}`);
+        throw new NotFoundException(
+          `Không tìm thấy loại thuốc với ID: ${item.medicine_id}`,
+        );
       }
       if (!med.is_active) {
-        throw new BadRequestException(`Thuốc '${med.medicine_name}' đã ngưng hoạt động.`);
+        throw new BadRequestException(
+          `Thuốc '${med.medicine_name}' đã ngưng hoạt động.`,
+        );
       }
     }
 
@@ -282,7 +308,9 @@ export class PrescriptionService {
       const patientAccountId = prescription.visitSession?.patient?.account_id;
       const currentUserId = currentUser.id || currentUser.sub;
       if (patientAccountId !== currentUserId) {
-        throw new ForbiddenException('Bạn không có quyền truy cập đơn thuốc của người khác.');
+        throw new ForbiddenException(
+          'Bạn không có quyền truy cập đơn thuốc của người khác.',
+        );
       }
     }
 
@@ -334,14 +362,18 @@ export class PrescriptionService {
     });
 
     if (!prescription) {
-      throw new NotFoundException(`Không tìm thấy đơn thuốc phù hợp với mã: ${code}`);
+      throw new NotFoundException(
+        `Không tìm thấy đơn thuốc phù hợp với mã: ${code}`,
+      );
     }
 
     if (currentUser && currentUser.role === 'USER') {
       const patientAccountId = prescription.visitSession?.patient?.account_id;
       const currentUserId = currentUser.id || currentUser.sub;
       if (patientAccountId !== currentUserId) {
-        throw new ForbiddenException('Bạn không có quyền truy cập đơn thuốc này.');
+        throw new ForbiddenException(
+          'Bạn không có quyền truy cập đơn thuốc này.',
+        );
       }
     }
 
@@ -387,14 +419,18 @@ export class PrescriptionService {
     });
 
     if (!prescription) {
-      throw new NotFoundException(`Phiên khám '${visitSessionId}' chưa có đơn thuốc.`);
+      throw new NotFoundException(
+        `Phiên khám '${visitSessionId}' chưa có đơn thuốc.`,
+      );
     }
 
     if (currentUser && currentUser.role === 'USER') {
       const patientAccountId = prescription.visitSession?.patient?.account_id;
       const currentUserId = currentUser.id || currentUser.sub;
       if (patientAccountId !== currentUserId) {
-        throw new ForbiddenException('Bạn không có quyền truy cập đơn thuốc này.');
+        throw new ForbiddenException(
+          'Bạn không có quyền truy cập đơn thuốc này.',
+        );
       }
     }
 
@@ -416,11 +452,15 @@ export class PrescriptionService {
     }
 
     if (prescription.status !== PrescriptionStatusEnum.PENDING) {
-      throw new BadRequestException(`Đơn thuốc '${prescription.prescription_code}' đã được thanh toán hoặc xử lý trước đó.`);
+      throw new BadRequestException(
+        `Đơn thuốc '${prescription.prescription_code}' đã được thanh toán hoặc xử lý trước đó.`,
+      );
     }
 
     const patientAccountId = prescription.visitSession?.patient?.account_id;
-    const docNo = parseInt(`${Date.now().toString().slice(-4)}${randomInt(10, 99)}`);
+    const docNo = parseInt(
+      `${Date.now().toString().slice(-4)}${randomInt(10, 99)}`,
+    );
 
     return this.prismaService.$transaction(async (tx) => {
       if (prescription.service_order_id) {
@@ -474,7 +514,9 @@ export class PrescriptionService {
     }
 
     if (prescription.status !== PrescriptionStatusEnum.PROCESSING) {
-      throw new BadRequestException('Đơn thuốc phải ở trạng thái PROCESSING (đã thanh toán) trước khi đánh dấu soạn xong.');
+      throw new BadRequestException(
+        'Đơn thuốc phải ở trạng thái PROCESSING (đã thanh toán) trước khi đánh dấu soạn xong.',
+      );
     }
 
     const patientAccountId = prescription.visitSession?.patient?.account_id;
@@ -519,7 +561,9 @@ export class PrescriptionService {
     }
 
     if (prescription.status !== PrescriptionStatusEnum.PREPARED) {
-      throw new BadRequestException('Đơn thuốc phải ở trạng thái PREPARED (đã soạn xong) trước khi giao cho bệnh nhân.');
+      throw new BadRequestException(
+        'Đơn thuốc phải ở trạng thái PREPARED (đã soạn xong) trước khi giao cho bệnh nhân.',
+      );
     }
 
     const patientAccountId = prescription.visitSession?.patient?.account_id;
@@ -588,7 +632,9 @@ export class PrescriptionService {
     }
 
     if (prescription.status !== PrescriptionStatusEnum.PENDING) {
-      throw new BadRequestException('Chỉ có thể chỉnh sửa đơn thuốc khi ở trạng thái PENDING.');
+      throw new BadRequestException(
+        'Chỉ có thể chỉnh sửa đơn thuốc khi ở trạng thái PENDING.',
+      );
     }
 
     const { diagnosis_note, details } = updateDto;
@@ -610,7 +656,9 @@ export class PrescriptionService {
     for (const item of details) {
       const med = medicineMap.get(item.medicine_id);
       if (!med) {
-        throw new NotFoundException(`Không tìm thấy loại thuốc với ID: ${item.medicine_id}`);
+        throw new NotFoundException(
+          `Không tìm thấy loại thuốc với ID: ${item.medicine_id}`,
+        );
       }
     }
 

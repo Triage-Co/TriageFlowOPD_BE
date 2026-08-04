@@ -18,10 +18,7 @@ import {
   UpdateBoundaryBatchItemDto,
   UpdateRoomBatchItemDto,
 } from './dto/batch-map-editor.dto';
-import {
-  lineMidpoint,
-  toGeoJsonString,
-} from './dto/geojson.dto';
+import { lineMidpoint, toGeoJsonString } from './dto/geojson.dto';
 
 interface ValidationErrorItem {
   scope: 'room' | 'boundary';
@@ -41,7 +38,9 @@ export class MapEditorService {
   ) {}
 
   async applyBatch(floorId: string, dto: MapEditorBatchDto) {
-    const floor = await this.prisma.floor.findUnique({ where: { id: floorId } });
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
     if (!floor) {
       throw new NotFoundException(`Không tìm thấy tầng với id ${floorId}`);
     }
@@ -265,7 +264,7 @@ export class MapEditorService {
         finalRoomPolys.push({
           key: r.id,
           id: r.id,
-          poly: turf.polygon(outline.coordinates as number[][][]),
+          poly: turf.polygon(outline.coordinates),
         });
       }
     }
@@ -276,7 +275,7 @@ export class MapEditorService {
     ): GeoJSON.Feature<GeoJSON.Polygon> | null => {
       let poly: GeoJSON.Feature<GeoJSON.Polygon>;
       try {
-        poly = turf.polygon(outline.coordinates as number[][][]);
+        poly = turf.polygon(outline.coordinates);
       } catch {
         errors.push({
           scope: 'room',
@@ -306,9 +305,7 @@ export class MapEditorService {
 
       if (floorOutline) {
         try {
-          const floorPoly = turf.polygon(
-            floorOutline.coordinates as number[][][],
-          );
+          const floorPoly = turf.polygon(floorOutline.coordinates);
           if (!turf.booleanContains(floorPoly, poly)) {
             errors.push({
               scope: 'room',
@@ -435,7 +432,11 @@ export class MapEditorService {
         }
       }
 
-      if (item.roomId && !roomById.has(item.roomId) && !deleteRoomSet.has(item.roomId)) {
+      if (
+        item.roomId &&
+        !roomById.has(item.roomId) &&
+        !deleteRoomSet.has(item.roomId)
+      ) {
         // roomId must exist unless it's being created via roomTempKey
         if (!item.roomTempKey) {
           errors.push({
@@ -480,9 +481,13 @@ export class MapEditorService {
       ref: { tempKey?: string; id?: string },
     ) => {
       const mid = lineMidpoint(coords);
-      const doorLen = turf.distance(turf.point(coords[0]), turf.point(coords[1]), {
-        units: 'meters',
-      });
+      const doorLen = turf.distance(
+        turf.point(coords[0]),
+        turf.point(coords[1]),
+        {
+          units: 'meters',
+        },
+      );
       let minDist = Infinity;
       let hostLen = 0;
       for (const wall of wallSegments) {
@@ -560,11 +565,7 @@ export class MapEditorService {
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
 
-  private async deleteBoundaries(
-    tx: TxClient,
-    floorId: string,
-    ids: string[],
-  ) {
+  private async deleteBoundaries(tx: TxClient, floorId: string, ids: string[]) {
     if (ids.length === 0) return;
 
     const boundaries = await tx.boundary.findMany({
@@ -572,9 +573,7 @@ export class MapEditorService {
       select: { id: true, doorId: true, boundaryType: true },
     });
 
-    const doorIds = boundaries
-      .filter((b) => b.doorId)
-      .map((b) => b.doorId!) as string[];
+    const doorIds = boundaries.filter((b) => b.doorId).map((b) => b.doorId!);
 
     await tx.boundary.deleteMany({
       where: { id: { in: ids }, floorId },
@@ -640,10 +639,7 @@ export class MapEditorService {
     if (nodeIds.length > 0) {
       await tx.edge.deleteMany({
         where: {
-          OR: [
-            { fromNodeId: { in: nodeIds } },
-            { toNodeId: { in: nodeIds } },
-          ],
+          OR: [{ fromNodeId: { in: nodeIds } }, { toNodeId: { in: nodeIds } }],
         },
       });
       await tx.node.deleteMany({ where: { id: { in: nodeIds } } });
@@ -672,14 +668,14 @@ export class MapEditorService {
       room.id,
       'outlineGeom',
       toGeoJsonString(item.outlineGeom),
-      tx as any,
+      tx,
     );
     await this.geoService.updateGeom(
       'physical_room',
       room.id,
       'centerGeom',
       toGeoJsonString(item.centerGeom),
-      tx as any,
+      tx,
     );
 
     return room.id;
@@ -708,7 +704,7 @@ export class MapEditorService {
         item.id,
         'outlineGeom',
         toGeoJsonString(item.outlineGeom),
-        tx as any,
+        tx,
       );
     }
     if (item.centerGeom) {
@@ -717,7 +713,7 @@ export class MapEditorService {
         item.id,
         'centerGeom',
         toGeoJsonString(item.centerGeom),
-        tx as any,
+        tx,
       );
     }
 
@@ -786,7 +782,7 @@ export class MapEditorService {
       boundary.id,
       'lineGeom',
       toGeoJsonString(item.lineGeom),
-      tx as any,
+      tx,
     );
 
     return boundary.id;
@@ -828,7 +824,7 @@ export class MapEditorService {
           'boundary',
           item.id,
           'lineGeom',
-          tx as any,
+          tx,
         )) as GeoJSON.LineString | null;
         if (line && line.coordinates.length >= 2) {
           coords = [
@@ -861,7 +857,7 @@ export class MapEditorService {
         doorId,
         'positionGeom',
         this.geoService.toWKT(mid[0], mid[1]),
-        tx as any,
+        tx,
       );
     }
 
@@ -884,7 +880,7 @@ export class MapEditorService {
         item.id,
         'lineGeom',
         toGeoJsonString(item.lineGeom),
-        tx as any,
+        tx,
       );
     }
   }
@@ -912,7 +908,7 @@ export class MapEditorService {
       door.id,
       'positionGeom',
       this.geoService.toWKT(mid[0], mid[1]),
-      tx as any,
+      tx,
     );
     return door.id;
   }

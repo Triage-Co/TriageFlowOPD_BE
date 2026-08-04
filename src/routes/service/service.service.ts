@@ -44,7 +44,11 @@ export class ServiceService {
     const { page, limit, service_type } = queryReqDto;
 
     try {
-      const data = await this.serviceRepository.findAll(page, limit, service_type);
+      const data = await this.serviceRepository.findAll(
+        page,
+        limit,
+        service_type,
+      );
 
       return {
         code: 200,

@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import type { IFlowRepository } from '../../shared/interfaces/i-flow.repository';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { TemplateStepDto } from '../template/dto/create-template.dto';
@@ -89,7 +94,9 @@ export class FlowService {
     });
 
     if (!serviceOrder) {
-      throw new NotFoundException(`Không tìm thấy service order: ${serviceOrderId}`);
+      throw new NotFoundException(
+        `Không tìm thấy service order: ${serviceOrderId}`,
+      );
     }
 
     if (!serviceOrder.package_id || !serviceOrder.package) {
@@ -106,7 +113,9 @@ export class FlowService {
     }
 
     if (!serviceOrder.booking_id) {
-      throw new BadRequestException(`Service order ${serviceOrderId} không có booking_id`);
+      throw new BadRequestException(
+        `Service order ${serviceOrderId} không có booking_id`,
+      );
     }
 
     const existingFlow = await this.prismaService.flow.findUnique({
@@ -121,7 +130,8 @@ export class FlowService {
       return {
         code: 200,
         status: 'success',
-        message: 'Booking đã có Flow, đã liên kết service_order với flow hiện tại',
+        message:
+          'Booking đã có Flow, đã liên kết service_order với flow hiện tại',
         flow_id: existingFlow.flow_id,
       };
     }
@@ -138,12 +148,17 @@ export class FlowService {
       data: { flow_id: newFlow.flow_id },
     });
 
-    const templateSteps = serviceOrder.package.template.steps as unknown as TemplateStepDto[];
+    const templateSteps = serviceOrder.package.template
+      .steps as unknown as TemplateStepDto[];
 
     // Truyền cờ isPrePaidPackage = true để không tạo thêm đơn thanh toán lẻ cho các bước
-    return this.addTemplateToFlow(newFlow.flow_id, templateSteps, true, serviceOrderId);
+    return this.addTemplateToFlow(
+      newFlow.flow_id,
+      templateSteps,
+      true,
+      serviceOrderId,
+    );
   }
-
 
   async addTemplateToFlowByTeamplateId(flowId: string, templateId: string) {
     const template = await this.prismaService.flow_Template.findUnique({
@@ -161,10 +176,10 @@ export class FlowService {
   }
 
   async addTemplateToFlow(
-    flowId: string, 
-    templateSteps: TemplateStepDto[], 
-    isPrePaidPackage: boolean = false, 
-    packageServiceOrderId: string | null = null
+    flowId: string,
+    templateSteps: TemplateStepDto[],
+    isPrePaidPackage: boolean = false,
+    packageServiceOrderId: string | null = null,
   ) {
     const existingFlow = await this.prismaService.flow.findUnique({
       where: { flow_id: flowId },
@@ -188,7 +203,9 @@ export class FlowService {
     });
 
     if (!existingFlow) {
-      throw new NotFoundException('Không tìm thấy Flow hiện tại của bệnh nhân.');
+      throw new NotFoundException(
+        'Không tìm thấy Flow hiện tại của bệnh nhân.',
+      );
     }
 
     const specialtyId = existingFlow.booking.slot.shift.room.specialty_id;
@@ -218,11 +235,16 @@ export class FlowService {
             const services = await tx.service.findMany({
               where: { service_code: { in: serviceCodes } },
             });
-            const servicesMap = new Map(services.map((s) => [s.service_code, s]));
+            const servicesMap = new Map(
+              services.map((s) => [s.service_code, s]),
+            );
 
             for (const step of stepsNeedingPayment) {
               const svc = servicesMap.get(step.service_code);
-              if (!svc) throw new Error(`Không tìm thấy dịch vụ với mã: ${step.service_code}`);
+              if (!svc)
+                throw new Error(
+                  `Không tìm thấy dịch vụ với mã: ${step.service_code}`,
+                );
 
               const createdServiceOrder = await tx.service_Order.create({
                 data: {
@@ -260,7 +282,8 @@ export class FlowService {
                 },
               });
 
-              (step as any).service_order_id = createdServiceOrder.service_order_id;
+              (step as any).service_order_id =
+                createdServiceOrder.service_order_id;
 
               const stepKey = step.template_id;
               const paymentStepId = `payment_${stepKey}_${Date.now()}`;
@@ -268,13 +291,14 @@ export class FlowService {
                 template_id: paymentStepId,
                 service_code: '',
                 step_name: `Thanh toán: ${step.step_name}`,
-                step_type: 'PAYMENT' as any,
-                room_type: 'CASHIER' as any,
+                step_type: 'PAYMENT',
+                room_type: 'CASHIER',
                 requires_payment: false,
                 depends_on: step.depends_on ? [...step.depends_on] : [],
                 sub_steps: [],
               };
-              (paymentStepDto as any).service_order_id = createdServiceOrder.service_order_id;
+              (paymentStepDto as any).service_order_id =
+                createdServiceOrder.service_order_id;
 
               if (!step.depends_on) {
                 step.depends_on = [];
@@ -458,10 +482,10 @@ export class FlowService {
             });
           }
         }
-        
+
         await tx.flow.update({
           where: { flow_id: flowId },
-          data: { status: 'IN_PROGRESS' }
+          data: { status: 'IN_PROGRESS' },
         });
 
         return {

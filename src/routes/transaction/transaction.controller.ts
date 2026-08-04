@@ -12,7 +12,7 @@ import { TransactionService } from './transaction.service';
 
 @Controller('transaction')
 export class TransactionController {
-  constructor(private readonly transactionService: TransactionService) { }
+  constructor(private readonly transactionService: TransactionService) {}
 
   @Post()
   @ApiOperation({

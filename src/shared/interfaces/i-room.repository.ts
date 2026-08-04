@@ -6,8 +6,8 @@ export type RoomWithStaff = Prisma.RoomGetPayload<{
     shifts: {
       include: {
         staff: true;
-      }
-    }
+      };
+    };
   };
 }>;
 export interface IRoomRepository {
@@ -23,7 +23,10 @@ export interface IRoomRepository {
   findByType(type: ClinicalRoomType): Promise<Room[]>;
   countByType(type: ClinicalRoomType): Promise<number>;
   countAll(): Promise<number>;
-  findBestRoomBySpecialtyId(specialty_id: string): Promise<RoomWithStaff | null>;
-  findBestRoomByRoomType(room_type: ClinicalRoomType): Promise<RoomWithStaff | null>;
+  findBestRoomBySpecialtyId(
+    specialty_id: string,
+  ): Promise<RoomWithStaff | null>;
+  findBestRoomByRoomType(
+    room_type: ClinicalRoomType,
+  ): Promise<RoomWithStaff | null>;
 }
-

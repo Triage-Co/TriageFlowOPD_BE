@@ -21,7 +21,7 @@ export class ExamPackageService {
 
   async findAll() {
     const packages = await this.prisma.exam_Package.findMany({
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
     });
     return {
       code: 200,
@@ -36,7 +36,8 @@ export class ExamPackageService {
       where: { package_id: id },
       include: { template: true },
     });
-    if (!examPackage) throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);
+    if (!examPackage)
+      throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);
     return {
       code: 200,
       message: 'Thành công',
@@ -46,8 +47,11 @@ export class ExamPackageService {
   }
 
   async update(id: string, updateExamPackageDto: UpdateExamPackageDto) {
-    const examPackage = await this.prisma.exam_Package.findUnique({ where: { package_id: id } });
-    if (!examPackage) throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);
+    const examPackage = await this.prisma.exam_Package.findUnique({
+      where: { package_id: id },
+    });
+    if (!examPackage)
+      throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);
 
     const updated = await this.prisma.exam_Package.update({
       where: { package_id: id },
@@ -62,8 +66,11 @@ export class ExamPackageService {
   }
 
   async remove(id: string) {
-    const examPackage = await this.prisma.exam_Package.findUnique({ where: { package_id: id } });
-    if (!examPackage) throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);
+    const examPackage = await this.prisma.exam_Package.findUnique({
+      where: { package_id: id },
+    });
+    if (!examPackage)
+      throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);
 
     await this.prisma.exam_Package.delete({
       where: { package_id: id },

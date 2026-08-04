@@ -10,9 +10,18 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { MedicineService } from './medicine.service';
-import { BulkCreateMedicineDto, CreateMedicineDto } from './dto/create-medicine.dto';
+import {
+  BulkCreateMedicineDto,
+  CreateMedicineDto,
+} from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsAuthGuard } from '../../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../../shared/guards/is-role.guard';
 import { roles } from '../../../shared/decorator/role.decorator';
@@ -20,7 +29,7 @@ import { roles } from '../../../shared/decorator/role.decorator';
 @ApiTags('Medicine')
 @Controller('medicine')
 export class MedicineController {
-  constructor(private readonly medicineService: MedicineService) { }
+  constructor(private readonly medicineService: MedicineService) {}
 
   @Post('bulk')
   @roles('PHARMACIST', 'ADMIN')
@@ -28,7 +37,8 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[PHARMACIST - ADMIN] Tạo/Khởi tạo hàng loạt loại thuốc',
-    description: 'Endpoint nhận vào mảng danh sách thuốc để chèn hàng loạt vào DB.',
+    description:
+      'Endpoint nhận vào mảng danh sách thuốc để chèn hàng loạt vào DB.',
   })
   @ApiResponse({ status: 201, description: 'Tạo hàng loạt thuốc thành công.' })
   bulkCreate(@Body() bulkDto: BulkCreateMedicineDto) {
@@ -41,7 +51,8 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] Tạo loại thuốc mới',
-    description: 'Endpoint dành cho Dược sĩ, Bác sĩ hoặc Quản trị viên khởi tạo thông tin loại thuốc mới vào danh mục.',
+    description:
+      'Endpoint dành cho Dược sĩ, Bác sĩ hoặc Quản trị viên khởi tạo thông tin loại thuốc mới vào danh mục.',
   })
   @ApiResponse({
     status: 201,
@@ -74,9 +85,13 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[ALL] Lấy danh sách các đường dùng thuốc (Dropdown FE)',
-    description: 'Trả về mảng danh sách các đường dùng thuốc độc nhất (VD: Uống, Tiêm, Bôi, Ngậm...) phục vụ bộ lọc FE.',
+    description:
+      'Trả về mảng danh sách các đường dùng thuốc độc nhất (VD: Uống, Tiêm, Bôi, Ngậm...) phục vụ bộ lọc FE.',
   })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách đường dùng thành công.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách đường dùng thành công.',
+  })
   getRoutes() {
     return this.medicineService.getRoutes();
   }
@@ -86,9 +101,13 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[ALL] Lấy danh sách các hoạt chất thuốc (Dropdown FE)',
-    description: 'Trả về mảng danh sách các hoạt chất thuốc độc nhất phục vụ bộ lọc FE.',
+    description:
+      'Trả về mảng danh sách các hoạt chất thuốc độc nhất phục vụ bộ lọc FE.',
   })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách hoạt chất thành công.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách hoạt chất thành công.',
+  })
   getActiveIngredients() {
     return this.medicineService.getActiveIngredients();
   }
@@ -98,12 +117,32 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[ALL] Tra cứu danh sách thuốc',
-    description: 'Endpoint hỗ trợ tìm kiếm thuốc theo tên, mã thuốc, hoạt chất và lọc theo trạng thái hoạt động.',
+    description:
+      'Endpoint hỗ trợ tìm kiếm thuốc theo tên, mã thuốc, hoạt chất và lọc theo trạng thái hoạt động.',
   })
-  @ApiQuery({ name: 'search', required: false, description: 'Từ khóa tìm kiếm (tên, mã thuốc, hoạt chất)' })
-  @ApiQuery({ name: 'is_active', required: false, type: Boolean, description: 'Lọc thuốc đang hoạt động' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Trang thứ bao nhiêu (mặc định 1)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Số bản ghi trên trang (mặc định 20)' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Từ khóa tìm kiếm (tên, mã thuốc, hoạt chất)',
+  })
+  @ApiQuery({
+    name: 'is_active',
+    required: false,
+    type: Boolean,
+    description: 'Lọc thuốc đang hoạt động',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Trang thứ bao nhiêu (mặc định 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Số bản ghi trên trang (mặc định 20)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lấy danh sách thuốc thành công.',
@@ -159,7 +198,8 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[PHARMACIST - ADMIN] Khôi phục loại thuốc đã vô hiệu hóa',
-    description: 'Chuyển is_active về true để tiếp tục sử dụng/kê đơn loại thuốc này.',
+    description:
+      'Chuyển is_active về true để tiếp tục sử dụng/kê đơn loại thuốc này.',
   })
   @ApiResponse({ status: 200, description: 'Khôi phục loại thuốc thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy loại thuốc.' })
@@ -177,7 +217,10 @@ export class MedicineController {
   })
   @ApiResponse({ status: 200, description: 'Cập nhật thuốc thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy loại thuốc.' })
-  update(@Param('id') id: string, @Body() updateMedicineDto: UpdateMedicineDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateMedicineDto: UpdateMedicineDto,
+  ) {
     return this.medicineService.update(id, updateMedicineDto);
   }
 
@@ -187,7 +230,8 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[PHARMACIST - ADMIN] Vô hiệu hóa (Soft delete) loại thuốc',
-    description: 'Chuyển is_active về false để tạm ngừng kinh doanh/kê đơn loại thuốc này.',
+    description:
+      'Chuyển is_active về false để tạm ngừng kinh doanh/kê đơn loại thuốc này.',
   })
   @ApiResponse({ status: 200, description: 'Tạm ngừng loại thuốc thành công.' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy loại thuốc.' })

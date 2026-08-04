@@ -8,7 +8,7 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class PrismaBookingRepository implements IBookingRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
   countBySlotId(slotId: string): Promise<number> {
     return this.prismaService.slot.count({
       where: {
@@ -24,9 +24,9 @@ export class PrismaBookingRepository implements IBookingRepository {
       include: {
         flow: {
           include: {
-            steps: true
-          }
-        }
+            steps: true,
+          },
+        },
       },
     });
   }

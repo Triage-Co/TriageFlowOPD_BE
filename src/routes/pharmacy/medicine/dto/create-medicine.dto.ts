@@ -1,6 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class CreateMedicineDto {
   @ApiProperty({ description: 'Mã thuốc (duy nhất)', example: 'MED-PAR-500' })
@@ -8,12 +17,18 @@ export class CreateMedicineDto {
   @IsNotEmpty()
   medicine_code: string;
 
-  @ApiProperty({ description: 'Tên biệt dược/thuốc', example: 'Paracetamol 500mg' })
+  @ApiProperty({
+    description: 'Tên biệt dược/thuốc',
+    example: 'Paracetamol 500mg',
+  })
   @IsString()
   @IsNotEmpty()
   medicine_name: string;
 
-  @ApiPropertyOptional({ description: 'Hoạt chất chính', example: 'Paracetamol' })
+  @ApiPropertyOptional({
+    description: 'Hoạt chất chính',
+    example: 'Paracetamol',
+  })
   @IsString()
   @IsOptional()
   active_ingredient?: string;
@@ -23,18 +38,28 @@ export class CreateMedicineDto {
   @IsOptional()
   unit?: string;
 
-  @ApiPropertyOptional({ description: 'Đường dùng (Uống, Tiêm, Bôi...)', example: 'Uống' })
+  @ApiPropertyOptional({
+    description: 'Đường dùng (Uống, Tiêm, Bôi...)',
+    example: 'Uống',
+  })
   @IsString()
   @IsOptional()
   usage_route?: string;
 
-  @ApiPropertyOptional({ description: 'Đơn giá (VNĐ)', example: 2000, default: 0 })
+  @ApiPropertyOptional({
+    description: 'Đơn giá (VNĐ)',
+    example: 2000,
+    default: 0,
+  })
   @IsInt()
   @Min(0)
   @IsOptional()
   unit_price?: number;
 
-  @ApiPropertyOptional({ description: 'Nhà sản xuất', example: 'Dược Hậu Giang' })
+  @ApiPropertyOptional({
+    description: 'Nhà sản xuất',
+    example: 'Dược Hậu Giang',
+  })
   @IsString()
   @IsOptional()
   manufacturer?: string;
@@ -51,7 +76,10 @@ export class CreateMedicineDto {
 }
 
 export class BulkCreateMedicineDto {
-  @ApiProperty({ type: [CreateMedicineDto], description: 'Danh sách các thuốc cần khởi tạo hàng loạt' })
+  @ApiProperty({
+    type: [CreateMedicineDto],
+    description: 'Danh sách các thuốc cần khởi tạo hàng loạt',
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateMedicineDto)

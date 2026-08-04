@@ -39,10 +39,7 @@ export class PrismaInvoiceDetailRepository implements IInvoiceDetailRepository {
     });
   }
 
-  delete(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Invoice_Detail> {
+  delete(id: string, tx?: Prisma.TransactionClient): Promise<Invoice_Detail> {
     const db = tx || this.prismaService;
     return db.invoice_Detail.delete({
       where: { invoice_detail_id: id },

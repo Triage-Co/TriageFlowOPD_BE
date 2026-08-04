@@ -72,7 +72,7 @@ export class BookingService {
     private readonly serviceRepository: IServiceRepository,
     @Inject('IQueueRepository')
     private readonly queueRepository: IQueueRepository,
-  ) { }
+  ) {}
 
   private generateTicketCode(): string {
     const dateStr = format(new Date(), 'yyyyMMdd');
@@ -189,7 +189,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-          'Lỗi tạo giao dịch thanh toán',
+            'Lỗi tạo giao dịch thanh toán',
         );
       }
 
@@ -459,7 +459,6 @@ export class BookingService {
     return await this.create(createBookingData);
   }
 
-
   async createBookingWithPackage(dto: CreateBookingWithPackageDto) {
     const { patient_id, slot_id, package_id, return_url, cancel_url } = dto;
 
@@ -583,7 +582,8 @@ export class BookingService {
 
     return {
       code: 200,
-      message: 'Tạo đơn gói khám thành công. Vui lòng thanh toán để tạo lịch khám.',
+      message:
+        'Tạo đơn gói khám thành công. Vui lòng thanh toán để tạo lịch khám.',
       status: 'success',
       data: {
         booking_id: rs.booking.booking_id,

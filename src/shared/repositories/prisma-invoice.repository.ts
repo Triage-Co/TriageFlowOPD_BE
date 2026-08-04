@@ -47,10 +47,7 @@ export class PrismaInvoiceRepository implements IInvoiceRepository {
     });
   }
 
-  delete(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Invoice> {
+  delete(id: string, tx?: Prisma.TransactionClient): Promise<Invoice> {
     const db = tx || this.prismaService;
     return db.invoice.delete({
       where: { invoice_id: id },

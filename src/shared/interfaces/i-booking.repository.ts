@@ -4,9 +4,9 @@ export type BookingWithFlow = Prisma.BookingGetPayload<{
   include: {
     flow: {
       include: {
-        steps: true
-      }
-    }
+        steps: true;
+      };
+    };
   };
 }>;
 export interface IBookingRepository {
