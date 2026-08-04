@@ -98,7 +98,12 @@ export class CronService {
               flow_id: { in: flowIds },
             },
           },
-          status: { in: [ServiceOrderStatusEnum.PENDING, ServiceOrderStatusEnum.IN_PROGRESS] },
+          status: {
+            in: [
+              ServiceOrderStatusEnum.PENDING,
+              ServiceOrderStatusEnum.IN_PROGRESS,
+            ],
+          },
         },
         data: { status: ServiceOrderStatusEnum.CANCELLED },
       });
@@ -112,7 +117,12 @@ export class CronService {
               },
             },
           },
-          status: { in: [ServiceOrderDetailStatusEnum.PENDING, ServiceOrderDetailStatusEnum.IN_PROGRESS] },
+          status: {
+            in: [
+              ServiceOrderDetailStatusEnum.PENDING,
+              ServiceOrderDetailStatusEnum.IN_PROGRESS,
+            ],
+          },
         },
         data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
       });
@@ -190,7 +200,12 @@ export class CronService {
             await tx.service_Order.updateMany({
               where: {
                 booking_id: flow.booking_id,
-                status: { in: [ServiceOrderStatusEnum.PENDING, ServiceOrderStatusEnum.IN_PROGRESS] },
+                status: {
+                  in: [
+                    ServiceOrderStatusEnum.PENDING,
+                    ServiceOrderStatusEnum.IN_PROGRESS,
+                  ],
+                },
               },
               data: { status: ServiceOrderStatusEnum.CANCELLED },
             });
@@ -198,7 +213,12 @@ export class CronService {
             await tx.service_Order_Detail.updateMany({
               where: {
                 order: { booking_id: flow.booking_id },
-                status: { in: [ServiceOrderDetailStatusEnum.PENDING, ServiceOrderDetailStatusEnum.IN_PROGRESS] },
+                status: {
+                  in: [
+                    ServiceOrderDetailStatusEnum.PENDING,
+                    ServiceOrderDetailStatusEnum.IN_PROGRESS,
+                  ],
+                },
               },
               data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
             });
@@ -256,5 +276,27 @@ export class CronService {
       message: 'Cập nhật đơn thuốc quá hạn thành EXPIRED thành công',
       updatedCount: result.count,
     };
+  }
+
+  @Cron('50 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async cancelTodayQueueEntries() {
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const now = new Date();
+    const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone });
+
+    await this.prismaService.queue.updateMany({
+      where: {
+        created_at: {
+          gte: startOfDay,
+        },
+        status: {
+          in: ['PENDING', 'QUEUED', 'CALLED', 'SERVING', 'MISSING'],
+        },
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
   }
 }

@@ -5,10 +5,24 @@ import { QueueService } from './queue.service';
 describe('QueueController', () => {
   let controller: QueueController;
 
+  const mockQueueService = {
+    callNextPatient: jest.fn(),
+    transferQueue: jest.fn(),
+    overrideQueuePosition: jest.fn(),
+    markQueueMissed: jest.fn(),
+    recallQueue: jest.fn(),
+    getRoomQueueView: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [QueueController],
-      providers: [QueueService],
+      providers: [
+        {
+          provide: QueueService,
+          useValue: mockQueueService,
+        },
+      ],
     }).compile();
 
     controller = module.get<QueueController>(QueueController);

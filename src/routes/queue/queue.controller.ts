@@ -1,35 +1,110 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { CallPatientDto, OverrideQueueDto, TransferQueueDto } from './dto/create-queue.dto';
 import { QueueService } from './queue.service';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { CallPatientDto } from './dto/create-queue.dto';
+
 @ApiTags('Queue')
 @Controller('queue')
 export class QueueController {
   constructor(private readonly queueService: QueueService) {}
 
+  private getUser(req: any) {
+    const u = req?.user;
+    return {
+      id: u?.account_id || u?.id || u?.sub || 'system',
+      role: u?.role || 'USER',
+    };
+  }
+
   @Post('call-next')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám' })
-  @ApiBody({
-    type: CallPatientDto,
-    description: 'Thông tin bước khám (step), phòng khám và bác sĩ gọi',
-    examples: {
-      example1: {
-        summary: 'Ví dụ request body',
-        value: {
-          step_id: 'a1b2c3d4-e5f6-7890-abcd-ef0123456789',
-          room_id: 'b2c3d4e5-f6a7-8901-bcde-f0123456789a',
-          staff_id: 'c3d4e5f6-a7b8-9012-cdef-0123456789ab',
-        },
-      },
-    },
+  @ApiOperation({
+    summary: 'Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám (tự động theo engine hoặc gọi đích danh)',
   })
   @ApiResponse({
     status: 200,
     description: 'Gọi bệnh nhân thành công và phát sóng realtime xuống TV.',
   })
-  async callNextPatient(@Body() body: CallPatientDto) {
+  async callNextPatient(@Body() body: CallPatientDto, @Req() req: any) {
     const { step_id, room_id, staff_id } = body;
-    return await this.queueService.callNextPatient(step_id, room_id, staff_id);
+    const user = this.getUser(req);
+    return await this.queueService.callNextPatient(step_id, room_id, staff_id, user);
+  }
+
+  @Post('transfer')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bác sĩ chuyển bệnh nhân sang phòng khám / hội chẩn mới' })
+  @ApiResponse({
+    status: 200,
+    description: 'Chuyển phòng thành công, cấp số mới và phát sóng realtime.',
+  })
+  async transferQueue(@Body() body: TransferQueueDto, @Req() req: any) {
+    const user = this.getUser(req);
+    return await this.queueService.transferQueue(body.step_id, body.to_room_id, body.staff_id, user);
+  }
+
+  @Post(':queueId/override')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Can thiệp thứ tự hàng chờ (PIN_TOP, MOVE_TO_POSITION, UNPIN)' })
+  @ApiResponse({ status: 200, description: 'Đã cập nhật vị trí ưu tiên lượt chờ.' })
+  async overrideQueuePosition(
+    @Param('queueId') queueId: string,
+    @Body() body: OverrideQueueDto,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.overrideQueuePosition(queueId, body, user);
+  }
+
+  @Post(':queueId/miss')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Đánh dấu bệnh nhân vắng mặt khi gọi (MISSING)' })
+  @ApiResponse({ status: 200, description: 'Đã đánh dấu vắng mặt.' })
+  async markQueueMissed(@Param('queueId') queueId: string, @Req() req: any) {
+    const user = this.getUser(req);
+    return await this.queueService.markQueueMissed(queueId, user);
+  }
+
+  @Post(':queueId/recall')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Gọi lại bệnh nhân vắng mặt vào lại hàng chờ' })
+  @ApiResponse({ status: 200, description: 'Đã đưa bệnh nhân quay lại hàng chờ.' })
+  async recallQueue(@Param('queueId') queueId: string, @Req() req: any) {
+    const user = this.getUser(req);
+    return await this.queueService.recallQueue(queueId, user);
+  }
+
+  @Get('room/:roomId')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xem chi tiết hàng chờ phòng khám dành cho Staff / Doctor' })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách chi tiết hàng chờ (serving, waiting, missing).',
+  })
+  async getRoomQueueView(@Param('roomId') roomId: string, @Req() req: any) {
+    const user = this.getUser(req);
+    return await this.queueService.getRoomQueueView(roomId, user);
   }
 }
