@@ -168,8 +168,17 @@ export class StepService {
   }
 
   private async unlockNextSteps(completedStepId: string) {
+    const completedStep = await this.stepRepository.findById(completedStepId);
     const nextSteps =
       await this.stepRepository.findDependentSteps(completedStepId);
+
+    const clsTypes = new Set([
+      StepTypeEnum.LAB_TEST,
+      StepTypeEnum.IMAGING,
+      StepTypeEnum.PROCEDURE,
+      StepTypeEnum.FUNCTIONAL_EXPLORATION,
+    ]);
+
     for (const nextStep of nextSteps) {
       const prerequisites = await this.stepRepository.findDependenciesOfStep(
         nextStep.step_id,
@@ -183,6 +192,29 @@ export class StepService {
         await this.stepRepository.update(nextStep.step_id, {
           step_status: StepStatusEnum.IN_PROGRESS,
         });
+
+        const unlockedByCls =
+          (completedStep?.step_type && clsTypes.has(completedStep.step_type)) ||
+          prerequisites.some(
+            (pre) => pre.step_type && clsTypes.has(pre.step_type),
+          );
+
+        if (unlockedByCls && nextStep.room_id) {
+          try {
+            await this.queueService.enqueueStep(
+              nextStep.step_id,
+              QueueTypeEnum.RETURNING,
+              undefined,
+              { forceType: true },
+            );
+          } catch (err: any) {
+            // Do not block step unlock if queue enqueue fails
+            console.error(
+              `Failed to enqueue RETURNING for step ${nextStep.step_id}:`,
+              err?.message || err,
+            );
+          }
+        }
       }
     }
   }

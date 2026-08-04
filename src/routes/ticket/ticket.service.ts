@@ -339,7 +339,10 @@ export class TicketService {
       where: { ticket_code: ticketCode },
       include: {
         booking: {
-          include: { patient: true },
+          include: {
+            patient: true,
+            slot: true,
+          },
         },
         steps: {
           where: {
@@ -397,17 +400,55 @@ export class TicketService {
       });
     }
 
-    // Broadcast queue update if room_id is active
+    const hasBookingSlot = Boolean(flow.booking?.slot_id);
+    const queueType = hasBookingSlot
+      ? QueueTypeEnum.APPOINTMENT
+      : QueueTypeEnum.NEW;
+
+    const activeQueue = (updatedStep.queues || []).find(
+      (q) =>
+        q.status !== QueueStatusEnum.FINISHED &&
+        q.status !== QueueStatusEnum.CANCELLED,
+    );
+
+    let queueNumber = activeQueue?.queue_number || '---';
+
     if (step.room_id) {
       try {
-        const displayPayload = await this.getRoomDisplayPayload(
+        if (!activeQueue) {
+          const created = await this.queueService.enqueueStep(
+            step.step_id,
+            queueType,
+          );
+          queueNumber = created.queue_number;
+        } else if (activeQueue.status === QueueStatusEnum.PENDING) {
+          // First real presence at room: start aging clock
+          const updatedQueue = await this.prisma.queue.update({
+            where: { queue_id: activeQueue.queue_id },
+            data: {
+              enqueued_at: new Date(),
+              status: QueueStatusEnum.QUEUED,
+              room_id: activeQueue.room_id || step.room_id,
+            },
+          });
+          queueNumber = updatedQueue.queue_number;
+        } else if (!activeQueue.room_id) {
+          const repaired = await this.queueService.enqueueStep(
+            step.step_id,
+            queueType,
+            undefined,
+            { forceType: true },
+          );
+          queueNumber = repaired.queue_number;
+        }
+
+        const displayPayload = await this.queueService.getRoomDisplayPayload(
           step.room_id,
-          step.staff_id || '',
+          step.staff_id || undefined,
         );
         this.queueGateway.emitQueueUpdate(step.room_id, displayPayload);
       } catch (err) {
-        // Socket broadcast errors should not block check-in response
-        console.error('Socket emit error during check-in:', err);
+        console.error('Queue/socket error during check-in:', err);
       }
     }
 
@@ -421,7 +462,7 @@ export class TicketService {
         step_name: updatedStep.step_name,
         step_status: updatedStep.step_status,
         room_name: updatedStep.room?.room_name,
-        queue_number: updatedStep.queues[0]?.queue_number || '---',
+        queue_number: queueNumber,
       },
     };
   }
@@ -460,59 +501,6 @@ export class TicketService {
         final_diagnosis: visitSession?.final_diagnosis || null,
         documents: visitSession?.clinicalDocuments || [],
       },
-    };
-  }
-
-  private async getRoomDisplayPayload(roomId: string, staffId: string) {
-    const currentStep = await this.prisma.step.findFirst({
-      where: {
-        room_id: roomId,
-        ...(staffId && { staff_id: staffId }),
-        step_status: StepStatusEnum.IN_PROGRESS,
-      },
-      include: {
-        queues: true,
-        flow: { include: { booking: { include: { patient: true } } } },
-        staff: true,
-        room: { include: { specialty: true } },
-      },
-    });
-
-    const upcomingSteps = await this.prisma.step.findMany({
-      where: {
-        room_id: roomId,
-        ...(staffId && { staff_id: staffId }),
-        step_status: StepStatusEnum.PENDING,
-      },
-      include: {
-        queues: true,
-        flow: { include: { booking: { include: { patient: true } } } },
-      },
-      take: 5,
-      orderBy: { created_at: 'asc' },
-    });
-
-    return {
-      room_info: {
-        specialty_name:
-          currentStep?.room?.specialty?.specialty_name || 'KHOA KHÁM BỆNH',
-        room_name: currentStep?.room?.room_name || 'Phòng Khám',
-        doctor_name: currentStep?.staff?.full_name
-          ? `BS. ${currentStep.staff.full_name}`
-          : 'Đang cập nhật',
-      },
-      current_patient: currentStep
-        ? {
-            queue_number: currentStep.queues[0]?.queue_number || '---',
-            patient_name:
-              currentStep.flow?.booking?.patient?.full_name || '---',
-          }
-        : null,
-      upcoming_patients: upcomingSteps.map((step) => ({
-        queue_number: step.queues[0]?.queue_number || '---',
-        patient_name: step.flow?.booking?.patient?.full_name || '---',
-      })),
-      timestamp: new Date().toISOString(),
     };
   }
 }

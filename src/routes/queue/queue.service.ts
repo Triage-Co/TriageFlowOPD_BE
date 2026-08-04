@@ -157,26 +157,89 @@ export class QueueService {
     return (count + 1).toString();
   }
 
+  private async evaluatePriorityForStep(
+    step: {
+      room?: { room_type: ClinicalRoomType; specialty_id: string | null } | null;
+      flow?: {
+        booking?: {
+          patient?: { patient_id: string; dob: Date | null; gender: any } | null;
+          slot?: {
+            start_time: string;
+            end_time: string;
+            shift?: { date: Date } | null;
+          } | null;
+          visitSession?: {
+            temperature: number | null;
+            heart_rate: number | null;
+            spo2: number | null;
+            blood_pressure_sys: number | null;
+          } | null;
+        } | null;
+      } | null;
+    },
+    queueType: QueueTypeEnum,
+    missedCount: number,
+    prismaTx: Prisma.TransactionClient,
+  ): Promise<{ basePriority: number; appliedRules: any }> {
+    if (process.env.QUEUE_ENGINE_ENABLED === 'false') {
+      return { basePriority: 0, appliedRules: null };
+    }
+
+    const patient = step.flow?.booking?.patient ?? null;
+    const slot = step.flow?.booking?.slot ?? null;
+    const shift = slot?.shift ?? null;
+    const visitSession = step.flow?.booking?.visitSession ?? null;
+
+    const suggestedPriority = patient
+      ? await this.getLatestTriagePriority(patient.patient_id, prismaTx)
+      : null;
+
+    const appointmentOnTime = Boolean(
+      slot?.start_time &&
+        slot?.end_time &&
+        shift?.date &&
+        isAppointmentOnTime(slot.start_time, slot.end_time, new Date(shift.date)),
+    );
+
+    const vitals = visitSession
+      ? {
+          temperature: visitSession.temperature ?? null,
+          heart_rate: visitSession.heart_rate ?? null,
+          spo2: visitSession.spo2 ?? null,
+          blood_pressure_sys: visitSession.blood_pressure_sys ?? null,
+        }
+      : null;
+
+    const evalResult = await this.queuePriorityService.evaluateRulesForEntry({
+      patient: patient
+        ? { dob: patient.dob ? new Date(patient.dob) : null, gender: patient.gender }
+        : null,
+      queueType,
+      suggestedPriority,
+      vitals,
+      appointmentOnTime,
+      missedCount,
+      roomType: step.room?.room_type ?? null,
+      specialtyId: step.room?.specialty_id ?? null,
+    });
+
+    return {
+      basePriority: evalResult.basePriority,
+      appliedRules: evalResult.appliedRules,
+    };
+  }
+
+  /**
+   * Create (or repair/retype) a queue entry for a step.
+   * @param options.forceType - when true, update queue_type + re-evaluate priority on existing entry
+   */
   async enqueueStep(
     stepId: string,
     queueType: QueueTypeEnum,
     tx?: Prisma.TransactionClient,
+    options?: { forceType?: boolean },
   ): Promise<Queue> {
     const execute = async (prismaTx: Prisma.TransactionClient) => {
-      // 1. Idempotent check
-      const existingQueue = await prismaTx.queue.findFirst({
-        where: {
-          step_id: stepId,
-          status: {
-            notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED],
-          },
-        },
-      });
-
-      if (existingQueue) {
-        return existingQueue;
-      }
-
       const step = await prismaTx.step.findUnique({
         where: { step_id: stepId },
         include: {
@@ -207,55 +270,55 @@ export class QueueService {
         throw new BadRequestException('Step chưa được gán phòng khám.');
       }
 
-      const nextNumber = await this.generateQueueNumberForRoom(step.room_id, prismaTx);
-      const isEngineEnabled = process.env.QUEUE_ENGINE_ENABLED !== 'false';
+      const existingQueue = await prismaTx.queue.findFirst({
+        where: {
+          step_id: stepId,
+          status: {
+            notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED],
+          },
+        },
+      });
 
-      let basePriority = 0;
-      let appliedRules: any = null;
+      if (existingQueue) {
+        const needsRepair = !existingQueue.room_id;
+        const needsRetype =
+          options?.forceType === true && existingQueue.queue_type !== queueType;
 
-      if (isEngineEnabled) {
-        const patient = step.flow?.booking?.patient ?? null;
-        const slot = step.flow?.booking?.slot ?? null;
-        const shift = slot?.shift ?? null;
-        const visitSession = step.flow?.booking?.visitSession ?? null;
+        if (!needsRepair && !needsRetype) {
+          return existingQueue;
+        }
 
-        const suggestedPriority = patient
-          ? await this.getLatestTriagePriority(patient.patient_id, prismaTx)
-          : null;
-
-        const appointmentOnTime = Boolean(
-          slot?.start_time &&
-            slot?.end_time &&
-            shift?.date &&
-            isAppointmentOnTime(slot.start_time, slot.end_time, new Date(shift.date)),
+        const { basePriority, appliedRules } = await this.evaluatePriorityForStep(
+          step,
+          queueType,
+          existingQueue.missed_count ?? 0,
+          prismaTx,
         );
 
-        const vitals = visitSession
-          ? {
-              temperature: visitSession.temperature ?? null,
-              heart_rate: visitSession.heart_rate ?? null,
-              spo2: visitSession.spo2 ?? null,
-              blood_pressure_sys: visitSession.blood_pressure_sys ?? null,
-            }
-          : null;
-
-        const evalInput = {
-          patient: patient ? { dob: patient.dob ? new Date(patient.dob) : null, gender: patient.gender } : null,
-          queueType,
-          suggestedPriority,
-          vitals,
-          appointmentOnTime,
-          missedCount: 0,
-          roomType: step.room?.room_type ?? null,
-          specialtyId: step.room?.specialty_id ?? null,
-        };
-
-        const evalResult = await this.queuePriorityService.evaluateRulesForEntry(evalInput);
-        basePriority = evalResult.basePriority;
-        appliedRules = evalResult.appliedRules;
+        return prismaTx.queue.update({
+          where: { queue_id: existingQueue.queue_id },
+          data: {
+            room_id: step.room_id,
+            queue_type: queueType,
+            base_priority: basePriority,
+            applied_rules: appliedRules ?? undefined,
+            status:
+              existingQueue.status === QueueStatusEnum.PENDING
+                ? QueueStatusEnum.QUEUED
+                : existingQueue.status,
+          },
+        });
       }
 
-      const createdQueue = await prismaTx.queue.create({
+      const nextNumber = await this.generateQueueNumberForRoom(step.room_id, prismaTx);
+      const { basePriority, appliedRules } = await this.evaluatePriorityForStep(
+        step,
+        queueType,
+        0,
+        prismaTx,
+      );
+
+      return prismaTx.queue.create({
         data: {
           step_id: stepId,
           room_id: step.room_id,
@@ -267,8 +330,6 @@ export class QueueService {
           status: QueueStatusEnum.QUEUED,
         },
       });
-
-      return createdQueue;
     };
 
     const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
@@ -307,11 +368,23 @@ export class QueueService {
     });
 
     for (const step of steps) {
-      if (step.queues && step.queues.length > 0) continue;
       if (!step.room_id) continue;
 
       const hasBooking = Boolean(step.flow?.booking?.slot_id);
       const queueType = hasBooking ? QueueTypeEnum.APPOINTMENT : QueueTypeEnum.NEW;
+      const activeQueue = (step.queues || []).find(
+        (q) =>
+          q.status !== QueueStatusEnum.FINISHED &&
+          q.status !== QueueStatusEnum.CANCELLED,
+      );
+
+      // Repair orphaned booking-created rows (missing room_id / priority) via forceType path
+      if (activeQueue && !activeQueue.room_id) {
+        await this.enqueueStep(step.step_id, queueType, undefined, { forceType: true });
+        continue;
+      }
+
+      if (activeQueue) continue;
 
       await this.enqueueStep(step.step_id, queueType);
     }

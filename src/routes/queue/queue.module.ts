@@ -6,10 +6,12 @@ import { QueueEtaService } from './queue-eta.service';
 import { QueueRebalanceService } from './queue-rebalance.service';
 import { QueueAdminController } from './queue-admin.controller';
 import { QueueAdminService } from './queue-admin.service';
+import { QueueGateway } from '../../shared/gateways/queue.gateway';
 
 @Module({
   controllers: [QueueController, QueueAdminController],
   providers: [
+    QueueGateway,
     QueueService,
     QueuePriorityService,
     QueueEtaService,
@@ -17,6 +19,7 @@ import { QueueAdminService } from './queue-admin.service';
     QueueAdminService,
   ],
   exports: [
+    QueueGateway,
     QueueService,
     QueuePriorityService,
     QueueEtaService,
