@@ -72,3 +72,10 @@ export class UpdateRoomStatDto {
   @Min(30, { message: 'default_duration_sec phải lớn hơn hoặc bằng 30' })
   default_duration_sec: number;
 }
+
+export class RefuseQueueDto {
+  @ApiPropertyOptional({ example: 'Bệnh nhân từ chối thực hiện dịch vụ' })
+  @IsOptional()
+  @IsString({ message: 'reason phải là chuỗi' })
+  reason?: string;
+}

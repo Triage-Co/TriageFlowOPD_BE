@@ -10,7 +10,6 @@ import {
   UpdateDependencyReqDto,
   CreateParentStepReqDto,
   CreateSubStepReqDto,
-  FindByIdAndPatientIdReqDto,
   UpdateStepReqDto,
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
@@ -18,6 +17,19 @@ import type { IStepRepository } from '../../shared/interfaces/i-step.repository'
 import { QueueTypeEnum, StepStatusEnum, StepTypeEnum } from '@prisma/client';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
 import { QueueService } from '../queue/queue.service';
+
+const CLS_TYPES = new Set([
+  StepTypeEnum.LAB_TEST,
+  StepTypeEnum.IMAGING,
+  StepTypeEnum.PROCEDURE,
+  StepTypeEnum.FUNCTIONAL_EXPLORATION,
+]);
+
+function isStepSatisfied(status: StepStatusEnum): boolean {
+  return (
+    status === StepStatusEnum.COMPLETED || status === StepStatusEnum.DECLINED
+  );
+}
 
 @Injectable()
 export class StepService {
@@ -125,7 +137,14 @@ export class StepService {
     };
   }
 
-  async completeStep(stepId: string) {
+  /**
+   * Complete a step and unlock dependents. Optionally skip closing SERVING queue
+   * when QueueService already handles that in the same flow.
+   */
+  async completeStep(
+    stepId: string,
+    options?: { skipCloseServingQueue?: boolean },
+  ) {
     const currentStep = await this.stepRepository.findById(stepId);
 
     if (!currentStep) {
@@ -134,10 +153,20 @@ export class StepService {
 
     if (currentStep.step_status === StepStatusEnum.COMPLETED) {
       return {
-        code: '200',
+        code: 200,
         message: 'Bước này đã được hoàn thành từ trước.',
         status: 'success',
+        data: currentStep,
       };
+    }
+
+    if (
+      currentStep.step_status === StepStatusEnum.DECLINED ||
+      currentStep.step_status === StepStatusEnum.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Không thể hoàn thành bước đã từ chối hoặc đã hủy.',
+      );
     }
 
     await this.stepRepository.update(stepId, {
@@ -147,45 +176,118 @@ export class StepService {
     if (currentStep.parent_step_id) {
       await this.checkAndCompleteParentStep(currentStep.parent_step_id);
     } else {
-      await this.unlockNextSteps(stepId);
+      await this.unlockNextSteps(stepId, StepStatusEnum.COMPLETED);
     }
+
+    if (!options?.skipCloseServingQueue) {
+      await this.queueService.closeServingQueueByStepId(stepId, 'complete');
+    }
+
+    const updated = await this.stepRepository.findById(stepId);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã hoàn thành bước và cập nhật tiến trình.',
+      data: updated,
+    };
+  }
+
+  /**
+   * Decline a step (staff refuse). Prerequisites treat DECLINED as satisfied.
+   * Does not enqueue RETURNING.
+   */
+  async declineStep(
+    stepId: string,
+    options?: { skipCloseServingQueue?: boolean; reason?: string },
+  ) {
+    const currentStep = await this.stepRepository.findById(stepId);
+
+    if (!currentStep) {
+      throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+
+    if (currentStep.step_status === StepStatusEnum.DECLINED) {
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Bước này đã được từ chối từ trước.',
+        data: currentStep,
+      };
+    }
+
+    if (currentStep.step_status === StepStatusEnum.COMPLETED) {
+      throw new BadRequestException('Không thể từ chối bước đã hoàn thành.');
+    }
+
+    await this.stepRepository.update(stepId, {
+      step_status: StepStatusEnum.DECLINED,
+    });
+
+    if (currentStep.parent_step_id) {
+      await this.checkAndCompleteParentStep(currentStep.parent_step_id);
+    } else {
+      await this.unlockNextSteps(stepId, StepStatusEnum.DECLINED);
+    }
+
+    if (!options?.skipCloseServingQueue) {
+      await this.queueService.closeServingQueueByStepId(
+        stepId,
+        'refuse',
+        options?.reason,
+      );
+    }
+
+    const updated = await this.stepRepository.findById(stepId);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã từ chối bước và mở khóa bước phụ thuộc (nếu có).',
+      data: updated,
+    };
   }
 
   private async checkAndCompleteParentStep(parentId: string) {
     const siblings = await this.stepRepository.findSubStepsByParentId(parentId);
 
-    const isAllSubStepsDone = siblings.every(
-      (sub) => sub.step_status === StepStatusEnum.COMPLETED,
+    const isAllSubStepsDone = siblings.every((sub) =>
+      isStepSatisfied(sub.step_status),
     );
 
     if (isAllSubStepsDone) {
+      const anyCompleted = siblings.some(
+        (sub) => sub.step_status === StepStatusEnum.COMPLETED,
+      );
       await this.stepRepository.update(parentId, {
-        step_status: StepStatusEnum.COMPLETED,
+        step_status: anyCompleted
+          ? StepStatusEnum.COMPLETED
+          : StepStatusEnum.DECLINED,
       });
 
-      await this.unlockNextSteps(parentId);
+      await this.unlockNextSteps(
+        parentId,
+        anyCompleted ? StepStatusEnum.COMPLETED : StepStatusEnum.DECLINED,
+      );
     }
   }
 
-  private async unlockNextSteps(completedStepId: string) {
+  /**
+   * @param triggerStatus status of the step that just finished (COMPLETED or DECLINED)
+   */
+  private async unlockNextSteps(
+    completedStepId: string,
+    triggerStatus: StepStatusEnum,
+  ) {
     const completedStep = await this.stepRepository.findById(completedStepId);
     const nextSteps =
       await this.stepRepository.findDependentSteps(completedStepId);
-
-    const clsTypes = new Set([
-      StepTypeEnum.LAB_TEST,
-      StepTypeEnum.IMAGING,
-      StepTypeEnum.PROCEDURE,
-      StepTypeEnum.FUNCTIONAL_EXPLORATION,
-    ]);
 
     for (const nextStep of nextSteps) {
       const prerequisites = await this.stepRepository.findDependenciesOfStep(
         nextStep.step_id,
       );
 
-      const isReadyToStart = prerequisites.every(
-        (pre) => pre.step_status === StepStatusEnum.COMPLETED,
+      const isReadyToStart = prerequisites.every((pre) =>
+        isStepSatisfied(pre.step_status),
       );
 
       if (isReadyToStart && nextStep.step_status === StepStatusEnum.PENDING) {
@@ -193,13 +295,19 @@ export class StepService {
           step_status: StepStatusEnum.IN_PROGRESS,
         });
 
-        const unlockedByCls =
-          (completedStep?.step_type && clsTypes.has(completedStep.step_type)) ||
-          prerequisites.some(
-            (pre) => pre.step_type && clsTypes.has(pre.step_type),
-          );
+        // RETURNING only when unlocked by a real CLS completion (not decline)
+        const unlockedByCompletedCls =
+          triggerStatus === StepStatusEnum.COMPLETED &&
+          ((completedStep?.step_type &&
+            CLS_TYPES.has(completedStep.step_type)) ||
+            prerequisites.some(
+              (pre) =>
+                pre.step_type &&
+                CLS_TYPES.has(pre.step_type) &&
+                pre.step_status === StepStatusEnum.COMPLETED,
+            ));
 
-        if (unlockedByCls && nextStep.room_id) {
+        if (unlockedByCompletedCls && nextStep.room_id) {
           try {
             await this.queueService.enqueueStep(
               nextStep.step_id,
@@ -208,7 +316,6 @@ export class StepService {
               { forceType: true },
             );
           } catch (err: any) {
-            // Do not block step unlock if queue enqueue fails
             console.error(
               `Failed to enqueue RETURNING for step ${nextStep.step_id}:`,
               err?.message || err,
@@ -245,12 +352,11 @@ export class StepService {
     }
 
     if (updateStatusDto.step_status === StepStatusEnum.COMPLETED) {
-      await this.completeStep(stepId);
-      return {
-        code: 200,
-        status: 'success',
-        message: 'Đã hoàn thành bước và cập nhật tiến trình.',
-      };
+      return this.completeStep(stepId);
+    }
+
+    if (updateStatusDto.step_status === StepStatusEnum.DECLINED) {
+      return this.declineStep(stepId);
     }
 
     const updatedStep = await this.stepRepository.update(stepId, {

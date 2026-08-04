@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { QueueService } from './queue.service';
 import { QueueController } from './queue.controller';
 import { QueuePriorityService } from './queue-priority.service';
@@ -7,8 +7,10 @@ import { QueueRebalanceService } from './queue-rebalance.service';
 import { QueueAdminController } from './queue-admin.controller';
 import { QueueAdminService } from './queue-admin.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
+import { StepModule } from '../step/step.module';
 
 @Module({
+  imports: [forwardRef(() => StepModule)],
   controllers: [QueueController, QueueAdminController],
   providers: [
     QueueGateway,

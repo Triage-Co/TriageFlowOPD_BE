@@ -17,21 +17,21 @@ Nâng cấp hệ thống hàng chờ OPD từ FIFO đơn thuần (sort theo `ste
 
 ## 2. Các quyết định kiến trúc ĐÃ CHỐT (không thay đổi khi triển khai)
 
-| Quyết định | Lựa chọn |
-| --- | --- |
-| Mô hình sắp xếp | **Hybrid**: score (weight + aging) quyết định thứ tự nền + lớp override cấu trúc (pin-top, hold n vị trí, interleave 1-1) |
-| Aging cap | Aging bonus có giới hạn tối đa (`max_aging` trên rule AGING, mặc định 15). Tránh người chờ rất lâu vượt qua emergency override |
-| ETA | **Hybrid EMA**: timestamps thực tế → EMA theo (room, step_type), fallback `default_duration_sec` do admin cấu hình khi `sample_count < 5` |
-| Scope rule | Global + override theo `ClinicalRoomType` / `specialty_id` (rule cụ thể hơn đè rule global) |
-| Heatmap | REST snapshot, FE tự polling (KHÔNG cần WebSocket, KHÔNG cần bảng thống kê lịch sử) |
-| Call-next | Auto: hệ thống tự chọn người đứng đầu theo engine; vẫn nhận `step_id` optional để gọi đích danh. **Optimistic locking**: dùng `SELECT ... FOR UPDATE` trên queue entry khi call-next để tránh 2 staff gọi cùng lúc |
-| Load balancing scope | Cả 2 lớp: chọn phòng ít tải nhất lúc enqueue + re-balance khi nghẽn |
-| Load balancing mode | **Bán tự động**: hệ thống sinh suggestion, staff/admin confirm mới chuyển thật |
-| Metric nghẽn | Chênh lệch **ETA** giữa các phòng cùng nhóm > ngưỡng X phút (admin cấu hình, mặc định 15) |
-| Nhóm phòng tương đương | Bảng mapping **`Room_Service`** (admin khai báo phòng nào làm được service nào) |
-| Khi chuyển phòng | Cấp `queue_number` mới ở phòng đích, **giữ nguyên `enqueued_at` + `base_priority`** (không mất aging) |
-| Feature flag | Env var `QUEUE_ENGINE_ENABLED` (default `true`). Khi `false`, `enqueueStep` chỉ tạo Queue record cơ bản (FIFO) mà không evaluate rules / compute order |
-| TV / Kiosk access | TV display (`getRoomDisplayPayload`) **không cần guard** (public). Kiosk KHÔNG được đọc hàng chờ staff view |
+| Quyết định             | Lựa chọn                                                                                                                                                                                                           |
+| ------------------------| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Mô hình sắp xếp        | **Hybrid**: score (weight + aging) quyết định thứ tự nền + lớp override cấu trúc (pin-top, hold n vị trí, interleave 1-1)                                                                                          |
+| Aging cap              | Aging bonus có giới hạn tối đa (`max_aging` trên rule AGING, mặc định 15). Tránh người chờ rất lâu vượt qua emergency override                                                                                     |
+| ETA                    | **Hybrid EMA**: timestamps thực tế → EMA theo (room, step_type), fallback `default_duration_sec` do admin cấu hình khi `sample_count < 5`                                                                          |
+| Scope rule             | Global + override theo `ClinicalRoomType` / `specialty_id` (rule cụ thể hơn đè rule global)                                                                                                                        |
+| Heatmap                | REST snapshot, FE tự polling (KHÔNG cần WebSocket, KHÔNG cần bảng thống kê lịch sử)                                                                                                                                |
+| Call-next              | Auto: hệ thống tự chọn người đứng đầu theo engine; vẫn nhận `step_id` optional để gọi đích danh. **Optimistic locking**: dùng `SELECT ... FOR UPDATE` trên queue entry khi call-next để tránh 2 staff gọi cùng lúc |
+| Load balancing scope   | Cả 2 lớp: chọn phòng ít tải nhất lúc enqueue + re-balance khi nghẽn                                                                                                                                                |
+| Load balancing mode    | **Bán tự động**: hệ thống sinh suggestion, staff/admin confirm mới chuyển thật                                                                                                                                     |
+| Metric nghẽn           | Chênh lệch **ETA** giữa các phòng cùng nhóm > ngưỡng X phút (admin cấu hình, mặc định 15)                                                                                                                          |
+| Nhóm phòng tương đương | Bảng mapping **`Room_Service`** (admin khai báo phòng nào làm được service nào)                                                                                                                                    |
+| Khi chuyển phòng       | Cấp `queue_number` mới ở phòng đích, **giữ nguyên `enqueued_at` + `base_priority`** (không mất aging)                                                                                                              |
+| Feature flag           | Env var `QUEUE_ENGINE_ENABLED` (default `true`). Khi `false`, `enqueueStep` chỉ tạo Queue record cơ bản (FIFO) mà không evaluate rules / compute order                                                             |
+| TV / Kiosk access      | TV display (`getRoomDisplayPayload`) **không cần guard** (public). Kiosk KHÔNG được đọc hàng chờ staff view                                                                                                        |
 
 ## 3. Sơ đồ kiến trúc
 
@@ -63,15 +63,15 @@ flowchart LR
 
 Thực hiện TUẦN TỰ theo số thứ tự. Mỗi phase phải build pass (`npm run build`) và lint pass trước khi coi là xong.
 
-| Phase | File | Nội dung | Phụ thuộc |
-| --- | --- | --- | --- |
-| 1 | [phase-1-schema.md](./phase-1-schema.md) | Prisma schema: mở rộng Queue/Move_Log, model mới Queue_Priority_Rule, Room_Service_Stat, Room_Service, Queue_Rebalance_Suggestion + seed rules | — |
-| 2 | [phase-2-priority-engine.md](./phase-2-priority-engine.md) | `QueuePriorityService`: evaluate rules khi enqueue + thuật toán computeQueueOrder | Phase 1 |
-| 3 | [phase-3-enqueue-integration.md](./phase-3-enqueue-integration.md) | Tích hợp engine vào các điểm enqueue: sau thanh toán, check-in, returning sau CLS, transfer | Phase 2 |
-| 4 | [phase-4-lifecycle-endpoints.md](./phase-4-lifecycle-endpoints.md) | Call-next auto, override/miss/recall endpoints, phân quyền, Move_Log, WS emit, cron auto-MISSING | Phase 3 |
-| 5 | [phase-5-eta.md](./phase-5-eta.md) | ETA service: cập nhật EMA khi finished, ETA per patient/queue, gắn vào ticket API + TV payload | Phase 4 |
-| 6 | [phase-6-load-balancing.md](./phase-6-load-balancing.md) | Room_Service mapping, chọn phòng least-ETA lúc enqueue, rebalance detector + suggestion + confirm flow | Phase 5 |
-| 7 | [phase-7-admin-heatmap.md](./phase-7-admin-heatmap.md) | Admin CRUD rules + room-services + default duration, heatmap endpoint | Phase 5 (heatmap), Phase 6 (room-services CRUD) |
+| Phase | File                                                               | Nội dung                                                                                                                                       | Phụ thuộc                                       |
+| -------| --------------------------------------------------------------------| ------------------------------------------------------------------------------------------------------------------------------------------------| -------------------------------------------------|
+| 1     | [phase-1-schema.md](./phase-1-schema.md)                           | Prisma schema: mở rộng Queue/Move_Log, model mới Queue_Priority_Rule, Room_Service_Stat, Room_Service, Queue_Rebalance_Suggestion + seed rules | —                                               |
+| 2     | [phase-2-priority-engine.md](./phase-2-priority-engine.md)         | `QueuePriorityService`: evaluate rules khi enqueue + thuật toán computeQueueOrder                                                              | Phase 1                                         |
+| 3     | [phase-3-enqueue-integration.md](./phase-3-enqueue-integration.md) | Tích hợp engine vào các điểm enqueue: sau thanh toán, check-in, returning sau CLS, transfer                                                    | Phase 2                                         |
+| 4     | [phase-4-lifecycle-endpoints.md](./phase-4-lifecycle-endpoints.md) | Call-next auto, override/miss/recall endpoints, phân quyền, Move_Log, WS emit, cron auto-MISSING                                               | Phase 3                                         |
+| 5     | [phase-5-eta.md](./phase-5-eta.md)                                 | ETA service: cập nhật EMA khi finished, ETA per patient/queue, gắn vào ticket API + TV payload                                                 | Phase 4                                         |
+| 6     | [phase-6-load-balancing.md](./phase-6-load-balancing.md)           | Room_Service mapping, chọn phòng least-ETA lúc enqueue, rebalance detector + suggestion + confirm flow                                         | Phase 5                                         |
+| 7     | [phase-7-admin-heatmap.md](./phase-7-admin-heatmap.md)             | Admin CRUD rules + room-services + default duration, heatmap endpoint                                                                          | Phase 5 (heatmap), Phase 6 (room-services CRUD) |
 
 ## 5. Bối cảnh codebase (đọc kỹ trước khi code)
 

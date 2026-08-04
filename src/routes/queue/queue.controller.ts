@@ -19,6 +19,7 @@ import { RoleTypeEnum } from '@prisma/client';
 import {
   CallPatientDto,
   OverrideQueueDto,
+  RefuseQueueDto,
   TransferQueueDto,
   UpdateRoomStatDto,
 } from './dto/create-queue.dto';
@@ -107,6 +108,92 @@ export class QueueController {
   async recallQueue(@Param('queueId') queueId: string, @Req() req: any) {
     const user = this.getUser(req);
     return await this.queueService.recallQueue(queueId, user);
+  }
+
+  @Post(':queueId/complete')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Hoàn thành lượt SERVING tại phòng (Step COMPLETED, đóng queue, sync SO)',
+  })
+  @ApiResponse({ status: 200, description: 'Đã hoàn thành lượt phục vụ.' })
+  async completeServingQueue(@Param('queueId') queueId: string, @Req() req: any) {
+    const user = this.getUser(req);
+    return await this.queueService.completeServingQueue(queueId, user);
+  }
+
+  @Post(':queueId/refuse')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Từ chối lượt SERVING tại phòng (Step DECLINED, đóng queue, sync SO)',
+  })
+  @ApiResponse({ status: 200, description: 'Đã từ chối lượt phục vụ.' })
+  async refuseServingQueue(
+    @Param('queueId') queueId: string,
+    @Body() body: RefuseQueueDto,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.refuseServingQueue(queueId, user, body?.reason);
+  }
+
+  @Post(':queueId/service-order-details/:detailId/complete')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Hoàn thành một Service Order Detail (queue vẫn SERVING)' })
+  async completeServiceOrderDetail(
+    @Param('queueId') queueId: string,
+    @Param('detailId') detailId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.completeServiceOrderDetail(queueId, detailId, user);
+  }
+
+  @Post(':queueId/service-order-details/:detailId/refuse')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Từ chối một Service Order Detail → CANCELLED (queue vẫn SERVING)' })
+  async refuseServiceOrderDetail(
+    @Param('queueId') queueId: string,
+    @Param('detailId') detailId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.refuseServiceOrderDetail(queueId, detailId, user);
+  }
+
+  @Post(':queueId/service-orders/:orderId/complete')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Hoàn thành toàn bộ Service Order (queue vẫn SERVING)' })
+  async completeServiceOrder(
+    @Param('queueId') queueId: string,
+    @Param('orderId') orderId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.completeServiceOrder(queueId, orderId, user);
+  }
+
+  @Post(':queueId/service-orders/:orderId/refuse')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Từ chối toàn bộ Service Order → CANCELLED (queue vẫn SERVING)' })
+  async refuseServiceOrder(
+    @Param('queueId') queueId: string,
+    @Param('orderId') orderId: string,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.refuseServiceOrder(queueId, orderId, user);
   }
 
   @Get('room/:roomId')

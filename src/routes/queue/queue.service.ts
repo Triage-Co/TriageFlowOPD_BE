@@ -16,6 +16,8 @@ import {
   QueueStatusEnum,
   QueueTypeEnum,
   RoleTypeEnum,
+  ServiceOrderDetailStatusEnum,
+  ServiceOrderStatusEnum,
   StepStatusEnum,
   StepTypeEnum,
 } from '@prisma/client';
@@ -26,6 +28,34 @@ import { QueuePriorityService } from './queue-priority.service';
 import { EntryEtaInfo, QueueEtaService } from './queue-eta.service';
 import { QueueRebalanceService } from './queue-rebalance.service';
 import { REBALANCEABLE_STEP_TYPES } from './queue.constants';
+import { StepService } from '../step/step.service';
+
+const ACTIVE_SOD_STATUSES: ServiceOrderDetailStatusEnum[] = [
+  ServiceOrderDetailStatusEnum.PENDING,
+  ServiceOrderDetailStatusEnum.PAID,
+  ServiceOrderDetailStatusEnum.IN_PROGRESS,
+];
+
+const SERVING_STEP_INCLUDE = {
+  flow: {
+    include: {
+      booking: {
+        include: {
+          patient: true,
+        },
+      },
+    },
+  },
+  service_order: {
+    include: {
+      serviceOrderDetails: {
+        include: {
+          service: true,
+        },
+      },
+    },
+  },
+} as const;
 
 const VN_TZ = 'Asia/Ho_Chi_Minh';
 
@@ -84,6 +114,9 @@ export class QueueService {
 
     @Inject(forwardRef(() => QueueRebalanceService))
     private readonly queueRebalanceService: QueueRebalanceService,
+
+    @Inject(forwardRef(() => StepService))
+    private readonly stepService: StepService,
   ) {}
 
   async assertCanManageRoom(
@@ -582,7 +615,7 @@ export class QueueService {
       include: {
         step: {
           include: {
-            flow: { include: { booking: { include: { patient: true } } } },
+            ...SERVING_STEP_INCLUDE,
             staff: true,
             room: { include: { specialty: true } },
           },
@@ -606,18 +639,24 @@ export class QueueService {
       etaMap.set(e.queueId, e);
     }
 
+    const serving = currentQueue ? this.buildServingPayload(currentQueue) : null;
+
     return {
       room_info: {
         specialty_name: room?.specialty?.specialty_name || 'KHOA KHÁM BỆNH',
         room_name: room?.room_name || 'Phòng Khám',
         doctor_name: staff?.full_name ? `BS. ${staff.full_name}` : 'Đang cập nhật',
       },
+      // TV: chỉ cần số + tên; staff có thể dùng `serving` đầy đủ
       current_patient: currentQueue
         ? {
             queue_number: currentQueue.queue_number,
-            patient_name: (currentQueue.step as any)?.flow?.booking?.patient?.full_name || '---',
+            patient_name:
+              (currentQueue.step as any)?.flow?.booking?.patient?.full_name ||
+              '---',
           }
         : null,
+      serving,
       upcoming_patients: upcomingOrder.slice(0, 5).map((entry) => {
         const etaInfo = etaMap.get(entry.queue.queue_id);
         return {
@@ -892,17 +931,7 @@ export class QueueService {
       },
       include: {
         step: {
-          include: {
-            flow: {
-              include: {
-                booking: {
-                  include: {
-                    patient: true,
-                  },
-                },
-              },
-            },
-          },
+          include: SERVING_STEP_INCLUDE,
         },
       },
     });
@@ -947,19 +976,14 @@ export class QueueService {
       data: {
         room_id: roomId,
         expected_service_minutes: Math.round(roomEta.expectedDurationSec / 60),
-        serving: servingQueue
-          ? {
-              queue_id: servingQueue.queue_id,
-              queue_number: servingQueue.queue_number,
-              patient_name: servingQueue.step?.flow?.booking?.patient?.full_name || '---',
-              serving_started_at: servingQueue.serving_started_at,
-            }
-          : null,
+        serving: servingQueue ? this.buildServingPayload(servingQueue) : null,
         waiting: waitingOrder.map((entry) => {
           const enqueuedAt = entry.queue.enqueued_at
             ? new Date(entry.queue.enqueued_at)
             : new Date(entry.queue.created_at);
-          const waitedMinutes = Math.floor(Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000);
+          const waitedMinutes = Math.floor(
+            Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000,
+          );
           const etaInfo = etaMap.get(entry.queue.queue_id);
           const etaMinutes = etaInfo ? Math.round(etaInfo.etaSec / 60) : 0;
 
@@ -967,7 +991,9 @@ export class QueueService {
             position: entry.position,
             queue_id: entry.queue.queue_id,
             queue_number: entry.queue.queue_number,
-            patient_name: (entry.queue as any).step?.flow?.booking?.patient?.full_name || '---',
+            patient_name:
+              (entry.queue as any).step?.flow?.booking?.patient?.full_name ||
+              '---',
             queue_type: entry.queue.queue_type,
             effective_score: entry.effectiveScore,
             reasons: entry.reasons,
@@ -985,6 +1011,460 @@ export class QueueService {
           missed_at: m.missed_at,
         })),
       },
+    };
+  }
+
+  buildServingPayload(servingQueue: any) {
+    const step = servingQueue.step;
+    const patient = step?.flow?.booking?.patient ?? null;
+    const so = step?.service_order ?? null;
+
+    return {
+      queue_id: servingQueue.queue_id,
+      queue_number: servingQueue.queue_number,
+      serving_started_at: servingQueue.serving_started_at,
+      patient: patient
+        ? {
+            patient_id: patient.patient_id,
+            full_name: patient.full_name,
+            dob: patient.dob,
+            gender: patient.gender,
+          }
+        : null,
+      step: step
+        ? {
+            step_id: step.step_id,
+            step_name: step.step_name,
+            step_type: step.step_type,
+            step_status: step.step_status,
+            service_code: step.service_code,
+          }
+        : null,
+      service_order: so
+        ? {
+            service_order_id: so.service_order_id,
+            name: so.name,
+            status: so.status,
+            details: (so.serviceOrderDetails || []).map((d: any) => ({
+              service_order_detail_id: d.service_order_detail_id,
+              name: d.name || d.service?.service_name || null,
+              service_id: d.service_id,
+              service_code: d.service?.service_code || null,
+              service_name: d.service?.service_name || null,
+              quantity: d.quantity,
+              status: d.status,
+            })),
+          }
+        : null,
+    };
+  }
+
+  private async assertQueueServing(
+    queueId: string,
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.prisma.queue.findUnique({
+      where: { queue_id: queueId },
+      include: {
+        step: {
+          include: SERVING_STEP_INCLUDE,
+        },
+      },
+    });
+
+    if (!queue || !queue.room_id) {
+      throw new NotFoundException('Không tìm thấy lượt chờ.');
+    }
+    if (queue.status !== QueueStatusEnum.SERVING) {
+      throw new BadRequestException(
+        'Chỉ thao tác được trên lượt đang phục vụ (SERVING).',
+      );
+    }
+
+    await this.assertCanManageRoom(user, queue.room_id, queue.step_id);
+    return queue;
+  }
+
+  async syncServiceOrderFromStep(
+    step: {
+      step_id: string;
+      service_order_id: string | null;
+      service_code: string | null;
+      service_order?: any;
+    },
+    outcome: 'complete' | 'refuse',
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (!step.service_order_id) return;
+
+    const db = tx || this.prisma;
+    const so =
+      step.service_order ||
+      (await db.service_Order.findUnique({
+        where: { service_order_id: step.service_order_id },
+        include: {
+          serviceOrderDetails: { include: { service: true } },
+        },
+      }));
+
+    if (!so) return;
+
+    const details = so.serviceOrderDetails || [];
+    const active = details.filter((d: any) =>
+      ACTIVE_SOD_STATUSES.includes(d.status),
+    );
+    if (active.length === 0) return;
+
+    let targets = active.filter(
+      (d: any) =>
+        step.service_code &&
+        d.service?.service_code &&
+        d.service.service_code === step.service_code,
+    );
+
+    if (targets.length === 0) {
+      targets = active.length === 1 ? active : active;
+    }
+
+    const detailStatus =
+      outcome === 'complete'
+        ? ServiceOrderDetailStatusEnum.COMPLETED
+        : ServiceOrderDetailStatusEnum.CANCELLED;
+
+    await db.service_Order_Detail.updateMany({
+      where: {
+        service_order_detail_id: {
+          in: targets.map((d: any) => d.service_order_detail_id),
+        },
+      },
+      data: { status: detailStatus },
+    });
+
+    await this.maybeCloseServiceOrder(step.service_order_id, outcome, db);
+  }
+
+  private async maybeCloseServiceOrder(
+    serviceOrderId: string,
+    outcome: 'complete' | 'refuse',
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = tx || this.prisma;
+    const remaining = await db.service_Order_Detail.count({
+      where: {
+        service_order_id: serviceOrderId,
+        status: { in: ACTIVE_SOD_STATUSES },
+      },
+    });
+
+    if (remaining > 0) return;
+
+    await db.service_Order.update({
+      where: { service_order_id: serviceOrderId },
+      data: {
+        status:
+          outcome === 'complete'
+            ? ServiceOrderStatusEnum.COMPLETED
+            : ServiceOrderStatusEnum.CANCELLED,
+      },
+    });
+  }
+
+  /**
+   * Close SERVING queue for a step (used by StepService complete/decline legacy paths).
+   */
+  async closeServingQueueByStepId(
+    stepId: string,
+    outcome: 'complete' | 'refuse',
+    reason?: string,
+  ) {
+    const queue = await this.prisma.queue.findFirst({
+      where: {
+        step_id: stepId,
+        status: QueueStatusEnum.SERVING,
+      },
+      include: {
+        step: {
+          include: SERVING_STEP_INCLUDE,
+        },
+      },
+    });
+    if (!queue) return null;
+
+    await this.syncServiceOrderFromStep(queue.step as any, outcome);
+    return this.closeServingQueue(queue, outcome, reason);
+  }
+
+  async closeServingQueue(
+    queue: Queue & { step?: { step_type?: StepTypeEnum | null } | null },
+    outcome: 'complete' | 'refuse',
+    reason?: string,
+    actorId?: string | null,
+  ) {
+    const now = new Date();
+    const status =
+      outcome === 'complete'
+        ? QueueStatusEnum.FINISHED
+        : QueueStatusEnum.CANCELLED;
+
+    const updated = await this.prisma.queue.update({
+      where: { queue_id: queue.queue_id },
+      data: {
+        status,
+        finished_at: outcome === 'complete' ? now : queue.finished_at,
+      },
+    });
+
+    await this.prisma.move_Log.create({
+      data: {
+        queue_id: queue.queue_id,
+        action_type: outcome === 'complete' ? 'FINISHED' : 'DECLINED',
+        actor_account_id: actorId ?? null,
+        reason: reason ?? null,
+      },
+    });
+
+    if (
+      outcome === 'complete' &&
+      queue.room_id &&
+      queue.serving_started_at
+    ) {
+      const durationSec = Math.round(
+        (now.getTime() - new Date(queue.serving_started_at).getTime()) / 1000,
+      );
+      this.queueEtaService
+        .recordServiceDuration(
+          queue.room_id,
+          queue.step?.step_type ?? null,
+          durationSec,
+        )
+        .catch((err) =>
+          this.logger.warn(`Failed recording service duration: ${err.message}`),
+        );
+    }
+
+    if (queue.room_id) {
+      try {
+        const payload = await this.getRoomDisplayPayload(queue.room_id);
+        this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+      } catch (err: any) {
+        this.logger.warn(`WS emit after closeServingQueue: ${err.message}`);
+      }
+    }
+
+    return updated;
+  }
+
+  async completeServingQueue(
+    queueId: string,
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.assertQueueServing(queueId, user);
+    const step = queue.step as any;
+
+    await this.stepService.completeStep(step.step_id, {
+      skipCloseServingQueue: true,
+    });
+
+    await this.syncServiceOrderFromStep(step, 'complete');
+    await this.closeServingQueue(queue, 'complete', undefined, user.id);
+
+    const view = await this.getRoomQueueView(queue.room_id!, user);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã hoàn thành lượt phục vụ tại phòng.',
+      data: view.data,
+    };
+  }
+
+  async refuseServingQueue(
+    queueId: string,
+    user: { id: string; role: string },
+    reason?: string,
+  ) {
+    const queue = await this.assertQueueServing(queueId, user);
+    const step = queue.step as any;
+
+    await this.stepService.declineStep(step.step_id, {
+      skipCloseServingQueue: true,
+      reason,
+    });
+
+    await this.syncServiceOrderFromStep(step, 'refuse');
+    await this.closeServingQueue(queue, 'refuse', reason, user.id);
+
+    const view = await this.getRoomQueueView(queue.room_id!, user);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã từ chối lượt phục vụ tại phòng.',
+      data: view.data,
+    };
+  }
+
+  async completeServiceOrderDetail(
+    queueId: string,
+    detailId: string,
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.assertQueueServing(queueId, user);
+    const step = queue.step as any;
+    if (!step?.service_order_id) {
+      throw new BadRequestException('Lượt này không gắn Service Order.');
+    }
+
+    const detail = await this.prisma.service_Order_Detail.findFirst({
+      where: {
+        service_order_detail_id: detailId,
+        service_order_id: step.service_order_id,
+      },
+    });
+    if (!detail) {
+      throw new NotFoundException('Không tìm thấy chi tiết chỉ định thuộc lượt này.');
+    }
+    if (!ACTIVE_SOD_STATUSES.includes(detail.status)) {
+      throw new BadRequestException('Chi tiết chỉ định không còn ở trạng thái chờ xử lý.');
+    }
+
+    await this.prisma.service_Order_Detail.update({
+      where: { service_order_detail_id: detailId },
+      data: { status: ServiceOrderDetailStatusEnum.COMPLETED },
+    });
+    await this.maybeCloseServiceOrder(step.service_order_id, 'complete');
+
+    if (queue.room_id) {
+      const payload = await this.getRoomDisplayPayload(queue.room_id);
+      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+    }
+
+    const view = await this.getRoomQueueView(queue.room_id!, user);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã hoàn thành chi tiết chỉ định.',
+      data: view.data.serving,
+    };
+  }
+
+  async refuseServiceOrderDetail(
+    queueId: string,
+    detailId: string,
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.assertQueueServing(queueId, user);
+    const step = queue.step as any;
+    if (!step?.service_order_id) {
+      throw new BadRequestException('Lượt này không gắn Service Order.');
+    }
+
+    const detail = await this.prisma.service_Order_Detail.findFirst({
+      where: {
+        service_order_detail_id: detailId,
+        service_order_id: step.service_order_id,
+      },
+    });
+    if (!detail) {
+      throw new NotFoundException('Không tìm thấy chi tiết chỉ định thuộc lượt này.');
+    }
+    if (!ACTIVE_SOD_STATUSES.includes(detail.status)) {
+      throw new BadRequestException('Chi tiết chỉ định không còn ở trạng thái chờ xử lý.');
+    }
+
+    await this.prisma.service_Order_Detail.update({
+      where: { service_order_detail_id: detailId },
+      data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+    });
+    await this.maybeCloseServiceOrder(step.service_order_id, 'refuse');
+
+    if (queue.room_id) {
+      const payload = await this.getRoomDisplayPayload(queue.room_id);
+      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+    }
+
+    const view = await this.getRoomQueueView(queue.room_id!, user);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã từ chối chi tiết chỉ định.',
+      data: view.data.serving,
+    };
+  }
+
+  async completeServiceOrder(
+    queueId: string,
+    orderId: string,
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.assertQueueServing(queueId, user);
+    const step = queue.step as any;
+    if (!step?.service_order_id || step.service_order_id !== orderId) {
+      throw new BadRequestException(
+        'Service Order không khớp với lượt đang phục vụ.',
+      );
+    }
+
+    await this.prisma.service_Order_Detail.updateMany({
+      where: {
+        service_order_id: orderId,
+        status: { in: ACTIVE_SOD_STATUSES },
+      },
+      data: { status: ServiceOrderDetailStatusEnum.COMPLETED },
+    });
+    await this.prisma.service_Order.update({
+      where: { service_order_id: orderId },
+      data: { status: ServiceOrderStatusEnum.COMPLETED },
+    });
+
+    if (queue.room_id) {
+      const payload = await this.getRoomDisplayPayload(queue.room_id);
+      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+    }
+
+    const view = await this.getRoomQueueView(queue.room_id!, user);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã hoàn thành toàn bộ Service Order.',
+      data: view.data.serving,
+    };
+  }
+
+  async refuseServiceOrder(
+    queueId: string,
+    orderId: string,
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.assertQueueServing(queueId, user);
+    const step = queue.step as any;
+    if (!step?.service_order_id || step.service_order_id !== orderId) {
+      throw new BadRequestException(
+        'Service Order không khớp với lượt đang phục vụ.',
+      );
+    }
+
+    await this.prisma.service_Order_Detail.updateMany({
+      where: {
+        service_order_id: orderId,
+        status: { in: ACTIVE_SOD_STATUSES },
+      },
+      data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+    });
+    await this.prisma.service_Order.update({
+      where: { service_order_id: orderId },
+      data: { status: ServiceOrderStatusEnum.CANCELLED },
+    });
+
+    if (queue.room_id) {
+      const payload = await this.getRoomDisplayPayload(queue.room_id);
+      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+    }
+
+    const view = await this.getRoomQueueView(queue.room_id!, user);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã từ chối toàn bộ Service Order.',
+      data: view.data.serving,
     };
   }
 
