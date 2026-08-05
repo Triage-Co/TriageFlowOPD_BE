@@ -9,6 +9,7 @@ import {
 } from './dto/request-shift.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { Prisma, PrismaClient } from '@prisma/client';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 @Injectable()
 export class ShiftService {
@@ -245,5 +246,47 @@ export class ShiftService {
     } catch (error) {
       throw error;
     }
+  }
+
+  async findMyShifts(staffId: string, dateStr?: string) {
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    let targetDate = new Date();
+    if (dateStr) {
+      const parsed = new Date(dateStr);
+      if (!isNaN(parsed.getTime())) {
+        targetDate = parsed;
+      }
+    }
+
+    const dateFormatted = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone });
+
+    const shifts = await this.SHIFT.findMany({
+      where: {
+        staff_id: staffId,
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        room: {
+          include: {
+            specialty: true,
+          },
+        },
+      },
+      orderBy: {
+        start_time: 'asc',
+      },
+    });
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy danh sách ca trực cá nhân thành công.',
+      data: shifts,
+    };
   }
 }
