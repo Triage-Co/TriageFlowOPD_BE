@@ -54,9 +54,12 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
           client.data = { ...client.data, user: payload };
           this.logger.log(`Client authenticated: ${client.id} (user: ${payload.sub || payload.id || 'valid'})`);
         } catch (err: any) {
-          this.logger.warn(`Client ${client.id} rejected due to invalid token: ${err.message}`);
-          client.disconnect(true);
-          return;
+          // Staff Supabase JWTs are not signed with KIOSK_KEY — fall back to anonymous TV mode
+          // instead of disconnecting (TV only listens; mutations stay on authenticated HTTP APIs).
+          client.data = { ...client.data, user: null };
+          this.logger.warn(
+            `Client ${client.id} token unverifiable (${err.message}); connected as anonymous TV`,
+          );
         }
       } else {
         // Anonymous TV mode: allow connection, mark user as null
@@ -132,6 +135,15 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
   emitRebalanceSuggestion(fromRoomId: string, toRoomId: string, suggestionData: any) {
     this.server.to(`room_${fromRoomId}`).emit('onRebalanceSuggestion', suggestionData);
     this.server.to(`room_${toRoomId}`).emit('onRebalanceSuggestion', suggestionData);
+  }
+
+  emitRebalanceResolved(
+    fromRoomId: string,
+    toRoomId: string,
+    data: { suggestion_id: string; status: string },
+  ) {
+    this.server.to(`room_${fromRoomId}`).emit('onRebalanceResolved', data);
+    this.server.to(`room_${toRoomId}`).emit('onRebalanceResolved', data);
   }
 }
 

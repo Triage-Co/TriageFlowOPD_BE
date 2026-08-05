@@ -441,6 +441,15 @@ export class QueueRebalanceService {
     await this.queueService.broadcastRoomUpdate(suggestion.from_room_id);
     await this.queueService.broadcastRoomUpdate(suggestion.to_room_id);
 
+    this.queueGateway.emitRebalanceResolved(
+      suggestion.from_room_id,
+      suggestion.to_room_id,
+      {
+        suggestion_id: suggestionId,
+        status: RebalanceSuggestionStatusEnum.CONFIRMED,
+      },
+    );
+
     return {
       code: 200,
       status: 'success',
@@ -492,6 +501,15 @@ export class QueueRebalanceService {
         confirmed_by: user.id,
       },
     });
+
+    this.queueGateway.emitRebalanceResolved(
+      suggestion.from_room_id,
+      suggestion.to_room_id,
+      {
+        suggestion_id: suggestionId,
+        status: RebalanceSuggestionStatusEnum.REJECTED,
+      },
+    );
 
     return {
       code: 200,

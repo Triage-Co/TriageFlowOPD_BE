@@ -652,13 +652,20 @@ export class QueueService {
         room_name: room?.room_name || 'Phòng Khám',
         doctor_name: staff?.full_name ? `BS. ${staff.full_name}` : 'Đang cập nhật',
       },
-      // TV: chỉ cần số + tên; staff có thể dùng `serving` đầy đủ
+      // TV: số + tên + status (CALLING/IN_PROGRESS); staff có thể dùng `serving` đầy đủ
       current_patient: currentQueue
         ? {
+            queue_id: currentQueue.queue_id,
             queue_number: currentQueue.queue_number,
             patient_name:
               (currentQueue.step as any)?.flow?.booking?.patient?.full_name ||
               '---',
+            status:
+              currentQueue.status === QueueStatusEnum.CALLED
+                ? 'CALLING'
+                : currentQueue.status === QueueStatusEnum.SERVING
+                  ? 'IN_PROGRESS'
+                  : String(currentQueue.status),
           }
         : null,
       serving,
