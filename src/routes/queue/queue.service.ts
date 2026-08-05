@@ -382,11 +382,7 @@ export class QueueService {
     const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
 
     if (result.room_id) {
-      this.getRoomDisplayPayload(result.room_id)
-        .then((payload) => this.queueGateway.emitQueueUpdate(result.room_id!, payload))
-        .catch((err) =>
-          this.logger.warn(`Failed to emit WS update for room ${result.room_id}: ${err.message}`),
-        );
+      this.broadcastRoomUpdate(result.room_id);
 
       // Fire-and-forget rebalance detector for CLS/procedure queues
       this.prisma.step
@@ -596,7 +592,7 @@ export class QueueService {
     });
 
     const displayPayload = await this.getRoomDisplayPayload(roomId, staffId);
-    this.queueGateway.emitQueueUpdate(roomId, displayPayload);
+    this.broadcastRoomUpdate(roomId, staffId, displayPayload);
 
     return {
       code: 200,
@@ -604,6 +600,15 @@ export class QueueService {
       message: 'Đã gọi bệnh nhân và cập nhật màn hình TV',
       data: displayPayload,
     };
+  }
+
+  async broadcastRoomUpdate(roomId: string, staffId?: string, preloadedPayload?: any): Promise<void> {
+    try {
+      const payload = preloadedPayload || (await this.getRoomDisplayPayload(roomId, staffId));
+      this.queueGateway.emitQueueUpdate(roomId, payload);
+    } catch (err: any) {
+      this.logger.warn(`WS emit failed for room ${roomId}: ${err?.message || err}`);
+    }
   }
 
   async getRoomDisplayPayload(roomId: string, staffId?: string) {
@@ -727,11 +732,9 @@ export class QueueService {
     });
 
     if (fromRoomId) {
-      const fromPayload = await this.getRoomDisplayPayload(fromRoomId);
-      this.queueGateway.emitQueueUpdate(fromRoomId, fromPayload);
+      await this.broadcastRoomUpdate(fromRoomId);
     }
-    const toPayload = await this.getRoomDisplayPayload(toRoomId);
-    this.queueGateway.emitQueueUpdate(toRoomId, toPayload);
+    await this.broadcastRoomUpdate(toRoomId);
 
     return {
       code: 200,
@@ -795,8 +798,7 @@ export class QueueService {
       },
     });
 
-    const displayPayload = await this.getRoomDisplayPayload(queue.room_id);
-    this.queueGateway.emitQueueUpdate(queue.room_id, displayPayload);
+    await this.broadcastRoomUpdate(queue.room_id);
 
     return {
       code: 200,
@@ -860,8 +862,7 @@ export class QueueService {
       return q;
     });
 
-    const displayPayload = await this.getRoomDisplayPayload(queue.room_id);
-    this.queueGateway.emitQueueUpdate(queue.room_id, displayPayload);
+    await this.broadcastRoomUpdate(queue.room_id);
 
     return {
       code: 200,
@@ -910,8 +911,7 @@ export class QueueService {
       return q;
     });
 
-    const displayPayload = await this.getRoomDisplayPayload(queue.room_id);
-    this.queueGateway.emitQueueUpdate(queue.room_id, displayPayload);
+    await this.broadcastRoomUpdate(queue.room_id);
 
     return {
       code: 200,
@@ -1243,12 +1243,7 @@ export class QueueService {
     }
 
     if (queue.room_id) {
-      try {
-        const payload = await this.getRoomDisplayPayload(queue.room_id);
-        this.queueGateway.emitQueueUpdate(queue.room_id, payload);
-      } catch (err: any) {
-        this.logger.warn(`WS emit after closeServingQueue: ${err.message}`);
-      }
+      await this.broadcastRoomUpdate(queue.room_id);
     }
 
     return updated;
@@ -1333,8 +1328,7 @@ export class QueueService {
     await this.maybeCloseServiceOrder(step.service_order_id, 'complete');
 
     if (queue.room_id) {
-      const payload = await this.getRoomDisplayPayload(queue.room_id);
-      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+      await this.broadcastRoomUpdate(queue.room_id);
     }
 
     const view = await this.getRoomQueueView(queue.room_id!, user);
@@ -1377,8 +1371,7 @@ export class QueueService {
     await this.maybeCloseServiceOrder(step.service_order_id, 'refuse');
 
     if (queue.room_id) {
-      const payload = await this.getRoomDisplayPayload(queue.room_id);
-      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+      await this.broadcastRoomUpdate(queue.room_id);
     }
 
     const view = await this.getRoomQueueView(queue.room_id!, user);
@@ -1416,8 +1409,7 @@ export class QueueService {
     });
 
     if (queue.room_id) {
-      const payload = await this.getRoomDisplayPayload(queue.room_id);
-      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+      await this.broadcastRoomUpdate(queue.room_id);
     }
 
     const view = await this.getRoomQueueView(queue.room_id!, user);
@@ -1455,8 +1447,7 @@ export class QueueService {
     });
 
     if (queue.room_id) {
-      const payload = await this.getRoomDisplayPayload(queue.room_id);
-      this.queueGateway.emitQueueUpdate(queue.room_id, payload);
+      await this.broadcastRoomUpdate(queue.room_id);
     }
 
     const view = await this.getRoomQueueView(queue.room_id!, user);

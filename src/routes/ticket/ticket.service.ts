@@ -4,6 +4,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
@@ -18,6 +19,8 @@ import { QueueStatusEnum, QueueTypeEnum, StepStatusEnum } from '@prisma/client';
 
 @Injectable()
 export class TicketService {
+  private readonly logger = new Logger(TicketService.name);
+
   constructor(
     private readonly prisma: PrismaService,
 
@@ -459,13 +462,12 @@ export class TicketService {
           queueNumber = repaired.queue_number;
         }
 
-        const displayPayload = await this.queueService.getRoomDisplayPayload(
+        await this.queueService.broadcastRoomUpdate(
           step.room_id,
           step.staff_id || undefined,
         );
-        this.queueGateway.emitQueueUpdate(step.room_id, displayPayload);
-      } catch (err) {
-        console.error('Queue/socket error during check-in:', err);
+      } catch (err: any) {
+        this.logger.warn(`Queue/socket error during check-in: ${err?.message || err}`);
       }
     }
 

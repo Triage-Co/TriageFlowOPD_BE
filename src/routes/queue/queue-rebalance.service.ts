@@ -438,18 +438,8 @@ export class QueueRebalanceService {
       return { newQueueNumber };
     });
 
-    try {
-      const fromDisplay = await this.queueService.getRoomDisplayPayload(
-        suggestion.from_room_id,
-      );
-      const toDisplay = await this.queueService.getRoomDisplayPayload(
-        suggestion.to_room_id,
-      );
-      this.queueGateway.emitQueueUpdate(suggestion.from_room_id, fromDisplay);
-      this.queueGateway.emitQueueUpdate(suggestion.to_room_id, toDisplay);
-    } catch (err: any) {
-      this.logger.warn(`Failed emitting WS updates post-confirm: ${err.message}`);
-    }
+    await this.queueService.broadcastRoomUpdate(suggestion.from_room_id);
+    await this.queueService.broadcastRoomUpdate(suggestion.to_room_id);
 
     return {
       code: 200,
