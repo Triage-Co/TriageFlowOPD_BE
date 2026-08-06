@@ -40,6 +40,11 @@ export class ShiftService {
       createShiftRequestDto;
 
     try {
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const dateFormatted = formatInTimeZone(date, timeZone, 'yyyy-MM-dd');
+      const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone });
+      const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone });
+
       const existedRoom = await this.ROOM.findUnique({
         where: {
           room_id: room_id,
@@ -68,7 +73,10 @@ export class ShiftService {
       const conflictingShift = await this.SHIFT.findFirst({
         where: {
           staff_id: staff_id,
-          date: date,
+          date: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
           start_time: {
             lt: end_time,
           },
@@ -82,7 +90,7 @@ export class ShiftService {
         if (conflictingShift.room_id !== room_id) {
           throw new ConflictException({
             message: 'Xung đột thời gian làm việc',
-            detail: `Nhân viên (ID: ${staff_id}) đã có ca trực từ ${conflictingShift.start_time} đến ${conflictingShift.end_time} tại một phòng khác với id ${conflictingShift.room_id} trong ngày ${date}.`,
+            detail: `Nhân viên (ID: ${staff_id}) đã có ca trực từ ${conflictingShift.start_time} đến ${conflictingShift.end_time} tại một phòng khác với id ${conflictingShift.room_id} trong ngày ${dateFormatted}.`,
           });
         } else {
           throw new ConflictException({
@@ -124,7 +132,7 @@ export class ShiftService {
           data: {
             staff_id: staff_id,
             room_id: room_id,
-            date: date,
+            date: startOfDay,
             start_time: start_time,
             end_time: end_time,
           },
@@ -168,7 +176,15 @@ export class ShiftService {
 
   async findAll() {
     try {
-      const data = await this.SHIFT.findMany();
+      const data = await this.SHIFT.findMany({
+        include: {
+          room: {
+            include: {
+              specialty: true,
+            },
+          },
+        },
+      });
 
       if (!data) {
         throw new NotFoundException({
@@ -177,11 +193,17 @@ export class ShiftService {
         });
       }
 
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const formattedData = data.map((shift) => ({
+        ...shift,
+        date: formatInTimeZone(shift.date, timeZone, 'yyyy-MM-dd'),
+      }));
+
       return {
         code: 200,
         message: 'Lấy danh sách ca trực thành công',
         status: 'success',
-        data: data,
+        data: formattedData,
       };
     } catch (error) {
       throw error;
@@ -194,6 +216,13 @@ export class ShiftService {
         where: {
           shift_id: id,
         },
+        include: {
+          room: {
+            include: {
+              specialty: true,
+            },
+          },
+        },
       });
       if (!data) {
         throw new NotFoundException({
@@ -202,11 +231,17 @@ export class ShiftService {
         });
       }
 
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const formattedData = {
+        ...data,
+        date: formatInTimeZone(data.date, timeZone, 'yyyy-MM-dd'),
+      };
+
       return {
         code: 200,
         message: `Lấy ca trực với id ${id} thành công`,
         status: 'success',
-        data: data,
+        data: formattedData,
       };
     } catch (error) {
       throw error;
@@ -282,11 +317,16 @@ export class ShiftService {
       },
     });
 
+    const formattedShifts = shifts.map((shift) => ({
+      ...shift,
+      date: formatInTimeZone(shift.date, timeZone, 'yyyy-MM-dd'),
+    }));
+
     return {
       code: 200,
       status: 'success',
       message: 'Lấy danh sách ca trực cá nhân thành công.',
-      data: shifts,
+      data: formattedShifts,
     };
   }
 }
