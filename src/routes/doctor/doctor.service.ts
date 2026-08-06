@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
 import { Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
+import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
 
 @Injectable()
 export class DoctorService {
@@ -12,7 +13,10 @@ export class DoctorService {
   SHIFT: PrismaClient['shift'];
   STEP: PrismaClient['step'];
   QUEUE: PrismaClient['queue'];
-  constructor(private readonly prismaService: PrismaService) {
+  constructor(
+    @Inject("IStaffRepository")
+    private readonly staffRepository: IStaffRepository,
+    private readonly prismaService: PrismaService) {
     this.STAFF = prismaService.staff;
     this.SLOT = prismaService.slot;
     this.SHIFT = prismaService.shift;
@@ -70,79 +74,35 @@ export class DoctorService {
         });
       }
 
-      let data: Prisma.InputJsonValue;
+      let start: Date | undefined;
+      let end: Date | undefined;
 
-      if (!dateTimeStr) {
-        data = await this.STAFF.findMany({
-          include: {
-            account: true,
-            specialty: true,
-            shifts: {
-              select: {
-                date: true,
-                slots: true,
-              },
-            },
-          },
-          omit: {
-            specialty_id: true,
-          },
-          where: {
-            specialty_id: existedSpecialtyCode.specialty_id,
-            account: {
-              role: RoleTypeEnum.DOCTOR,
-            },
-          },
-        });
-      } else {
-        const timeZone = 'Asia/Ho_Chi_Minh';
 
+      if (dateTimeStr) {
         const targetDate = new Date(dateTimeStr);
+
+        if (isNaN(targetDate.getTime())) {
+          throw new BadRequestException({
+            message: 'Định dạng ngày không hợp lệ.',
+            detail: `Giá trị dateTimeStr [${dateTimeStr}] không thể parse thành Date.`,
+          });
+        }
+
+        const timeZone = 'Asia/Ho_Chi_Minh';
         const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
 
-        const start = toDate(`${dateString}T00:00:00`, { timeZone });
-        const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
-
-        data = await this.STAFF.findMany({
-          include: {
-            account: true,
-            specialty: true,
-            shifts: {
-              where: {
-                date: {
-                  gte: start,
-                  lte: end,
-                },
-              },
-              select: {
-                date: true,
-                slots: true,
-              },
-            },
-          },
-          where: {
-            specialty_id: existedSpecialtyCode.specialty_id,
-            account: {
-              role: RoleTypeEnum.DOCTOR,
-            },
-            shifts: {
-              some: {
-                date: {
-                  gte: start,
-                  lte: end,
-                },
-              },
-            },
-          },
-        });
+        start = toDate(`${dateString}T00:00:00`, { timeZone });
+        end = toDate(`${dateString}T23:59:59.999`, { timeZone });
       }
+
+      const data = await this.staffRepository.findDoctorsBySpecialtyAndDate(existedSpecialtyCode.specialty_id, start, end)
+
 
       if (data.length <= 0) {
         throw new NotFoundException({
           message: 'Danh sách rỗng',
-          detail: `Không tìm thấy bác sĩ nào với chuyên ngành ${existedSpecialtyCode.specialty_name} có ca trực ${
-            dateTimeStr ? 'trong ngày ' + dateTimeStr : ''
-          } trong hệ thống`,
+          detail: `Không tìm thấy bác sĩ nào với chuyên ngành ${existedSpecialtyCode.specialty_name} có ca trực ${dateTimeStr ? 'trong ngày ' + dateTimeStr : ''
+            } trong hệ thống`,
         });
       }
       return {

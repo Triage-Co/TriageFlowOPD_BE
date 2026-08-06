@@ -10,6 +10,47 @@ import { Prisma, Slot } from '@prisma/client';
 @Injectable()
 export class PrismaSlotRepository implements ISlotRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findAvailableBySlotId(slotId: string): Promise<SlotWithShiftAndRoom | null> {
+    const timeZone = 'asia/Ho_Chi_Minh';
+    const now = new Date();
+    const currentHours = formatInTimeZone(now, timeZone, 'HH:mm');
+    const targetDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+    const startOfToday = toDate(`${targetDate}T00:00:00`, { timeZone });
+    return this.prismaService.slot.findFirst({
+      where:{
+        slot_id: slotId,
+        capacity: {
+          gt: 0,
+        },
+        OR:[
+          {
+            shift: {
+              date: startOfToday,
+              start_time: {
+                gt: currentHours,
+              },
+            },
+          },
+          {
+            shift: {
+              date: {
+                gt: startOfToday,
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        shift: {
+          include: {
+            room: true,
+            staff: true,
+          },
+        },
+      },
+    })
+  }
+  
   update(
     slotId: string,
     data: Prisma.SlotUncheckedUpdateInput,
@@ -23,6 +64,7 @@ export class PrismaSlotRepository implements ISlotRepository {
       data: data,
     });
   }
+
   async findOne(slotId: string): Promise<SlotWithShiftAndRoom> {
     const timeZone = 'Asia/Ho_Chi_Minh';
     const targetDate = formatInTimeZone(new Date(), timeZone, 'yyyy-MM-dd');
@@ -64,6 +106,7 @@ export class PrismaSlotRepository implements ISlotRepository {
     }
     return data;
   }
+
   async findAvailableSlots(
     specialtyId: string,
     currentHours: string,

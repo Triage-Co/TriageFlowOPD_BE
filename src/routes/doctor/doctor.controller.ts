@@ -11,11 +11,8 @@ import {
   Req,
 } from '@nestjs/common';
 import { DoctorService } from './doctor.service';
-import { CreateDoctorDto } from './dto/create-doctor.dto';
-import { UpdateDoctorDto } from './dto/update-doctor.dto';
-import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { AuthGuard } from '@nestjs/passport';
 
 @Controller('doctor')
 export class DoctorController {
@@ -29,6 +26,9 @@ export class DoctorController {
     example: '2026-07-04',
     required: false,
   })
+  @ApiOperation({
+    summary: "Lấy danh sách bệnh nhân mà bác sĩ cần khám trong ngày"
+  })
   getPatients(@Req() req: any, @Query('date') date: string) {
     const id = req.user.id || req.user.sub;
     console.log(id, date);
@@ -38,6 +38,9 @@ export class DoctorController {
   @Get('patients/queue/:id')
   @ApiBearerAuth()
   @UseGuards(IsAuthGuard)
+  @ApiOperation({
+    summary: "Lấy chi tiết bệnh nhân theo queue_id"
+  })
   getPatientByQueueId(@Req() req: any, @Param('id') queueId: string) {
     const id = req.user.id || req.user.sub;
     return this.doctorService.getPatientByQueueId(queueId, id);
