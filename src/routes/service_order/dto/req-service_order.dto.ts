@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -56,13 +55,6 @@ export class CreateServiceOrderReqDto {
   })
   room_id?: string;
 
-  @IsBoolean()
-  @ApiProperty({
-    description: 'Dịch vụ có cần thanh toán hay không',
-    default: true,
-    example: true,
-  })
-  is_payment: boolean;
 }
 
 export class UpdateServiceOrderReqDto extends PartialType(

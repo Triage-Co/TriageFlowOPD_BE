@@ -96,7 +96,8 @@ export class StaffController {
   }
 
   @Get()
-  @ApiOperation({ summary: '[ADMIN] Lấy danh sách tất cả nhân viên' })
+  @roles('ADMIN', 'DOCTOR')
+  @ApiOperation({ summary: '[ADMIN, DOCTOR] Lấy danh sách tất cả nhân viên' })
   @ApiResponse({
     status: 200,
     schema: {
@@ -131,8 +132,9 @@ export class StaffController {
   }
 
   @Get(':id')
+  @roles('ADMIN', 'DOCTOR')
   @ApiOperation({
-    summary: '[ADMIN] Lấy thông tin chi tiết 1 nhân viên theo ID',
+    summary: '[ADMIN, DOCTOR] Lấy thông tin chi tiết 1 nhân viên theo ID',
   })
   @ApiResponse({
     status: 200,
