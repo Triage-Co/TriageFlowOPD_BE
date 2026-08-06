@@ -438,18 +438,17 @@ export class QueueRebalanceService {
       return { newQueueNumber };
     });
 
-    try {
-      const fromDisplay = await this.queueService.getRoomDisplayPayload(
-        suggestion.from_room_id,
-      );
-      const toDisplay = await this.queueService.getRoomDisplayPayload(
-        suggestion.to_room_id,
-      );
-      this.queueGateway.emitQueueUpdate(suggestion.from_room_id, fromDisplay);
-      this.queueGateway.emitQueueUpdate(suggestion.to_room_id, toDisplay);
-    } catch (err: any) {
-      this.logger.warn(`Failed emitting WS updates post-confirm: ${err.message}`);
-    }
+    await this.queueService.broadcastRoomUpdate(suggestion.from_room_id);
+    await this.queueService.broadcastRoomUpdate(suggestion.to_room_id);
+
+    this.queueGateway.emitRebalanceResolved(
+      suggestion.from_room_id,
+      suggestion.to_room_id,
+      {
+        suggestion_id: suggestionId,
+        status: RebalanceSuggestionStatusEnum.CONFIRMED,
+      },
+    );
 
     return {
       code: 200,
@@ -502,6 +501,15 @@ export class QueueRebalanceService {
         confirmed_by: user.id,
       },
     });
+
+    this.queueGateway.emitRebalanceResolved(
+      suggestion.from_room_id,
+      suggestion.to_room_id,
+      {
+        suggestion_id: suggestionId,
+        status: RebalanceSuggestionStatusEnum.REJECTED,
+      },
+    );
 
     return {
       code: 200,
