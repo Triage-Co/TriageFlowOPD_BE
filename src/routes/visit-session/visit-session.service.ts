@@ -106,7 +106,7 @@ export class VisitSessionService {
 
   async findLatestByPatient(patientId: string, reqUser: any) {
     const id = reqUser.sub || reqUser.id;
-    const account = await this.accountRepository.findById(reqUser.id);
+    const account = await this.accountRepository.findById(id);
     if (!account) {
       throw new NotFoundException('Account not found');
     }
