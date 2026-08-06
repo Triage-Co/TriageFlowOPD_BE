@@ -17,8 +17,5 @@ export interface IInvoiceDetailRepository {
     tx?: Prisma.TransactionClient,
   ): Promise<Invoice_Detail>;
 
-  delete(
-    id: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<Invoice_Detail>;
+  delete(id: string, tx?: Prisma.TransactionClient): Promise<Invoice_Detail>;
 }

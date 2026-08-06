@@ -12,7 +12,7 @@ import { UpdateMedicineDto } from './dto/update-medicine.dto';
 
 @Injectable()
 export class MedicineService {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
 
   async create(createMedicineDto: CreateMedicineDto) {
     const existing = await this.prismaService.medicine.findUnique({

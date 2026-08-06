@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueRebalanceService } from '../queue/queue-rebalance.service';
 import {
   BookingStatusEnum,
   FlowStatusEnum,
   PaymentStatusEnum,
   PrescriptionStatusEnum,
+  ServiceOrderDetailStatusEnum,
+  ServiceOrderStatusEnum,
   StepStatusEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
@@ -12,7 +15,12 @@ import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class CronService {
-  constructor(private readonly prismaService: PrismaService) {}
+  private readonly logger = new Logger(CronService.name);
+
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly queueRebalanceService: QueueRebalanceService,
+  ) {}
 
   @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updateFlowAndStepExpired() {
@@ -24,8 +32,14 @@ export class CronService {
     return this.prismaService.$transaction(async (tx) => {
       const expiredFlows = await tx.flow.findMany({
         where: {
-          created_at: {
-            lt: startOfDay,
+          booking: {
+            slot: {
+              shift: {
+                date: {
+                  lt: startOfDay,
+                },
+              },
+            },
           },
           status: {
             in: ['PENDING', 'IN_PROGRESS'],
@@ -81,6 +95,42 @@ export class CronService {
         data: {
           status: BookingStatusEnum.CANCELLED,
         },
+      });
+
+      await tx.service_Order.updateMany({
+        where: {
+          booking: {
+            flow: {
+              flow_id: { in: flowIds },
+            },
+          },
+          status: {
+            in: [
+              ServiceOrderStatusEnum.PENDING,
+              ServiceOrderStatusEnum.IN_PROGRESS,
+            ],
+          },
+        },
+        data: { status: ServiceOrderStatusEnum.CANCELLED },
+      });
+
+      await tx.service_Order_Detail.updateMany({
+        where: {
+          order: {
+            booking: {
+              flow: {
+                flow_id: { in: flowIds },
+              },
+            },
+          },
+          status: {
+            in: [
+              ServiceOrderDetailStatusEnum.PENDING,
+              ServiceOrderDetailStatusEnum.IN_PROGRESS,
+            ],
+          },
+        },
+        data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
       });
 
       return {
@@ -152,6 +202,32 @@ export class CronService {
               where: { booking_id: flow.booking_id },
               data: { status: BookingStatusEnum.CANCELLED },
             });
+
+            await tx.service_Order.updateMany({
+              where: {
+                booking_id: flow.booking_id,
+                status: {
+                  in: [
+                    ServiceOrderStatusEnum.PENDING,
+                    ServiceOrderStatusEnum.IN_PROGRESS,
+                  ],
+                },
+              },
+              data: { status: ServiceOrderStatusEnum.CANCELLED },
+            });
+
+            await tx.service_Order_Detail.updateMany({
+              where: {
+                order: { booking_id: flow.booking_id },
+                status: {
+                  in: [
+                    ServiceOrderDetailStatusEnum.PENDING,
+                    ServiceOrderDetailStatusEnum.IN_PROGRESS,
+                  ],
+                },
+              },
+              data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+            });
           }
         });
       }
@@ -163,7 +239,7 @@ export class CronService {
       updatedFlowCount: expiredFlows.length,
     };
   }
-  @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  // @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updatePrescriptionExpired() {
     const oneDayAgo = new Date();
     oneDayAgo.setDate(oneDayAgo.getDate() - 1);
@@ -206,5 +282,36 @@ export class CronService {
       message: 'Cập nhật đơn thuốc quá hạn thành EXPIRED thành công',
       updatedCount: result.count,
     };
+  }
+
+  @Cron('50 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async cancelTodayQueueEntries() {
+    const timeZone = 'Asia/Ho_Chi_Minh';
+    const now = new Date();
+    const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone });
+
+    await this.prismaService.queue.updateMany({
+      where: {
+        created_at: {
+          gte: startOfDay,
+        },
+        status: {
+          in: ['PENDING', 'QUEUED', 'CALLED', 'SERVING', 'MISSING'],
+        },
+      },
+      data: {
+        status: 'CANCELLED',
+      },
+    });
+  }
+
+  @Cron('*/2 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async handleRebalanceDetector() {
+    try {
+      await this.queueRebalanceService.detectAndSuggest();
+    } catch (err: any) {
+      this.logger.warn(`Failed handleRebalanceDetector cron: ${err.message}`);
+    }
   }
 }

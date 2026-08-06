@@ -45,7 +45,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     return this.prismaService.flow.findMany({
       where: {
         status: {
-          in: [FlowStatusEnum.PENDING, FlowStatusEnum.IN_PROGRESS],
+          in: [FlowStatusEnum.IN_PROGRESS],
         },
         booking: {
           patient_id: patient_id,
@@ -100,7 +100,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     const rawFlow = await this.prismaService.flow.findMany({
       where: {
         status: {
-          in: ['PENDING', 'IN_PROGRESS'],
+          in: ['IN_PROGRESS'],
         },
         booking: {
           patient_id: patient_id,
@@ -146,84 +146,25 @@ export class PrismaFlowRepository implements IFlowRepository {
       throw new NotFoundException();
     }
 
-    const formattedSteps = rawFlow.steps.map((step) => {
-      return {
-        step_id: step.step_id,
-        step_name: step.step_name,
-        flow_id: step.flow_id,
-        room_id: step.room_id,
-        staff_id: step.staff_id,
-        step_status: step.step_status,
-        service_order_id: step.service_order_id,
-        room_info: step.room
-          ? {
-              room_name: step.room.room_name,
-              room_id: step.room.room_id,
-            }
-          : null,
-        specialty_info:
-          step.room && step.room.specialty
-            ? {
-                specialty_name: step.room?.specialty.specialty_name,
-                specialty_id: step.room?.specialty.specialty_id,
-              }
-            : null,
-        staff_info: step.staff
-          ? {
-              staff_id: step.staff.staff_id,
-              full_name: step.staff.full_name || 'N/A',
-            }
-          : null,
-        parent_step_id: step.parent_step_id,
-        physicalRoomId: step.physicalRoomId,
-        depends_on: step.dependencies.map((d: any) => d.depends_on_step_id), //bước cần hoàn thành
-        sub_steps: [],
-        queues: step.queues || [],
-      };
+    return this.formatFlowResponse(rawFlow);
+  }
+
+  async findByTicketCode(ticket_code: string): Promise<any> {
+    const rawFlow = await this.prismaService.flow.findUnique({
+      where: {
+        ticket_code: ticket_code,
+      },
+      include: findQuery,
     });
 
-    const stepMap = new Map<string, any>();
-    const rootSteps: any[] = [];
+    if (!rawFlow) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy lượt khám',
+        detail: `Không tìm thấy flow với mã ticket ${ticket_code}`,
+      });
+    }
 
-    formattedSteps.forEach((step) => stepMap.set(step.step_id, step));
-
-    formattedSteps.forEach((step) => {
-      if (step.parent_step_id) {
-        const parentNode = stepMap.get(step.parent_step_id);
-        if (parentNode) {
-          parentNode.sub_steps.push(step);
-        } else {
-          rootSteps.push(step);
-        }
-      } else {
-        rootSteps.push(step);
-      }
-    });
-
-    const currentProcessingSteps = (rawFlow.steps as any)
-      .filter((s: any) => s.step_status === 'IN_PROGRESS')
-      .map((s: any) => s.step_id);
-
-    const timeZone = 'Asia/Ho_Chi_Minh';
-    const createAt = formatInTimeZone(
-      rawFlow.created_at,
-      timeZone,
-      "yyyy-MM-dd'T'HH:mm:ss",
-    );
-    const shiftDate = rawFlow.booking?.slot?.shift?.date;
-    const dateStr = shiftDate
-      ? formatInTimeZone(shiftDate, timeZone, 'yyyy-MM-dd')
-      : null;
-
-    return {
-      flow_id: rawFlow.flow_id,
-      booking_id: rawFlow.booking_id,
-      status: rawFlow.status,
-      date: dateStr,
-      create_at: createAt,
-      current_processing_steps: currentProcessingSteps,
-      steps: rootSteps,
-    };
+    return this.formatFlowResponse(rawFlow);
   }
 
   private formatFlowResponse(rawFlow: any) {
@@ -303,6 +244,7 @@ export class PrismaFlowRepository implements IFlowRepository {
     return {
       flow_id: rawFlow.flow_id,
       booking_id: rawFlow.booking_id,
+      ticket_code: rawFlow.ticket_code,
       status: rawFlow.status,
       date: dateStr,
       create_at: createAt,

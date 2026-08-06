@@ -41,7 +41,9 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
-  findClinicalStepByServiceOrderId(serviceOrderId: string): Promise<Step | null> {
+  findClinicalStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null> {
     return this.prismaService.step.findFirst({
       where: {
         service_order_id: serviceOrderId,
@@ -49,7 +51,9 @@ export class PrismaStepRepository implements IStepRepository {
       },
     });
   }
-  findPaymentStepByServiceOrderId(serviceOrderId: string): Promise<Step | null> {
+  findPaymentStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null> {
     return this.prismaService.step.findFirst({
       where: {
         service_order_id: serviceOrderId,
@@ -202,25 +206,29 @@ export class PrismaStepRepository implements IStepRepository {
   }
 
   findDependentSteps(stepId: string): Promise<any> {
-    return this.prismaService.step_Dependency.findMany({
-      where: {
-        depends_on_step_id: stepId,
-      },
-      include: {
-        step: true,
-      },
-    }).then((deps) => deps.map((d) => d.step));
+    return this.prismaService.step_Dependency
+      .findMany({
+        where: {
+          depends_on_step_id: stepId,
+        },
+        include: {
+          step: true,
+        },
+      })
+      .then((deps) => deps.map((d) => d.step));
   }
 
   findDependenciesOfStep(stepId: string): Promise<any> {
-    return this.prismaService.step_Dependency.findMany({
-      where: {
-        step_id: stepId,
-      },
-      include: {
-        dependsOnStep: true,
-      },
-    }).then((deps) => deps.map((d) => d.dependsOnStep));
+    return this.prismaService.step_Dependency
+      .findMany({
+        where: {
+          step_id: stepId,
+        },
+        include: {
+          dependsOnStep: true,
+        },
+      })
+      .then((deps) => deps.map((d) => d.dependsOnStep));
   }
 
   createDependency(

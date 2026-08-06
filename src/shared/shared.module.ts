@@ -18,9 +18,7 @@ import { PrismaClinicalDocumentRepository } from './repositories/prisma-clinical
 import { PrismaBookingRepository } from './repositories/prisma-booking.repository';
 import { PrismaShiftRepository } from './repositories/prisma-shift.repository';
 import { PrismaTriageInformationRepository } from './repositories/prisma-triage-information.repository';
-import { QueueGateway } from './gateways/queue.gateway';
 import { PrismaSlotRepository } from './repositories/prisma-slot.repository';
-import { QueueService } from '../routes/queue/queue.service';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './guards/jwt.strategy';
 import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repository';
@@ -40,8 +38,6 @@ import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-det
     SupabaseService,
     PrismaService,
     PayosService,
-    QueueGateway,
-    QueueService,
     GeoService,
     {
       provide: 'IAuthProvider',
@@ -136,7 +132,6 @@ import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-det
     SupabaseService,
     PrismaService,
     PayosService,
-    QueueGateway,
     GeoService,
     'IAuthProvider',
     'IAccountRepository',

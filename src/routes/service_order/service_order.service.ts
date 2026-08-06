@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CreateServiceOrderReqDto,
   QueryServiceOrderReqDto,
@@ -6,7 +6,13 @@ import {
 } from './dto/req-service_order.dto';
 import { ServiceOrderErrors } from '../../shared/exceptions/service_order.exceptions';
 import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
-import { ServiceOrderStatusEnum, Step, StepTypeEnum } from '@prisma/client';
+import {
+  ClinicalRoomType,
+  ServiceOrderStatusEnum,
+  Step,
+  StepTypeEnum,
+  TransTypeEnum,
+} from '@prisma/client';
 import type { IBookingRepository } from '../../shared/interfaces/i-booking.repository';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import type { ISpecialtyRepository } from '../../shared/interfaces/i-specialty.repository';
@@ -15,10 +21,26 @@ import type { IServiceOrderDetailRepository } from '../../shared/interfaces/i-se
 import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 import type { IInvoiceRepository } from '../../shared/interfaces/i-invoice.repository';
 import type { IInvoiceDetailRepository } from '../../shared/interfaces/i-invoice-detail.repository';
+import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueEtaService } from '../queue/queue-eta.service';
+import { REBALANCEABLE_STEP_TYPES } from '../queue/queue.constants';
+import { TransactionService } from '../transaction/transaction.service';
+
+/** Map ClinicalRoomType → StepTypeEnum for rebalanceable CLS/procedure rooms. */
+const ROOM_TYPE_TO_STEP_TYPE: Partial<Record<ClinicalRoomType, StepTypeEnum>> = {
+  [ClinicalRoomType.LABORATORY]: StepTypeEnum.LAB_TEST,
+  [ClinicalRoomType.IMAGING_ROOM]: StepTypeEnum.IMAGING,
+  [ClinicalRoomType.PROCEDURE_ROOM]: StepTypeEnum.PROCEDURE,
+  [ClinicalRoomType.FUNCTIONAL_EXPLORATION]: StepTypeEnum.FUNCTIONAL_EXPLORATION,
+};
 
 @Injectable()
 export class ServiceOrderService {
   constructor(
+    private readonly prisma: PrismaService,
+    private readonly queueEtaService: QueueEtaService,
+    private readonly transactionService: TransactionService,
+
     @Inject('IServiceOrderRepository')
     private readonly serviceOrderRepository: IServiceOrderRepository,
     @Inject('IServiceOrderDetailRepository')
@@ -37,7 +59,7 @@ export class ServiceOrderService {
     private readonly specialtyRepository: ISpecialtyRepository,
     @Inject('IRoomRepository')
     private readonly roomRepository: IRoomRepository,
-  ) { }
+  ) {}
 
   async create(createServiceOrderReqDto: CreateServiceOrderReqDto) {
     const {
@@ -65,7 +87,7 @@ export class ServiceOrderService {
           detail: `Không tìm thấy flow với id: ${booking.flow?.flow_id}`,
         });
       }
-      const service = await this.serviceRepository.findByCode(service_code)
+      const service = await this.serviceRepository.findByCode(service_code);
       if (!service) {
         throw new NotFoundException({
           message: 'Không tìm thấy service',
@@ -91,12 +113,12 @@ export class ServiceOrderService {
           service_code: service_code,
           step_name: `Thanh toán ${service.service_name}`,
           service_order_id: serviceOrder.service_order_id,
-        })
+        });
 
         await this.stepRepository.createDependency(
           paymentStep.step_id,
-          lastStep.step_id
-        )
+          lastStep.step_id,
+        );
 
         const invoice = await this.invoiceRepository.create({
           service_order_id: serviceOrder.service_order_id,
@@ -111,6 +133,29 @@ export class ServiceOrderService {
           unit_price: service.price,
           sub_total: service.price,
         });
+
+        const paymentLink = await this.transactionService.create({
+          cancelUrl: 'https://triageflow.me/api-docs',
+          returnUrl: 'https://triageflow.me/api-docs',
+          transType: TransTypeEnum.ORDER_PAYMENT,
+          amount: service.price || 0,
+          clientId: booking.patient_id,
+          service_order_id: serviceOrder.service_order_id,
+        });
+
+        if (!paymentLink || !('data' in paymentLink)) {
+          throw new BadRequestException(
+            (paymentLink?.detail as any)?.error?.desc ||
+              'Lỗi tạo giao dịch thanh toán',
+          );
+        }
+
+        await this.serviceOrderRepository.update(
+          serviceOrder.service_order_id,
+          {
+            qr_code: paymentLink.data.qrCode,
+          },
+        );
       }
 
       let room: any = null;
@@ -126,7 +171,43 @@ export class ServiceOrderService {
         }
         stepStaffId = null;
       } else if (service.room_type) {
-        room = await this.roomRepository.findBestRoomByRoomType(service.room_type);
+        const mappedStepType = ROOM_TYPE_TO_STEP_TYPE[service.room_type];
+        const isRebalanceable =
+          !!mappedStepType && REBALANCEABLE_STEP_TYPES.includes(mappedStepType);
+
+        if (isRebalanceable) {
+          const roomServices = await this.prisma.room_Service.findMany({
+            where: {
+              service_id: service.service_id,
+              is_active: true,
+            },
+            include: { room: true },
+          });
+
+          if (roomServices.length >= 1) {
+            let minEtaRoom: any = null;
+            let minEtaSec = Infinity;
+
+            for (const rs of roomServices) {
+              const etaResult = await this.queueEtaService.computeEtaForRoom(rs.room_id);
+              if (etaResult.totalWaitingSec < minEtaSec) {
+                minEtaSec = etaResult.totalWaitingSec;
+                minEtaRoom = rs.room;
+              }
+            }
+
+            if (minEtaRoom) {
+              room = minEtaRoom;
+            }
+          }
+        }
+
+        if (!room) {
+          room = await this.roomRepository.findBestRoomByRoomType(
+            service.room_type,
+          );
+        }
+
         if (!room) {
           throw new NotFoundException({
             message: 'Không tìm thấy phòng phù hợp cho loại dịch vụ này',
@@ -142,47 +223,57 @@ export class ServiceOrderService {
           });
         }
 
-        room = await this.roomRepository.findBestRoomBySpecialtyId(specialty_id);
+        room =
+          await this.roomRepository.findBestRoomBySpecialtyId(specialty_id);
         if (!room) {
           throw new NotFoundException({
             message: 'Không tìm thấy phòng với chuyên khoa cần khám',
-            detail: `Không tìm thấy room với chuyên khoa cần khám`,
+            detail: `Không tìm thấy phòng với chuyên khoa cần khám`,
           });
         }
       }
 
       if (room) {
         if (!assigned_room_id) {
-          const staff = room.shifts && room.shifts.length > 0 ? room.shifts[0].staff : null;
+          const staff =
+            room.shifts && room.shifts.length > 0 ? room.shifts[0].staff : null;
           stepStaffId = staff?.staff_id;
         }
+
+        const targetStepType =
+          service.room_type === ClinicalRoomType.LABORATORY
+            ? StepTypeEnum.LAB_TEST
+            : service.room_type === ClinicalRoomType.IMAGING_ROOM
+            ? StepTypeEnum.IMAGING
+            : service.room_type === ClinicalRoomType.PROCEDURE_ROOM
+            ? StepTypeEnum.PROCEDURE
+            : service.room_type === ClinicalRoomType.FUNCTIONAL_EXPLORATION
+            ? StepTypeEnum.FUNCTIONAL_EXPLORATION
+            : StepTypeEnum.CLINICAL;
+
         const step = await this.stepRepository.createParentStep({
           flow_id: flow.flow_id,
-          step_type: StepTypeEnum.CLINICAL,
+          step_type: targetStepType,
           step_name: `${service.service_name}`,
           service_code: service_code,
           room_id: room.room_id,
           staff_id: stepStaffId,
           service_order_id: serviceOrder.service_order_id,
-        })
-
+        });
 
         await this.stepRepository.createDependency(
           step.step_id,
-          paymentStep?.step_id ?? lastStep.step_id
-        )
+          paymentStep?.step_id ?? lastStep.step_id,
+        );
       }
-
-
 
       await this.serviceOrderDetailRepository.create({
         service_order_id: serviceOrder.service_order_id,
         quantity: 1,
         price_at_order: service.price,
         service_id: service.service_id,
-        name: service.service_name
-      })
-
+        name: service.service_name,
+      });
 
       return {
         code: 201,
@@ -288,10 +379,14 @@ export class ServiceOrderService {
         ...updateData
       } = updateServiceOrderReqDto;
 
-      const invoice: any = await this.invoiceRepository.findByServiceOrderId(id);
-      const clinicalStep = await this.stepRepository.findClinicalStepByServiceOrderId(id);
-      let paymentStep = await this.stepRepository.findPaymentStepByServiceOrderId(id);
-      const orderDetail = await this.serviceOrderDetailRepository.findByServiceOrderId(id);
+      const invoice: any =
+        await this.invoiceRepository.findByServiceOrderId(id);
+      const clinicalStep =
+        await this.stepRepository.findClinicalStepByServiceOrderId(id);
+      let paymentStep =
+        await this.stepRepository.findPaymentStepByServiceOrderId(id);
+      const orderDetail =
+        await this.serviceOrderDetailRepository.findByServiceOrderId(id);
 
       let newService: any = null;
       let newPrice: number | undefined = undefined;
@@ -307,11 +402,18 @@ export class ServiceOrderService {
       }
 
       if (invoice && invoice.status === 'PAID') {
-        if (service_code !== undefined && newService?.service_id !== orderDetail?.service_id) {
-          throw new Error('Không thể thay đổi dịch vụ vì hóa đơn đã được thanh toán.');
+        if (
+          service_code !== undefined &&
+          newService?.service_id !== orderDetail?.service_id
+        ) {
+          throw new Error(
+            'Không thể thay đổi dịch vụ vì hóa đơn đã được thanh toán.',
+          );
         }
         if (is_payment === false) {
-          throw new Error('Không thể hủy thanh toán vì hóa đơn đã được thanh toán.');
+          throw new Error(
+            'Không thể hủy thanh toán vì hóa đơn đã được thanh toán.',
+          );
         }
       }
 
@@ -323,7 +425,7 @@ export class ServiceOrderService {
               service_id: newService.service_id,
               price_at_order: newPrice,
               name: newServiceName,
-            }
+            },
           );
         }
 
@@ -359,7 +461,9 @@ export class ServiceOrderService {
         if (is_payment === true && !paymentStep) {
           if (!newService) {
             if (orderDetail && orderDetail.service_id) {
-              newService = await this.serviceRepository.findById(orderDetail.service_id);
+              newService = await this.serviceRepository.findById(
+                orderDetail.service_id,
+              );
             }
           }
           if (newService) {
@@ -367,12 +471,16 @@ export class ServiceOrderService {
             if (!flowId) {
               const bookingId = existing.booking_id ?? booking_id;
               if (!bookingId) {
-                throw new Error('Không tìm thấy booking_id để xác định flow khi tạo payment step.');
+                throw new Error(
+                  'Không tìm thấy booking_id để xác định flow khi tạo payment step.',
+                );
               }
               const booking = await this.bookingRepository.findOne(bookingId);
               flowId = booking?.flow?.flow_id;
               if (!flowId) {
-                throw new Error('Không tìm thấy flow liên kết với booking để tạo payment step.');
+                throw new Error(
+                  'Không tìm thấy flow liên kết với booking để tạo payment step.',
+                );
               }
             }
 
@@ -397,14 +505,19 @@ export class ServiceOrderService {
               sub_total: newService.price,
             });
             if (clinicalStep) {
-              await this.stepRepository.createDependency(clinicalStep.step_id, paymentStep.step_id);
+              await this.stepRepository.createDependency(
+                clinicalStep.step_id,
+                paymentStep.step_id,
+              );
             }
           }
         } else if (is_payment === false && paymentStep) {
           if (invoice) {
             if (invoice.invoice_details) {
               for (const det of invoice.invoice_details) {
-                await this.invoiceDetailRepository.delete(det.invoice_detail_id);
+                await this.invoiceDetailRepository.delete(
+                  det.invoice_detail_id,
+                );
               }
             }
             await this.invoiceRepository.delete(invoice.invoice_id);
@@ -422,7 +535,8 @@ export class ServiceOrderService {
             });
           }
         } else if (specialty_id && clinicalStep) {
-          const room = await this.roomRepository.findBestRoomBySpecialtyId(specialty_id);
+          const room =
+            await this.roomRepository.findBestRoomBySpecialtyId(specialty_id);
           if (room) {
             await this.stepRepository.update(clinicalStep.step_id, {
               room_id: room.room_id,
@@ -431,10 +545,7 @@ export class ServiceOrderService {
         }
       }
 
-      const data = await this.serviceOrderRepository.update(
-        id,
-        updateData,
-      );
+      const data = await this.serviceOrderRepository.update(id, updateData);
 
       return {
         code: 200,

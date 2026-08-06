@@ -28,14 +28,14 @@ export class CreateServiceOrderReqDto {
 
   @IsString()
   @ApiProperty({
-    example: "Xét nghiệm máu",
+    example: 'Xét nghiệm máu',
     description: 'Tên của Service Order',
   })
   name: string;
 
   @IsString()
   @ApiProperty({
-    example: "XET_NGHIEM_MAU",
+    example: 'XET_NGHIEM_MAU',
     description: 'Mã của Service Order',
   })
   service_code: string;
@@ -64,7 +64,6 @@ export class CreateServiceOrderReqDto {
   })
   is_payment: boolean;
 }
-
 
 export class UpdateServiceOrderReqDto extends PartialType(
   CreateServiceOrderReqDto,

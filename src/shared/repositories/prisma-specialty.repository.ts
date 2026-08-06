@@ -11,7 +11,7 @@ export class PrismaSpecialtyRepository implements ISpecialtyRepository {
       where: {
         specialty_id: id,
       },
-    })
+    });
   }
   findAll(page?: number, limit?: number): Promise<Partial<Specialty>[]> {
     const skip =

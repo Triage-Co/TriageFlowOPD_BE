@@ -10,8 +10,6 @@ export class TemplateService {
     private readonly templateRepository: ITemplateRepository,
   ) {}
 
-
-
   async create(createTemplateDto: CreateTemplateDto) {
     const data = await this.templateRepository.create({
       name: createTemplateDto.name,

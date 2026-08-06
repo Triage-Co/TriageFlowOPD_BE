@@ -38,6 +38,8 @@ import { ServiceOrderDetailModule } from './routes/service_order_detail/service_
 import { InvoiceModule } from './routes/invoice/invoice.module';
 import { InvoiceDetailModule } from './routes/invoice_detail/invoice_detail.module';
 import { PharmacyModule } from './routes/pharmacy/pharmacy.module';
+import { TicketModule } from './routes/ticket/ticket.module';
+import { ExamPackageModule } from './routes/exam-package/exam-package.module';
 
 @Module({
   imports: [
@@ -106,6 +108,8 @@ import { PharmacyModule } from './routes/pharmacy/pharmacy.module';
     InvoiceModule,
     InvoiceDetailModule,
     PharmacyModule,
-  ]
+    TicketModule,
+    ExamPackageModule,
+  ],
 })
-export class AppModule { }
+export class AppModule {}

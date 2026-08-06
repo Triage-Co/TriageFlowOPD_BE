@@ -7,7 +7,7 @@ import { IServiceRepository } from '../interfaces/i-service.repository';
 
 @Injectable()
 export class PrismaServiceRepository implements IServiceRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
   findByCode(code: string): Promise<Service | null> {
     return this.prismaService.service.findFirst({
       where: {

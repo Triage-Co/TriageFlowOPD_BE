@@ -1,18 +1,32 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CreateRoomRequestDto,
+  QueryRoomReqDto,
   UpdateRoomRequestDto,
 } from './dto/request-room.dto';
 import type { IRoomRepository } from '../../shared/interfaces/i-room.repository';
 import { RoomErrors } from '../../shared/exceptions/room.exceptions';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class RoomService {
   constructor(
     @Inject('IRoomRepository') private readonly roomRepository: IRoomRepository,
+    private readonly prismaService: PrismaService,
   ) {}
 
   async create(createRoomRequestDto: CreateRoomRequestDto) {
+    if (createRoomRequestDto.physical_room_id) {
+      const physicalRoom = await this.prismaService.physicalRoom.findUnique({
+        where: { id: createRoomRequestDto.physical_room_id },
+      });
+      if (!physicalRoom) {
+        throw RoomErrors.PhysicalRoomNotFoundById(
+          createRoomRequestDto.physical_room_id,
+        );
+      }
+    }
+
     const data = await this.roomRepository.create(createRoomRequestDto);
 
     return {
@@ -22,6 +36,7 @@ export class RoomService {
       data: data,
     };
   }
+
   async createMany(createRoomRequestDto: CreateRoomRequestDto[]) {
     const data = await this.roomRepository.create(createRoomRequestDto);
 
@@ -33,10 +48,10 @@ export class RoomService {
     };
   }
 
-  async findAll() {
-    const data = await this.roomRepository.findAll();
+  async findAll(query?: QueryRoomReqDto) {
+    const result = await this.roomRepository.findAll(query);
 
-    if (!data || data.length <= 0) {
+    if (!result.data || result.data.length <= 0) {
       throw RoomErrors.RoomNotFound;
     }
 
@@ -44,7 +59,8 @@ export class RoomService {
       code: 200,
       message: 'Lấy danh sách phòng thành công',
       status: 'success',
-      data: data,
+      data: result.data,
+      meta: result.meta,
     };
   }
 
@@ -69,6 +85,20 @@ export class RoomService {
       throw RoomErrors.RoomNotFoundById(id);
     }
 
+    if (
+      updateRoomRequestDto.physical_room_id !== undefined &&
+      updateRoomRequestDto.physical_room_id !== null
+    ) {
+      const physicalRoom = await this.prismaService.physicalRoom.findUnique({
+        where: { id: updateRoomRequestDto.physical_room_id },
+      });
+      if (!physicalRoom) {
+        throw RoomErrors.PhysicalRoomNotFoundById(
+          updateRoomRequestDto.physical_room_id,
+        );
+      }
+    }
+
     const dataUpdate = await this.roomRepository.update(
       id,
       updateRoomRequestDto,
@@ -76,7 +106,7 @@ export class RoomService {
 
     return {
       code: 200,
-      message: `cập nhật phòng với id ${id} thành công`,
+      message: `Cập nhật phòng với id ${id} thành công`,
       status: 'success',
       data: dataUpdate,
     };
@@ -95,6 +125,38 @@ export class RoomService {
       code: 200,
       message: `Xóa phòng với id ${id} thành công`,
       status: 'success',
+    };
+  }
+
+  async getSlotsByRoomId(roomId: string, dateStr?: string) {
+    const room = await this.roomRepository.findById(roomId);
+    if (!room) {
+      throw RoomErrors.RoomNotFoundById(roomId);
+    }
+
+    const whereCondition: any = {
+      shift: {
+        room_id: roomId,
+      },
+    };
+
+    if (dateStr) {
+      whereCondition.shift.date = new Date(`${dateStr}T00:00:00Z`);
+    }
+
+    const slots = await this.prismaService.slot.findMany({
+      where: whereCondition,
+      include: {
+        shift: true,
+      },
+      orderBy: [{ shift: { date: 'asc' } }, { start_time: 'asc' }],
+    });
+
+    return {
+      code: 200,
+      message: 'Thành công',
+      status: 'success',
+      data: slots,
     };
   }
 }
