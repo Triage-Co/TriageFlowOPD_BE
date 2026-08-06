@@ -12,6 +12,7 @@ import {
   Step,
   StepTypeEnum,
   TransTypeEnum,
+  FlowStatusEnum,
 } from '@prisma/client';
 import type { IBookingRepository } from '../../shared/interfaces/i-booking.repository';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
@@ -65,12 +66,13 @@ export class ServiceOrderService {
     const {
       service_code,
       specialty_id,
-      is_payment,
       booking_id,
       name,
       assign_by_staff_id,
       room_id: assigned_room_id,
     } = createServiceOrderReqDto;
+
+    const is_payment = !!service_code;
 
     try {
       const booking = await this.bookingRepository.findOne(booking_id);
@@ -369,12 +371,28 @@ export class ServiceOrderService {
       throw ServiceOrderErrors.ServiceOrderNotFoundById(id);
     }
 
+    if (existing.booking_id) {
+      const booking = await this.prisma.booking.findUnique({
+        where: { booking_id: existing.booking_id },
+        include: { flow: true },
+      });
+      const flowStatus = booking?.flow?.status;
+      if (
+        flowStatus &&
+        flowStatus !== FlowStatusEnum.IN_PROGRESS &&
+        flowStatus !== FlowStatusEnum.PENDING
+      ) {
+        throw new BadRequestException(
+          'Không thể cập nhật Service Order vì flow hiện tại không ở trạng thái IN_PROGRESS hoặc PENDING',
+        );
+      }
+    }
+
     try {
       const {
         room_id,
         specialty_id,
         service_code,
-        is_payment,
         booking_id,
         ...updateData
       } = updateServiceOrderReqDto;
@@ -410,11 +428,6 @@ export class ServiceOrderService {
             'Không thể thay đổi dịch vụ vì hóa đơn đã được thanh toán.',
           );
         }
-        if (is_payment === false) {
-          throw new Error(
-            'Không thể hủy thanh toán vì hóa đơn đã được thanh toán.',
-          );
-        }
       }
 
       if (service_code) {
@@ -429,7 +442,20 @@ export class ServiceOrderService {
           );
         }
 
-        if (invoice) {
+        if (!invoice) {
+          const newInvoice = await this.invoiceRepository.create({
+            service_order_id: id,
+            total_amount: newPrice,
+            status: 'PENDING',
+          });
+          await this.invoiceDetailRepository.create({
+            invoice_id: newInvoice.invoice_id,
+            item_name: newServiceName ?? 'Dịch vụ',
+            quantity: 1,
+            unit_price: newPrice,
+            sub_total: newPrice,
+          });
+        } else {
           await this.invoiceRepository.update(invoice.invoice_id, {
             total_amount: newPrice,
           });
@@ -449,7 +475,40 @@ export class ServiceOrderService {
             step_name: newServiceName,
           });
         }
-        if (paymentStep) {
+
+        if (!paymentStep) {
+          let flowId = clinicalStep?.flow_id;
+          if (!flowId) {
+            const bookingId = existing.booking_id ?? booking_id;
+            if (!bookingId) {
+              throw new Error(
+                'Không tìm thấy booking_id để xác định flow khi tạo payment step.',
+              );
+            }
+            const booking = await this.bookingRepository.findOne(bookingId);
+            flowId = booking?.flow?.flow_id;
+            if (!flowId) {
+              throw new Error(
+                'Không tìm thấy flow liên kết với booking để tạo payment step.',
+              );
+            }
+          }
+
+          paymentStep = await this.stepRepository.createParentStep({
+            flow_id: flowId,
+            step_type: 'PAYMENT',
+            service_code: newService.service_code,
+            step_name: `Thanh toán ${newService.service_name}`,
+            service_order_id: id,
+          });
+
+          if (clinicalStep) {
+            await this.stepRepository.createDependency(
+              clinicalStep.step_id,
+              paymentStep.step_id,
+            );
+          }
+        } else {
           await this.stepRepository.update(paymentStep.step_id, {
             service_code: service_code,
             step_name: `Thanh toán ${newServiceName}`,
@@ -457,75 +516,7 @@ export class ServiceOrderService {
         }
       }
 
-      if (is_payment !== undefined) {
-        if (is_payment === true && !paymentStep) {
-          if (!newService) {
-            if (orderDetail && orderDetail.service_id) {
-              newService = await this.serviceRepository.findById(
-                orderDetail.service_id,
-              );
-            }
-          }
-          if (newService) {
-            let flowId = clinicalStep?.flow_id;
-            if (!flowId) {
-              const bookingId = existing.booking_id ?? booking_id;
-              if (!bookingId) {
-                throw new Error(
-                  'Không tìm thấy booking_id để xác định flow khi tạo payment step.',
-                );
-              }
-              const booking = await this.bookingRepository.findOne(bookingId);
-              flowId = booking?.flow?.flow_id;
-              if (!flowId) {
-                throw new Error(
-                  'Không tìm thấy flow liên kết với booking để tạo payment step.',
-                );
-              }
-            }
 
-            paymentStep = await this.stepRepository.createParentStep({
-              flow_id: flowId,
-              step_type: 'PAYMENT',
-              service_code: newService.service_code,
-              step_name: `Thanh toán ${newService.service_name}`,
-              service_order_id: id,
-            });
-
-            const newInvoice = await this.invoiceRepository.create({
-              service_order_id: id,
-              total_amount: newService.price,
-              status: 'PENDING',
-            });
-            await this.invoiceDetailRepository.create({
-              invoice_id: newInvoice.invoice_id,
-              item_name: newService.service_name ?? 'Dịch vụ',
-              quantity: 1,
-              unit_price: newService.price,
-              sub_total: newService.price,
-            });
-            if (clinicalStep) {
-              await this.stepRepository.createDependency(
-                clinicalStep.step_id,
-                paymentStep.step_id,
-              );
-            }
-          }
-        } else if (is_payment === false && paymentStep) {
-          if (invoice) {
-            if (invoice.invoice_details) {
-              for (const det of invoice.invoice_details) {
-                await this.invoiceDetailRepository.delete(
-                  det.invoice_detail_id,
-                );
-              }
-            }
-            await this.invoiceRepository.delete(invoice.invoice_id);
-          }
-
-          await this.stepRepository.delete(paymentStep.step_id);
-        }
-      }
 
       if (room_id !== undefined || specialty_id !== undefined) {
         if (room_id) {

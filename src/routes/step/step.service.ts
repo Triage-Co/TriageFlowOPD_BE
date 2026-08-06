@@ -14,9 +14,10 @@ import {
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
-import { QueueTypeEnum, StepStatusEnum, StepTypeEnum } from '@prisma/client';
+import { QueueTypeEnum, StepStatusEnum, StepTypeEnum, FlowStatusEnum } from '@prisma/client';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
 import { QueueService } from '../queue/queue.service';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 const CLS_TYPES = new Set([
   StepTypeEnum.LAB_TEST,
@@ -38,6 +39,7 @@ export class StepService {
 
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async createParentStep(createParentStepReqDto: CreateParentStepReqDto) {
@@ -327,9 +329,22 @@ export class StepService {
   }
 
   async updateStep(stepId: string, updateData: UpdateStepReqDto) {
-    const currentStep = await this.stepRepository.findById(stepId);
+    const currentStep = await this.prisma.step.findUnique({
+      where: { step_id: stepId },
+      include: { flow: true },
+    });
     if (!currentStep) {
       throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+    const flowStatus = currentStep.flow?.status;
+    if (
+      flowStatus &&
+      flowStatus !== FlowStatusEnum.IN_PROGRESS &&
+      flowStatus !== FlowStatusEnum.PENDING
+    ) {
+      throw new BadRequestException(
+        'Không thể cập nhật Step vì flow hiện tại không ở trạng thái IN_PROGRESS hoặc PENDING',
+      );
     }
 
     const updatedStep = await this.stepRepository.update(stepId, updateData);
@@ -346,9 +361,22 @@ export class StepService {
     stepId: string,
     updateStatusDto: UpdateStepStatusReqDto,
   ) {
-    const currentStep = await this.stepRepository.findById(stepId);
+    const currentStep = await this.prisma.step.findUnique({
+      where: { step_id: stepId },
+      include: { flow: true },
+    });
     if (!currentStep) {
       throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+    const flowStatus = currentStep.flow?.status;
+    if (
+      flowStatus &&
+      flowStatus !== FlowStatusEnum.IN_PROGRESS &&
+      flowStatus !== FlowStatusEnum.PENDING
+    ) {
+      throw new BadRequestException(
+        'Không thể cập nhật trạng thái Step vì flow hiện tại không ở trạng thái IN_PROGRESS hoặc PENDING',
+      );
     }
 
     if (updateStatusDto.step_status === StepStatusEnum.COMPLETED) {
