@@ -7,6 +7,7 @@ import {
 import type { IRoomRepository } from '../../shared/interfaces/i-room.repository';
 import { RoomErrors } from '../../shared/exceptions/room.exceptions';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 @Injectable()
 export class RoomService {
@@ -141,7 +142,15 @@ export class RoomService {
     };
 
     if (dateStr) {
-      whereCondition.shift.date = new Date(`${dateStr}T00:00:00Z`);
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const targetDate = new Date(dateStr);
+      const dateFormatted = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+      const start = toDate(`${dateFormatted}T00:00:00`, { timeZone });
+      const end = toDate(`${dateFormatted}T23:59:59.999`, { timeZone });
+      whereCondition.shift.date = {
+        gte: start,
+        lte: end,
+      };
     }
 
     const slots = await this.prismaService.slot.findMany({
