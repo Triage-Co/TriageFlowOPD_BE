@@ -28,6 +28,7 @@ import { PrismaServiceRepository } from './repositories/prisma-service.repositor
 import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
 import { PrismaInvoiceRepository } from './repositories/prisma-invoice.repository';
 import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-detail.repository';
+import { PrismaRoomServiceRepository } from './repositories/prisma.room-service.repository';
 
 @Global()
 @Module({
@@ -127,6 +128,10 @@ import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-det
       provide: 'IInvoiceDetailRepository',
       useClass: PrismaInvoiceDetailRepository,
     },
+    {
+      provide: "IRoomServiceRepository",
+      useClass: PrismaRoomServiceRepository
+    }
   ],
   exports: [
     SupabaseService,
@@ -155,7 +160,8 @@ import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-det
     'IQueueRepository',
     'IInvoiceRepository',
     'IInvoiceDetailRepository',
+    'IRoomServiceRepository',
     PassportModule,
   ],
 })
-export class SharedModule {}
+export class SharedModule { }

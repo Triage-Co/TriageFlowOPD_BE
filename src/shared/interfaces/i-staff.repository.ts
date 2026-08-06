@@ -12,4 +12,5 @@ export interface IStaffRepository {
   ): Promise<any>;
   findAll(): Promise<any>;
   findById(id: string): Promise<any>;
+  findDoctorsBySpecialtyAndDate(specialtyId: string, startTime?: Date, endTime?: Date): Promise<any>;
 }
