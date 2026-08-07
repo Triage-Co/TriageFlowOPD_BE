@@ -118,12 +118,15 @@ export class ServiceOrderService {
       let paymentStep: Step | null = null;
 
       if (is_payment) {
+        const isFree = !service.price || service.price === 0;
+
         paymentStep = await this.stepRepository.createParentStep({
           flow_id: flow.flow_id,
           step_type: StepTypeEnum.PAYMENT,
           service_code: service_code,
           step_name: `Thanh toán ${service.service_name}`,
           service_order_id: serviceOrder.service_order_id,
+          step_status: isFree ? StepStatusEnum.COMPLETED : StepStatusEnum.PENDING,
         });
 
         await this.stepRepository.createDependency(
@@ -133,40 +136,49 @@ export class ServiceOrderService {
 
         const invoice = await this.invoiceRepository.create({
           service_order_id: serviceOrder.service_order_id,
-          total_amount: service.price,
-          status: 'PENDING',
+          total_amount: service.price || 0,
+          status: isFree ? InvoiceStatusEnum.PAID : InvoiceStatusEnum.PENDING,
         });
 
         await this.invoiceDetailRepository.create({
           invoice_id: invoice.invoice_id,
           item_name: service.service_name ?? 'Dịch vụ',
           quantity: 1,
-          unit_price: service.price,
-          sub_total: service.price,
+          unit_price: service.price || 0,
+          sub_total: service.price || 0,
         });
 
-        const paymentLink = await this.transactionService.create({
-          cancelUrl: 'https://triageflow.me/api-docs',
-          returnUrl: 'https://triageflow.me/api-docs',
-          transType: TransTypeEnum.ORDER_PAYMENT,
-          amount: service.price || 0,
-          clientId: booking.patient_id,
-          service_order_id: serviceOrder.service_order_id,
-        });
+        if (isFree) {
+          await this.serviceOrderRepository.update(
+            serviceOrder.service_order_id,
+            {
+              payment_status: 'SUCCESSED',
+            },
+          );
+        } else {
+          const paymentLink = await this.transactionService.create({
+            cancelUrl: 'https://triageflow.me/api-docs',
+            returnUrl: 'https://triageflow.me/api-docs',
+            transType: TransTypeEnum.ORDER_PAYMENT,
+            amount: service.price,
+            clientId: booking.patient_id,
+            service_order_id: serviceOrder.service_order_id,
+          });
 
-        if (!paymentLink || !('data' in paymentLink)) {
-          throw new BadRequestException(
-            (paymentLink?.detail as any)?.error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
+          if (!paymentLink || !('data' in paymentLink)) {
+            throw new BadRequestException(
+              (paymentLink?.detail as any)?.error?.desc ||
+              'Lỗi tạo giao dịch thanh toán',
+            );
+          }
+
+          await this.serviceOrderRepository.update(
+            serviceOrder.service_order_id,
+            {
+              qr_code: paymentLink.data.qrCode,
+            },
           );
         }
-
-        await this.serviceOrderRepository.update(
-          serviceOrder.service_order_id,
-          {
-            qr_code: paymentLink.data.qrCode,
-          },
-        );
       }
 
       let room: any = null;
