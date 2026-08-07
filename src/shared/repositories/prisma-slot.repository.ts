@@ -11,7 +11,7 @@ import { Prisma, Slot } from '@prisma/client';
 export class PrismaSlotRepository implements ISlotRepository {
   constructor(private readonly prismaService: PrismaService) {}
   findAvailableBySlotId(slotId: string): Promise<SlotWithShiftAndRoom | null> {
-    const timeZone = 'asia/Ho_Chi_Minh';
+    const timeZone = 'Asia/Ho_Chi_Minh';
     const now = new Date();
     const currentHours = formatInTimeZone(now, timeZone, 'HH:mm');
     const targetDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
@@ -26,10 +26,10 @@ export class PrismaSlotRepository implements ISlotRepository {
           {
             shift: {
               date: startOfToday,
-              start_time: {
-                gt: currentHours,
-              },
             },
+            start_time: {
+              gt: currentHours
+            }
           },
           {
             shift: {
