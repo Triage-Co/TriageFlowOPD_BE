@@ -368,6 +368,30 @@ export class ServiceOrderService {
     }
   }
 
+  async findOrderServiceByBookingId(bookingId: string) {
+    try {
+      const data =
+        await this.serviceOrderRepository.findOrderServiceByBookingId(
+          bookingId,
+        );
+
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Lấy danh sách Service Order theo booking thành công',
+        data,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Lỗi không xác định';
+
+      throw ServiceOrderErrors.ActionFailed(
+        'Lấy danh sách Service Order theo booking',
+        errorMessage,
+      );
+    }
+  }
+
   async update(id: string, updateServiceOrderReqDto: UpdateServiceOrderReqDto) {
     const existing = await this.serviceOrderRepository.findById(id);
 

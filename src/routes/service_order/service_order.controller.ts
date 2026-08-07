@@ -23,7 +23,7 @@ import {
   UpdateServiceOrderReqDto,
   QueryServiceOrderReqDto,
 } from './dto/req-service_order.dto';
-
+import { roles } from '../../shared/decorator/role.decorator';
 @ApiTags('Service Order')
 @Controller('service-order')
 export class ServiceOrderController {
@@ -72,6 +72,20 @@ export class ServiceOrderController {
     patientId: string,
   ) {
     return this.serviceOrderService.findPendingByPatientId(patientId);
+  }
+
+  @Get('booking/:bookingId')
+  @roles('ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN', 'PHARMACIST', 'RECEPTIONIST')
+  @ApiOperation({
+    summary: 'Lấy danh sách Service Order theo booking (chỉ Admin và Staff)',
+  })
+  @ApiOkResponse({
+    description: 'Lấy danh sách thành công.',
+  })
+  findOrderServiceByBookingId(
+    @Param('bookingId') bookingId: string,
+  ) {
+    return this.serviceOrderService.findOrderServiceByBookingId(bookingId);
   }
 
   @Get(':id')
