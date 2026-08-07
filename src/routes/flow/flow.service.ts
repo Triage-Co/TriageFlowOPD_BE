@@ -24,7 +24,7 @@ export class FlowService {
     private readonly serviceOrderRepository: IServiceOrderRepository,
     @Inject('IServiceRepository')
     private readonly serviceRepository: IServiceRepository,
-  ) {}
+  ) { }
 
   private roundRobinTracker = new Map<string, number>();
 
@@ -446,6 +446,9 @@ export class FlowService {
 
         await saveDependenciesRecursively(templateSteps);
 
+        let rootStepStarted = false;
+        const rootStepIds: string[] = [];
+
         for (const stepId of Array.from(idMapping.values())) {
           const currentStep = await tx.step.findUnique({
             where: { step_id: stepId },
@@ -460,7 +463,11 @@ export class FlowService {
 
           if (dependencyCount == 0) {
             if (!currentStep?.parent_step_id) {
-              isReadyToProgress = true;
+              rootStepIds.push(stepId);
+              if (!rootStepStarted) {
+                isReadyToProgress = true;
+                rootStepStarted = true;
+              }
             } else {
               const parentStep = await tx.step.findUnique({
                 where: { step_id: currentStep.parent_step_id },
@@ -481,6 +488,16 @@ export class FlowService {
               data: { step_status: 'IN_PROGRESS' },
             });
           }
+        }
+
+        // Chain the other root steps sequentially
+        for (let i = 1; i < rootStepIds.length; i++) {
+          await tx.step_Dependency.create({
+            data: {
+              step_id: rootStepIds[i],
+              depends_on_step_id: rootStepIds[i - 1],
+            },
+          });
         }
 
         await tx.flow.update({

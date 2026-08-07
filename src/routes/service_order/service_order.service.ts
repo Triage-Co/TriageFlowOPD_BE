@@ -97,7 +97,11 @@ export class ServiceOrderService {
         });
       }
       const steps = flow.steps;
-      const lastStep = steps[steps.length - 1];
+      const latestStep = await this.prisma.step.findFirst({
+        where: { flow_id: flow.flow_id },
+        orderBy: { created_at: 'desc' },
+      });
+      const lastStep = latestStep || steps[steps.length - 1];
 
       const serviceOrder = await this.serviceOrderRepository.create({
         booking_id,
