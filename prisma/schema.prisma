@@ -255,6 +255,7 @@ model Specialty {
   specialty_code String   @unique
   specialty_name String
   description    String?
+  is_active      Boolean  @default(true)
   createdAt      DateTime @default(now()) @db.Timestamptz()
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz()
 
@@ -265,6 +266,7 @@ model Specialty {
 
   @@index([specialty_code])
   @@index([specialty_name])
+  @@index([is_active])
   @@map("specialty")
 }
 
