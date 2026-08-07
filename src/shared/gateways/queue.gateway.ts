@@ -101,6 +101,17 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const roomId = payload.roomId.trim();
 
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(roomId)) {
+      this.logger.warn(`Client ${client.id} passed non-UUID roomId: ${roomId}`);
+      client.emit('onError', {
+        message: 'roomId phải là UUID phòng hợp lệ (không dùng mã phòng kiểu 101)',
+        roomId,
+      });
+      return;
+    }
+
     // Auto-leave any previous room starting with "room_"
     for (const room of client.rooms) {
       if (room !== client.id && room.startsWith('room_')) {

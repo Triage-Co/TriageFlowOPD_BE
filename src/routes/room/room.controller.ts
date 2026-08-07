@@ -36,8 +36,6 @@ export class RoomController {
   }
 
   @Get()
-  @UseGuards(IsAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Lấy danh sách các phòng logic (hỗ trợ phân trang, sắp xếp và lấy kèm roomCode từ physical room)',
@@ -47,16 +45,12 @@ export class RoomController {
   }
 
   @Get(':id')
-  @UseGuards(IsAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết phòng logic theo ID' })
   findOne(@Param('id') id: string) {
     return this.roomService.findOne(id);
   }
 
   @Get(':id/slots')
-  @UseGuards(IsAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách các slot (khung giờ khám) của một phòng. Có thể lọc theo ngày (YYYY-MM-DD)' })
   getSlotsByRoomId(
     @Param('id') id: string,

@@ -394,8 +394,12 @@ export class QueuePriorityService {
 
     const entries = await db.queue.findMany({
       where: {
-        room_id: roomId,
         status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
+        // Prefer denormalized queue.room_id; also pick up orphans where only step.room_id is set
+        OR: [
+          { room_id: roomId },
+          { room_id: null, step: { room_id: roomId } },
+        ],
       },
       include: {
         step: {
@@ -413,6 +417,18 @@ export class QueuePriorityService {
         },
       },
     });
+
+    // Repair denormalized room_id so TV/socket queries stay consistent
+    const orphanIds = entries.filter((e) => !e.room_id).map((e) => e.queue_id);
+    if (orphanIds.length > 0) {
+      await db.queue.updateMany({
+        where: { queue_id: { in: orphanIds } },
+        data: { room_id: roomId },
+      });
+      for (const e of entries) {
+        if (!e.room_id) e.room_id = roomId;
+      }
+    }
 
     return orderEntries(entries, rules, new Date(), {
       room_type: room?.room_type,

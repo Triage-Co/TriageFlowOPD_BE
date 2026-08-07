@@ -535,12 +535,21 @@ export class QueueService {
         const stepQueue = await tx.queue.findFirst({
           where: {
             step_id: stepId,
-            room_id: roomId,
             status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
+            OR: [
+              { room_id: roomId },
+              { room_id: null },
+            ],
           },
         });
         if (!stepQueue) {
           throw new BadRequestException('Lượt khám không hợp lệ, không đúng phòng ban hoặc đã được xử lý.');
+        }
+        if (!stepQueue.room_id) {
+          await tx.queue.update({
+            where: { queue_id: stepQueue.queue_id },
+            data: { room_id: roomId },
+          });
         }
         nextQueueId = stepQueue.queue_id;
       } else {
@@ -612,10 +621,31 @@ export class QueueService {
   }
 
   async getRoomDisplayPayload(roomId: string, staffId?: string) {
+    // Heal orphans first so upcoming/current queries by room_id stay consistent
+    await this.prisma.queue.updateMany({
+      where: {
+        room_id: null,
+        status: {
+          in: [
+            QueueStatusEnum.PENDING,
+            QueueStatusEnum.QUEUED,
+            QueueStatusEnum.CALLED,
+            QueueStatusEnum.SERVING,
+            QueueStatusEnum.MISSING,
+          ],
+        },
+        step: { room_id: roomId },
+      },
+      data: { room_id: roomId },
+    });
+
     const currentQueue = await this.prisma.queue.findFirst({
       where: {
-        room_id: roomId,
         status: { in: [QueueStatusEnum.SERVING, QueueStatusEnum.CALLED] },
+        OR: [
+          { room_id: roomId },
+          { room_id: null, step: { room_id: roomId } },
+        ],
       },
       include: {
         step: {
@@ -672,6 +702,7 @@ export class QueueService {
       upcoming_patients: upcomingOrder.slice(0, 5).map((entry) => {
         const etaInfo = etaMap.get(entry.queue.queue_id);
         return {
+          queue_id: entry.queue.queue_id,
           queue_number: entry.queue.queue_number,
           patient_name: (entry.queue as any).step?.flow?.booking?.patient?.full_name || '---',
           queue_type: entry.queue.queue_type,
