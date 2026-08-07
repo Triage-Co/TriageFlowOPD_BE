@@ -44,16 +44,16 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
 
     return rawOrders.map(order => {
       const room = order.booking?.slot?.shift?.room;
-      
+
       return {
         service_order_id: order.service_order_id,
-        service_name: order.name, 
-        room_id: room?.room_id || null, 
+        service_name: order.name,
+        room_id: room?.room_id || null,
         room_name: room?.room_name || null,
-        specialty_id: room?.specialty?.specialty_id || null, 
-        specialty_name: room?.specialty?.specialty_name || null, 
-        is_payment: order.payment_status, 
-        staff_name: order.staff?.full_name || null, 
+        specialty_id: room?.specialty?.specialty_id || null,
+        specialty_name: room?.specialty?.specialty_name || null,
+        is_payment: order.payment_status,
+        staff_name: order.staff?.full_name || null,
       };
     });
   }
@@ -138,12 +138,57 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
     };
   }
 
-  async findById(id: string): Promise<Partial<Service_Order> | null> {
-    return await this.prismaService.service_Order.findUnique({
+  async findById(id: string): Promise<any | null> {
+    const rawData = await this.prismaService.service_Order.findUnique({
       where: {
         service_order_id: id,
       },
+      include: {
+        staff: true,
+        serviceOrderDetails: true,
+        booking: {
+          select: {
+            slot: {
+              select: {
+                shift: {
+                  select: {
+                    room: {
+                      select: {
+                        room_id: true,
+                        room_name: true,
+                        room_type: true,
+                        specialty: {
+                          select: {
+                            specialty_name: true,
+                            specialty_id: true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     });
+
+    if (!rawData) return null;
+
+    const room = rawData.booking?.slot?.shift?.room;
+
+    return {
+      ...rawData,
+      status: rawData.status,
+      service_name: rawData.name,
+      room_id: room?.room_id || null,
+      room_name: room?.room_name || null,
+      specialty_id: room?.specialty?.specialty_id || null,
+      specialty_name: room?.specialty?.specialty_name || null,
+      is_payment: rawData.payment_status,
+      staff_name: rawData.staff?.full_name || null,
+    };
   }
 
   async findPendingByPatientId(patientId: string): Promise<any[]> {
