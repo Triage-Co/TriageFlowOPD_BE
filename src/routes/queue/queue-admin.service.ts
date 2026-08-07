@@ -1,11 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
-  ClinicalRoomType,
   Prisma,
   QueueRuleTypeEnum,
   QueueStatusEnum,
@@ -165,7 +165,7 @@ export class QueueAdminService {
           data: updated,
         };
       } else {
-        throw new BadRequestException({
+        throw new ConflictException({
           message: 'Mã quy tắc đã tồn tại',
           detail: `rule_code '${dto.rule_code}' đã tồn tại và đang hoạt động.`,
         });
@@ -323,6 +323,13 @@ export class QueueAdminService {
       });
     }
 
+    if (!service.is_active) {
+      throw new ConflictException({
+        message: 'Không thể gán dịch vụ đã bị vô hiệu hóa cho phòng',
+        detail: `Dịch vụ '${service.service_name ?? service.service_id}' hiện đang bị tắt (is_active=false).`,
+      });
+    }
+
     const existing = await this.prisma.room_Service.findUnique({
       where: {
         room_id_service_id: {
@@ -332,32 +339,40 @@ export class QueueAdminService {
       },
     });
 
+    let mapping;
+    let isReactivated = false;
     if (existing) {
-      throw new BadRequestException({
-        message: 'Phân công dịch vụ cho phòng này đã tồn tại.',
+      // Upsert/reactivate thay vì báo lỗi trùng lặp
+      mapping = await this.prisma.room_Service.update({
+        where: { id: existing.id },
+        data: { is_active: true },
+        include: { room: true, service: true },
+      });
+      isReactivated = true;
+    } else {
+      mapping = await this.prisma.room_Service.create({
+        data: {
+          room_id: dto.room_id,
+          service_id: dto.service_id,
+          is_active: true,
+        },
+        include: { room: true, service: true },
       });
     }
 
-    const created = await this.prisma.room_Service.create({
-      data: {
-        room_id: dto.room_id,
-        service_id: dto.service_id,
-        is_active: true,
-      },
-      include: { room: true, service: true },
-    });
-
-    const isClinical = room.room_type === ClinicalRoomType.CLINICAL_ROOM;
-    const warning = isClinical
-      ? 'Cảnh báo: Phòng thuộc loại CLINICAL_ROOM, tính năng load balancing tự động sẽ không áp dụng cho phòng khám lâm sàng.'
-      : undefined;
+    const warning =
+      service.room_type && service.room_type !== room.room_type
+        ? `Cảnh báo: Loại dịch vụ (${service.room_type}) không khớp với loại phòng (${room.room_type}).`
+        : undefined;
 
     return {
-      code: 201,
+      code: isReactivated ? 200 : 201,
       status: 'success',
-      message: 'Tạo phân công dịch vụ phòng thành công.',
+      message: isReactivated
+        ? 'Kích hoạt lại phân công dịch vụ phòng thành công.'
+        : 'Tạo phân công dịch vụ phòng thành công.',
       warning,
-      data: created,
+      data: mapping,
     };
   }
 

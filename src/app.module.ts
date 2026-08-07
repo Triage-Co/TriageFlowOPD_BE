@@ -40,6 +40,7 @@ import { InvoiceDetailModule } from './routes/invoice_detail/invoice_detail.modu
 import { PharmacyModule } from './routes/pharmacy/pharmacy.module';
 import { TicketModule } from './routes/ticket/ticket.module';
 import { ExamPackageModule } from './routes/exam-package/exam-package.module';
+import { AdminDashboardModule } from './routes/admin-dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -110,6 +111,7 @@ import { ExamPackageModule } from './routes/exam-package/exam-package.module';
     PharmacyModule,
     TicketModule,
     ExamPackageModule,
+    AdminDashboardModule,
   ],
 })
 export class AppModule {}

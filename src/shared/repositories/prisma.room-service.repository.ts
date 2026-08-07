@@ -9,7 +9,9 @@ export class PrismaRoomServiceRepository implements IRoomServiceRepository {
     findOneByRoomId(roomId: string): Promise<RoomServiceWithRoomAndService | null> {
         return this.prismaService.room_Service.findFirst({
             where: {
-                room_id: roomId
+                room_id: roomId,
+                is_active: true,
+                service: { is_active: true },
             },
             include: {
                 room: true,

@@ -154,6 +154,10 @@ export class MedicineService {
       }
     }
 
+    if (updateMedicineDto.is_active === false) {
+      await this.assertNoPrescriptionDetailRefs(id);
+    }
+
     return this.prismaService.medicine.update({
       where: { medicine_id: id },
       data: updateMedicineDto,
@@ -170,9 +174,22 @@ export class MedicineService {
 
   async remove(id: string) {
     await this.findOne(id);
+    await this.assertNoPrescriptionDetailRefs(id);
     return this.prismaService.medicine.update({
       where: { medicine_id: id },
       data: { is_active: false },
     });
+  }
+
+  private async assertNoPrescriptionDetailRefs(id: string) {
+    const count = await this.prismaService.prescription_Detail.count({
+      where: { medicine_id: id },
+    });
+    if (count > 0) {
+      throw new ConflictException({
+        message: 'Không thể vô hiệu hóa thuốc vì còn tham chiếu trong đơn thuốc',
+        detail: `prescriptionDetails=${count}`,
+      });
+    }
   }
 }

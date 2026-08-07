@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { StepTypeEnum } from '@prisma/client';
 
 export class CallPatientDto {
@@ -66,10 +66,11 @@ export class UpdateRoomStatDto {
   @IsEnum(StepTypeEnum, { message: 'step_type không hợp lệ' })
   step_type: StepTypeEnum;
 
-  @ApiProperty({ example: 900, description: 'Thời gian phục vụ mặc định tính bằng giây' })
+  @ApiProperty({ example: 900, description: 'Thời gian phục vụ mặc định tính bằng giây (60 - 7200)' })
   @IsNotEmpty({ message: 'default_duration_sec không được để trống' })
   @IsInt({ message: 'default_duration_sec phải là số nguyên' })
-  @Min(30, { message: 'default_duration_sec phải lớn hơn hoặc bằng 30' })
+  @Min(60, { message: 'default_duration_sec phải lớn hơn hoặc bằng 60 (1 phút)' })
+  @Max(7200, { message: 'default_duration_sec phải nhỏ hơn hoặc bằng 7200 (2 giờ)' })
   default_duration_sec: number;
 }
 

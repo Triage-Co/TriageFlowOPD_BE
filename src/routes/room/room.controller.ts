@@ -7,8 +7,13 @@ import {
   Param,
   Delete,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { RoleTypeEnum } from '@prisma/client';
+import { roles } from '../../shared/decorator/role.decorator';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { RoomService } from './room.service';
 import {
   CreateRoomRequestDto,
@@ -22,12 +27,17 @@ export class RoomController {
   constructor(private readonly roomService: RoomService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Tạo phòng logic mới' })
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Tạo phòng logic mới' })
   create(@Body() createRoomRequestDto: CreateRoomRequestDto) {
     return this.roomService.create(createRoomRequestDto);
   }
 
   @Get()
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary:
       'Lấy danh sách các phòng logic (hỗ trợ phân trang, sắp xếp và lấy kèm roomCode từ physical room)',
@@ -37,12 +47,16 @@ export class RoomController {
   }
 
   @Get(':id')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết phòng logic theo ID' })
   findOne(@Param('id') id: string) {
     return this.roomService.findOne(id);
   }
 
   @Get(':id/slots')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách các slot (khung giờ khám) của một phòng. Có thể lọc theo ngày (YYYY-MM-DD)' })
   getSlotsByRoomId(
     @Param('id') id: string,
@@ -52,8 +66,11 @@ export class RoomController {
   }
 
   @Patch(':id')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room',
+    summary: '[ADMIN] Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room',
   })
   update(
     @Param('id') id: string,
@@ -63,7 +80,10 @@ export class RoomController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Xóa phòng logic theo ID' })
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Xóa phòng logic theo ID' })
   remove(@Param('id') id: string) {
     return this.roomService.remove(id);
   }
