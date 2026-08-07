@@ -12,6 +12,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -24,6 +25,36 @@ import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 @Controller('ticket')
 export class TicketController {
   constructor(private readonly ticketService: TicketService) {}
+
+  @Get('patient/:patientId')
+  @ApiOperation({
+    summary: 'Tra cứu thông tin vé (Ticket) theo Patient ID để in lại vé',
+    description:
+      'Trả về thông tin chi tiết vé khám (mã ticket, thông tin bệnh nhân, số thứ tự hàng chờ, bước khám hiện tại, các bước khám) theo patient_id để phục vụ in lại vé khi bị mất vé vật lý.',
+  })
+  @ApiParam({
+    name: 'patientId',
+    description: 'ID của bệnh nhân (UUID)',
+    example: 'd9b2b3a1-1234-5678-90ab-cdef12345678',
+  })
+  async getTicketByPatientId(@Param('patientId') patientId: string) {
+    return this.ticketService.getTicketByPatientId(patientId);
+  }
+
+  @Get('by-patient')
+  @ApiOperation({
+    summary: 'Tra cứu thông tin vé (Ticket) theo query param patient_id',
+    description:
+      'Trả về thông tin chi tiết vé khám theo query param patient_id để phục vụ in lại vé vật lý.',
+  })
+  @ApiQuery({
+    name: 'patient_id',
+    description: 'ID của bệnh nhân (UUID)',
+    required: true,
+  })
+  async getTicketByPatientQuery(@Query('patient_id') patientId: string) {
+    return this.ticketService.getTicketByPatientId(patientId);
+  }
 
   @Get(':code')
   @ApiOperation({
