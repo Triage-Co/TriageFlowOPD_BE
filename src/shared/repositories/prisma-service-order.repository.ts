@@ -5,7 +5,59 @@ import { IServiceOrderRepository } from '../interfaces/i-service-order.repositor
 
 @Injectable()
 export class PrismaServiceOrderRepository implements IServiceOrderRepository {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prismaService: PrismaService) { }
+  async findOrderServiceByBookingId(booking_id: string): Promise<any[]> {
+    const rawOrders = await this.prismaService.service_Order.findMany({
+      where: {
+        booking_id: booking_id,
+      },
+      include: {
+        staff: true,
+        serviceOrderDetails: true,
+        booking: {
+          select: {
+            slot: {
+              select: {
+                shift: {
+                  select: {
+                    room: {
+                      select: {
+                        room_id: true,
+                        room_name: true,
+                        room_type: true,
+                        specialty: {
+                          select: {
+                            specialty_name: true,
+                            specialty_id: true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return rawOrders.map(order => {
+      const room = order.booking?.slot?.shift?.room;
+      
+      return {
+        service_order_id: order.service_order_id,
+        service_name: order.name, 
+        room_id: room?.room_id || null, 
+        room_name: room?.room_name || null,
+        specialty_id: room?.specialty?.specialty_id || null, 
+        specialty_name: room?.specialty?.specialty_name || null, 
+        is_payment: order.payment_status, 
+        staff_name: order.staff?.full_name || null, 
+      };
+    });
+  }
+
   delete(id: string, tx?: Prisma.TransactionClient): Promise<Service_Order> {
     const db = tx || this.prismaService;
 
@@ -117,15 +169,7 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
       include: {
         serviceOrderDetails: {
           include: {
-            service: {
-              include: {
-                roomServices: {
-                  include: {
-                    room: true,
-                  }
-                }
-              }
-            },
+            service: true,
           },
         },
       },
@@ -134,4 +178,6 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
       },
     });
   }
+
+
 }
