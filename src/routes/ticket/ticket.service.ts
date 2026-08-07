@@ -31,7 +31,7 @@ export class TicketService {
 
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
-  ) {}
+  ) { }
 
   /**
    * 1. GET /ticket/:code - Tra cứu thông tin cơ bản phiếu khám
@@ -137,21 +137,21 @@ export class TicketService {
         created_at: flow.created_at,
         patient: patient
           ? {
-              patient_id: patient.patient_id,
-              full_name: patient.full_name,
-              citizen_id: patient.citizen_id,
-              gender: patient.gender,
-              dob: patient.dob,
-            }
+            patient_id: patient.patient_id,
+            full_name: patient.full_name,
+            citizen_id: patient.citizen_id,
+            gender: patient.gender,
+            dob: patient.dob,
+          }
           : null,
         current_step: currentStep
           ? {
-              step_id: currentStep.step_id,
-              step_name: currentStep.step_name,
-              step_status: currentStep.step_status,
-              room_name: currentStep.room?.room_name || 'Đang cập nhật',
-              staff_name: currentStep.staff?.full_name || 'Đang cập nhật',
-            }
+            step_id: currentStep.step_id,
+            step_name: currentStep.step_name,
+            step_status: currentStep.step_status,
+            room_name: currentStep.room?.room_name || 'Đang cập nhật',
+            staff_name: currentStep.staff?.full_name || 'Đang cập nhật',
+          }
           : null,
         queue_info: queueInfo,
         progress_summary: {
