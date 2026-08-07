@@ -117,7 +117,15 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
       include: {
         serviceOrderDetails: {
           include: {
-            service: true,
+            service: {
+              include: {
+                roomServices: {
+                  include: {
+                    room: true,
+                  }
+                }
+              }
+            },
           },
         },
       },
