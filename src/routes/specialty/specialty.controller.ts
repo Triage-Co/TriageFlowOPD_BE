@@ -31,16 +31,12 @@ export class SpecialtyController {
   constructor(private readonly specialtyService: SpecialtyService) {}
 
   @Get()
-  @UseGuards(IsAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách chuyên khoa' })
   findAll(@Query() query: QuerySpecialtyDto) {
     return this.specialtyService.findAll(query);
   }
 
   @Get(':id')
-  @UseGuards(IsAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Chi tiết chuyên khoa' })
   findOne(@Param('id') id: string) {
     return this.specialtyService.findOne(id);
