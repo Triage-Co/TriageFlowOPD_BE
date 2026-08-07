@@ -663,9 +663,11 @@ export class QueueService {
       include: { specialty: true },
     });
 
-    const staff = staffId
-      ? await this.prisma.staff.findUnique({ where: { staff_id: staffId } })
-      : currentQueue?.step?.staff;
+    const staff = await this.resolveRoomDisplayDoctor(
+      roomId,
+      staffId,
+      currentQueue?.step?.staff ?? null,
+    );
 
     const upcomingOrder = await this.queuePriorityService.computeQueueOrder(roomId);
     const roomEta = await this.queueEtaService.computeEtaForRoom(roomId);
@@ -712,6 +714,60 @@ export class QueueService {
       }),
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Resolve doctor name for TV room display.
+   * Priority: valid staffId UUID → staff on current serving step → shift on duty today.
+   */
+  private async resolveRoomDisplayDoctor(
+    roomId: string,
+    staffId?: string,
+    servingStepStaff?: { staff_id: string; full_name: string } | null,
+  ) {
+    const staffIdUuid =
+      staffId &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        staffId,
+      )
+        ? staffId
+        : undefined;
+
+    if (staffIdUuid) {
+      const byId = await this.prisma.staff.findUnique({
+        where: { staff_id: staffIdUuid },
+      });
+      if (byId) return byId;
+    }
+
+    if (servingStepStaff?.full_name) {
+      return servingStepStaff;
+    }
+
+    const now = new Date();
+    const startOfDay = getStartOfDayVn(now);
+    const endOfDay = getEndOfDayVn(now);
+    const nowHm = formatInTimeZone(now, VN_TZ, 'HH:mm');
+
+    const shiftsToday = await this.prisma.shift.findMany({
+      where: {
+        room_id: roomId,
+        date: { gte: startOfDay, lte: endOfDay },
+      },
+      include: { staff: true },
+      orderBy: { start_time: 'asc' },
+    });
+
+    const covering = shiftsToday.find(
+      (s) =>
+        !!s.staff &&
+        s.start_time <= nowHm &&
+        nowHm < s.end_time,
+    );
+    if (covering?.staff) return covering.staff;
+
+    // Fallback: any assigned shift today (before/after exact window)
+    return shiftsToday.find((s) => s.staff)?.staff ?? null;
   }
 
   async transferQueue(
