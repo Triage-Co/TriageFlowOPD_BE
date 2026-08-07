@@ -24,7 +24,7 @@ import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @Controller('patient')
 export class PatientController {
-  constructor(private readonly patientService: PatientService) {}
+  constructor(private readonly patientService: PatientService) { }
 
   @Get('kiosk')
   @ApiBearerAuth()
@@ -109,6 +109,7 @@ export class PatientController {
     'RECEPTIONIST',
   )
   @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] tạo bệnh nhân',
   })
@@ -127,6 +128,7 @@ export class PatientController {
     'RECEPTIONIST',
   )
   @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy tất cả bệnh nhân',
   })
@@ -144,6 +146,7 @@ export class PatientController {
     'RECEPTIONIST',
   )
   @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy bệnh nhân theo patient id',
   })
@@ -161,6 +164,7 @@ export class PatientController {
     'RECEPTIONIST',
   )
   @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] cập nhật bệnh nhân theo patient id',
   })
@@ -182,6 +186,7 @@ export class PatientController {
     'RECEPTIONIST',
   )
   @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] xóa bệnh nhân theo patient id',
   })

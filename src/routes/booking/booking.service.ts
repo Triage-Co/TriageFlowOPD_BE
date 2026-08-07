@@ -132,6 +132,10 @@ export class BookingService {
         tx,
       );
 
+      if (slot.capacity <= 0) {
+        throw SlotErrors.SlotFullError();
+      }
+
       await this.SlotRepository.update(
         slot_id,
         {
@@ -143,7 +147,7 @@ export class BookingService {
       );
 
       const ticketCode = this.generateTicketCode();
-      
+
       const flow = await this.flowRepository.create(
         {
           booking_id: booking.booking_id,

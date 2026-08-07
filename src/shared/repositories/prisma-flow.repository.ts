@@ -42,6 +42,7 @@ export class PrismaFlowRepository implements IFlowRepository {
 
     const start = toDate(`${currentDate}T00:00:00`, { timeZone });
     const end = toDate(`${currentDate}T23:59:59`, { timeZone });
+   
     return this.prismaService.flow.findMany({
       where: {
         status: {
