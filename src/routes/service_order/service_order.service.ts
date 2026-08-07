@@ -11,8 +11,13 @@ import {
   ServiceOrderStatusEnum,
   Step,
   StepTypeEnum,
+  StepStatusEnum,
   TransTypeEnum,
   FlowStatusEnum,
+  ServiceOrderDetailStatusEnum,
+  TransStatusEnum,
+  InvoiceStatusEnum,
+  PrescriptionStatusEnum,
 } from '@prisma/client';
 import type { IBookingRepository } from '../../shared/interfaces/i-booking.repository';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
@@ -60,7 +65,7 @@ export class ServiceOrderService {
     private readonly specialtyRepository: ISpecialtyRepository,
     @Inject('IRoomRepository')
     private readonly roomRepository: IRoomRepository,
-  ) {}
+  ) { }
 
   async create(createServiceOrderReqDto: CreateServiceOrderReqDto) {
     const {
@@ -152,7 +157,7 @@ export class ServiceOrderService {
         if (!paymentLink || !('data' in paymentLink)) {
           throw new BadRequestException(
             (paymentLink?.detail as any)?.error?.desc ||
-              'Lỗi tạo giao dịch thanh toán',
+            'Lỗi tạo giao dịch thanh toán',
           );
         }
 
@@ -250,12 +255,12 @@ export class ServiceOrderService {
           service.room_type === ClinicalRoomType.LABORATORY
             ? StepTypeEnum.LAB_TEST
             : service.room_type === ClinicalRoomType.IMAGING_ROOM
-            ? StepTypeEnum.IMAGING
-            : service.room_type === ClinicalRoomType.PROCEDURE_ROOM
-            ? StepTypeEnum.PROCEDURE
-            : service.room_type === ClinicalRoomType.FUNCTIONAL_EXPLORATION
-            ? StepTypeEnum.FUNCTIONAL_EXPLORATION
-            : StepTypeEnum.CLINICAL;
+              ? StepTypeEnum.IMAGING
+              : service.room_type === ClinicalRoomType.PROCEDURE_ROOM
+                ? StepTypeEnum.PROCEDURE
+                : service.room_type === ClinicalRoomType.FUNCTIONAL_EXPLORATION
+                  ? StepTypeEnum.FUNCTIONAL_EXPLORATION
+                  : StepTypeEnum.CLINICAL;
 
         const step = await this.stepRepository.createParentStep({
           flow_id: flow.flow_id,
@@ -590,20 +595,75 @@ export class ServiceOrderService {
       throw ServiceOrderErrors.ServiceOrderNotFoundById(id);
     }
 
+    if (existing.payment_status === 'SUCCESSED') {
+      throw ServiceOrderErrors.ActionFailed(
+        'Hủy Service Order',
+        'Không thể hủy Service Order đã thanh toán thành công'
+      );
+    }
+
     try {
       await this.serviceOrderRepository.delete(id);
+
+      await this.prisma.step.updateMany({
+        where: { service_order_id: id },
+        data: { step_status: StepStatusEnum.CANCELLED },
+      });
+
+      await this.prisma.service_Order_Detail.updateMany({
+        where: {
+          service_order_id: id
+        },
+        data: {
+          status: ServiceOrderDetailStatusEnum.CANCELLED
+        }
+      });
+
+      await this.prisma.invoice.updateMany({
+        where: { service_order_id: id, status: InvoiceStatusEnum.PENDING },
+        data: { status: InvoiceStatusEnum.CANCELLED },
+      });
+
+      await this.prisma.transaction.updateMany({
+        where: {
+          service_order_id: id,
+          status: TransStatusEnum.PENDING
+        },
+        data: { status: TransStatusEnum.CANCELLED },
+      });
+
+      await this.prisma.prescription.updateMany({
+        where: { service_order_id: id, status: PrescriptionStatusEnum.PENDING },
+        data: { status: PrescriptionStatusEnum.CANCELLED },
+      });
+
+      const cancelledSteps = await this.prisma.step.findMany({
+        where: { service_order_id: id },
+        select: { step_id: true }
+      });
+      const stepIds = cancelledSteps.map(s => s.step_id);
+
+      if (stepIds.length > 0) {
+        await this.prisma.queue.updateMany({
+          where: {
+            step_id: { in: stepIds },
+            status: StepStatusEnum.PENDING
+          },
+          data: { status: StepStatusEnum.CANCELLED },
+        });
+      }
 
       return {
         code: 200,
         status: 'success',
-        message: 'Xóa Service Order thành công',
+        message: 'Hủy Service Order và các dữ liệu liên quan thành công',
         data: null,
       };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Lỗi không xác định';
 
-      throw ServiceOrderErrors.ActionFailed('Xóa Service Order', errorMessage);
+      throw ServiceOrderErrors.ActionFailed('Hủy Service Order', errorMessage);
     }
   }
 }

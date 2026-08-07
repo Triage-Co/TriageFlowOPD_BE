@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
-import { Prisma, RoleTypeEnum, Service_Order } from '@prisma/client';
+import { Prisma, RoleTypeEnum, Service_Order, ServiceOrderStatusEnum } from '@prisma/client';
 import { IServiceOrderRepository } from '../interfaces/i-service-order.repository';
 
 @Injectable()
@@ -61,10 +61,13 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
   delete(id: string, tx?: Prisma.TransactionClient): Promise<Service_Order> {
     const db = tx || this.prismaService;
 
-    return db.service_Order.delete({
+    return db.service_Order.update({
       where: {
         service_order_id: id,
       },
+      data: {
+        status: ServiceOrderStatusEnum.CANCELLED
+      }
     });
   }
   create(
