@@ -7,6 +7,8 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -15,6 +17,10 @@ export class CreateMedicineDto {
   @ApiProperty({ description: 'Mã thuốc (duy nhất)', example: 'MED-PAR-500' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(64, { message: 'medicine_code tối đa 64 ký tự' })
+  @Matches(/^[A-Z0-9_-]+$/, {
+    message: 'medicine_code chỉ chứa chữ in hoa, số, gạch dưới và gạch ngang',
+  })
   medicine_code: string;
 
   @ApiProperty({
@@ -23,6 +29,7 @@ export class CreateMedicineDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200, { message: 'medicine_name tối đa 200 ký tự' })
   medicine_name: string;
 
   @ApiPropertyOptional({
