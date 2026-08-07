@@ -12,10 +12,20 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { QueueService } from '../../routes/queue/queue.service';
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const getCorsOrigins = (): string[] | string => {
   const allowed = process.env.WS_ALLOWED_ORIGINS;
   if (!allowed) {
-    return ['http://localhost:3000', 'http://localhost:8000'];
+    // FE often runs on 3001 when BE takes 3000
+    return [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8000',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+    ];
   }
   const origins = allowed.split(',').map((o) => o.trim()).filter(Boolean);
   return origins.length > 0 ? origins : '*';
@@ -101,15 +111,24 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const roomId = payload.roomId.trim();
 
-    const uuidRe =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRe.test(roomId)) {
+    if (!UUID_RE.test(roomId)) {
       this.logger.warn(`Client ${client.id} passed non-UUID roomId: ${roomId}`);
       client.emit('onError', {
         message: 'roomId phải là UUID phòng hợp lệ (không dùng mã phòng kiểu 101)',
         roomId,
       });
       return;
+    }
+
+    // Ignore non-UUID staffId (e.g. auth email) — TV does not need it for queue numbers
+    const staffId =
+      payload.staffId && UUID_RE.test(payload.staffId.trim())
+        ? payload.staffId.trim()
+        : undefined;
+    if (payload.staffId && !staffId) {
+      this.logger.warn(
+        `Client ${client.id} sent non-UUID staffId "${payload.staffId}" — ignored for TV payload`,
+      );
     }
 
     // Auto-leave any previous room starting with "room_"
@@ -127,7 +146,7 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const currentState = await this.queueService.getRoomDisplayPayload(
         roomId,
-        payload.staffId,
+        staffId,
       );
       client.emit('onQueueUpdate', currentState);
     } catch (error: any) {
@@ -157,4 +176,3 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`room_${toRoomId}`).emit('onRebalanceResolved', data);
   }
 }
-
