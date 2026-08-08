@@ -79,7 +79,7 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  page?: number = 1;
+  page?: number ;
 
   @ApiPropertyOptional({
     name: 'limit',
@@ -90,5 +90,5 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  limit?: number = 10;
+  limit?: number;
 }

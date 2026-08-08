@@ -77,24 +77,24 @@ export class QueryServiceReqDto {
   @ApiPropertyOptional({
     name: 'page',
     example: 1,
-    description: 'Số trang hiện tại',
+    description: 'Số trang hiện tại (nếu bỏ trống sẽ lấy tất cả)',
   })
   @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  page?: number = 1;
+  page?: number;
 
   @ApiPropertyOptional({
     name: 'limit',
     example: 10,
-    description: 'Số lượng bản ghi trên một trang',
+    description: 'Số lượng bản ghi trên một trang (nếu bỏ trống sẽ lấy tất cả)',
   })
   @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  limit?: number = 10;
+  limit?: number;
 
   @ApiPropertyOptional({
     name: 'service_type',
