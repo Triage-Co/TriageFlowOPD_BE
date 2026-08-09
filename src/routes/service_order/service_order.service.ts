@@ -72,7 +72,6 @@ export class ServiceOrderService {
       service_code,
       specialty_id,
       booking_id,
-      name,
       assign_by_staff_id,
       room_id: assigned_room_id,
     } = createServiceOrderReqDto;
@@ -319,19 +318,37 @@ export class ServiceOrderService {
             }
           }
 
-          const cStep = existingOrder.steps.find((s: any) => s.room_id === room.room_id && s.step_type !== StepTypeEnum.PAYMENT);
-          if (cStep) {
-            const newStepName = cStep.step_name ? `${cStep.step_name}, ${service.service_name}` : service.service_name;
-            await this.stepRepository.update(cStep.step_id, {
-              step_name: newStepName
-            });
-          }
+          const targetStepType =
+            service.room_type === ClinicalRoomType.LABORATORY
+              ? StepTypeEnum.LAB_TEST
+              : service.room_type === ClinicalRoomType.IMAGING_ROOM
+                ? StepTypeEnum.IMAGING
+                : service.room_type === ClinicalRoomType.PROCEDURE_ROOM
+                  ? StepTypeEnum.PROCEDURE
+                  : service.room_type === ClinicalRoomType.FUNCTIONAL_EXPLORATION
+                    ? StepTypeEnum.FUNCTIONAL_EXPLORATION
+                    : StepTypeEnum.CLINICAL;
 
-          const pStep = existingOrder.steps.find((s: any) => s.step_type === StepTypeEnum.PAYMENT);
-          if (pStep) {
+          const pStepRef = existingOrder.steps.find((s: any) => s.step_type === StepTypeEnum.PAYMENT);
 
-            const newPStepName = pStep.step_name ? `${pStep.step_name}, ${service.service_name}` : `Thanh toán ${service.service_name}`;
-            await this.stepRepository.update(pStep.step_id, {
+          const newStep = await this.stepRepository.createParentStep({
+            flow_id: existingOrder.steps[0]?.flow_id || flow.flow_id,
+            step_type: targetStepType,
+            step_name: service.service_name,
+            service_code: service_code,
+            room_id: room.room_id,
+            staff_id: stepStaffId,
+            service_order_id: existingOrder.service_order_id,
+          });
+
+          await this.stepRepository.createDependency(
+            newStep.step_id,
+            pStepRef?.step_id ?? lastStep.step_id,
+          );
+
+          if (pStepRef) {
+            const newPStepName = pStepRef.step_name ? `${pStepRef.step_name}, ${service.service_name}` : `Thanh toán ${service.service_name}`;
+            await this.stepRepository.update(pStepRef.step_id, {
               step_name: newPStepName
             });
           }
@@ -350,9 +367,21 @@ export class ServiceOrderService {
         }
       }
 
+      const orderTargetStepType =
+        service.room_type === ClinicalRoomType.LABORATORY
+          ? StepTypeEnum.LAB_TEST
+          : service.room_type === ClinicalRoomType.IMAGING_ROOM
+            ? StepTypeEnum.IMAGING
+            : service.room_type === ClinicalRoomType.PROCEDURE_ROOM
+              ? StepTypeEnum.PROCEDURE
+              : service.room_type === ClinicalRoomType.FUNCTIONAL_EXPLORATION
+                ? StepTypeEnum.FUNCTIONAL_EXPLORATION
+                : StepTypeEnum.CLINICAL;
+
       const serviceOrder = await this.serviceOrderRepository.create({
         booking_id,
-        name,
+        name: service.service_name,
+        type: orderTargetStepType,
         assign_by_staff_id,
         status: ServiceOrderStatusEnum.PENDING,
       });

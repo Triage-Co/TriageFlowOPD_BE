@@ -25,12 +25,6 @@ export class CreateServiceOrderReqDto {
   })
   assign_by_staff_id: string;
 
-  @IsString()
-  @ApiProperty({
-    example: 'Xét nghiệm máu',
-    description: 'Tên của Service Order',
-  })
-  name: string;
 
   @IsString()
   @ApiProperty({
