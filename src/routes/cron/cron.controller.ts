@@ -14,15 +14,16 @@ import {
 import envInstance from '../../shared/config/env.config';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 
 @Controller('cron')
 export class CronController {
-  constructor(private readonly cronService: CronService) {}
+  constructor(private readonly cronService: CronService) { }
 
   @Get('update-flows')
   @ApiBearerAuth()
   @roles('ADMIN')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   updateFlowAndStepExpiredWithCron() {
     return this.cronService.updateFlowAndStepExpired();
   }
@@ -30,7 +31,7 @@ export class CronController {
   @Get('update-transactions')
   @ApiBearerAuth()
   @roles('ADMIN')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   updateTransactionStatusWithCron() {
     return this.cronService.updateTransactionStatus();
   }
@@ -38,7 +39,7 @@ export class CronController {
   @Get('update-prescriptions')
   @ApiBearerAuth()
   @roles('ADMIN')
-  @UseGuards(IsRoleGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   updatePrescriptionExpiredWithCron() {
     return this.cronService.updatePrescriptionExpired();
   }

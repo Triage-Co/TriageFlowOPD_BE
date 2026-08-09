@@ -4,6 +4,7 @@ import { QueueRebalanceService } from '../queue/queue-rebalance.service';
 import {
   BookingStatusEnum,
   FlowStatusEnum,
+  InvoiceStatusEnum,
   PaymentStatusEnum,
   PrescriptionStatusEnum,
   ServiceOrderDetailStatusEnum,
@@ -47,10 +48,12 @@ export class CronService {
         },
         select: {
           flow_id: true,
+          booking_id: true,
         },
       });
 
       const flowIds = expiredFlows.map((f) => f.flow_id);
+      const bookingIds = expiredFlows.map((f) => f.booking_id).filter(id => id != null) as string[];
 
       if (flowIds.length === 0) {
         return {
@@ -84,54 +87,71 @@ export class CronService {
         },
       });
 
-      await tx.booking.updateMany({
-        where: {
-          flow: {
-            flow_id: {
-              in: flowIds,
+      if (bookingIds.length > 0) {
+        await tx.booking.updateMany({
+          where: {
+            booking_id: {
+              in: bookingIds,
             },
           },
-        },
-        data: {
-          status: BookingStatusEnum.CANCELLED,
-        },
-      });
+          data: {
+            status: BookingStatusEnum.CANCELLED,
+          },
+        });
 
-      await tx.service_Order.updateMany({
-        where: {
-          booking: {
-            flow: {
-              flow_id: { in: flowIds },
+        await tx.service_Order.updateMany({
+          where: {
+            booking_id: { in: bookingIds },
+            status: {
+              in: [
+                ServiceOrderStatusEnum.PENDING,
+                ServiceOrderStatusEnum.IN_PROGRESS,
+              ],
             },
           },
-          status: {
-            in: [
-              ServiceOrderStatusEnum.PENDING,
-              ServiceOrderStatusEnum.IN_PROGRESS,
-            ],
+          data: { 
+            status: ServiceOrderStatusEnum.CANCELLED,
+            payment_status: PaymentStatusEnum.CANCELLED
           },
-        },
-        data: { status: ServiceOrderStatusEnum.CANCELLED },
-      });
+        });
 
-      await tx.service_Order_Detail.updateMany({
-        where: {
-          order: {
-            booking: {
-              flow: {
-                flow_id: { in: flowIds },
+        const affectedServiceOrders = await tx.service_Order.findMany({
+          where: { booking_id: { in: bookingIds } },
+          select: { service_order_id: true }
+        });
+        const serviceOrderIds = affectedServiceOrders.map(so => so.service_order_id);
+
+        if (serviceOrderIds.length > 0) {
+          await tx.service_Order_Detail.updateMany({
+            where: {
+              service_order_id: { in: serviceOrderIds },
+              status: {
+                in: [
+                  ServiceOrderDetailStatusEnum.PENDING,
+                  ServiceOrderDetailStatusEnum.IN_PROGRESS,
+                ],
               },
             },
-          },
-          status: {
-            in: [
-              ServiceOrderDetailStatusEnum.PENDING,
-              ServiceOrderDetailStatusEnum.IN_PROGRESS,
-            ],
-          },
-        },
-        data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
-      });
+            data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+          });
+
+          await tx.invoice.updateMany({
+            where: {
+              service_order_id: { in: serviceOrderIds },
+              status: InvoiceStatusEnum.PENDING
+            },
+            data: { status: InvoiceStatusEnum.CANCELLED }
+          });
+
+          await tx.transaction.updateMany({
+            where: {
+              service_order_id: { in: serviceOrderIds },
+              status: 'PENDING'
+            },
+            data: { status: PaymentStatusEnum.CANCELLED }
+          });
+        }
+      }
 
       return {
         message: 'Cập nhật Flow và Step quá hạn thành công',
@@ -213,21 +233,49 @@ export class CronService {
                   ],
                 },
               },
-              data: { status: ServiceOrderStatusEnum.CANCELLED },
+              data: { 
+                status: ServiceOrderStatusEnum.CANCELLED,
+                payment_status: PaymentStatusEnum.CANCELLED
+              },
             });
 
-            await tx.service_Order_Detail.updateMany({
-              where: {
-                order: { booking_id: flow.booking_id },
-                status: {
-                  in: [
-                    ServiceOrderDetailStatusEnum.PENDING,
-                    ServiceOrderDetailStatusEnum.IN_PROGRESS,
-                  ],
-                },
-              },
-              data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+            // Get Service Order IDs to cancel details, invoices and transactions
+            const affectedOrders = await tx.service_Order.findMany({
+              where: { booking_id: flow.booking_id },
+              select: { service_order_id: true }
             });
+            const sOrderIds = affectedOrders.map(so => so.service_order_id);
+
+            if (sOrderIds.length > 0) {
+              await tx.service_Order_Detail.updateMany({
+                where: {
+                  service_order_id: { in: sOrderIds },
+                  status: {
+                    in: [
+                      ServiceOrderDetailStatusEnum.PENDING,
+                      ServiceOrderDetailStatusEnum.IN_PROGRESS,
+                    ],
+                  },
+                },
+                data: { status: ServiceOrderDetailStatusEnum.CANCELLED },
+              });
+
+              await tx.invoice.updateMany({
+                where: {
+                  service_order_id: { in: sOrderIds },
+                  status: InvoiceStatusEnum.PENDING
+                },
+                data: { status: InvoiceStatusEnum.CANCELLED }
+              });
+
+              await tx.transaction.updateMany({
+                where: {
+                  service_order_id: { in: sOrderIds },
+                  status: 'PENDING'
+                },
+                data: { status: PaymentStatusEnum.CANCELLED }
+              });
+            }
           }
         });
       }

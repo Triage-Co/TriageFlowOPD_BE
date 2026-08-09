@@ -702,6 +702,7 @@ model Service_Order {
   service_order_id   String                 @id @default(uuid()) @db.Uuid
   booking_id         String?                @db.Uuid
   name               String?
+  type               StepTypeEnum?
   assign_by_staff_id String?                @db.Uuid
   status             ServiceOrderStatusEnum @default(PENDING)
   qr_code            String?
