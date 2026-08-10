@@ -296,7 +296,7 @@ export class DoctorService {
     }
   }
 
-  async getPatients(staff_id: string, dateStr?: string) {
+   async getPatients(staff_id: string, dateStr?: string) {
     try {
       const whereCondition: any = {
         step: {
@@ -304,27 +304,25 @@ export class DoctorService {
         },
       };
 
-      if (dateStr) {
-        const timeZone = 'Asia/Ho_Chi_Minh';
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const targetDate = dateStr ? new Date(dateStr) : new Date();
+      const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
 
-        const targetDate = new Date(dateStr);
-        const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
-
-        const start = toDate(`${dateString}T00:00:00`, { timeZone });
-        const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
-        whereCondition.step.flow = {
-          booking: {
-            slot: {
-              shift: {
-                date: {
-                  gte: start,
-                  lte: end,
-                },
+      const start = toDate(`${dateString}T00:00:00`, { timeZone });
+      const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
+     
+      whereCondition.step.flow = {
+        booking: {
+          slot: {
+            shift: {
+              date: {
+                gte: start,
+                lte: end,
               },
             },
           },
-        };
-      }
+        },
+      };
 
       const existedQueue = await this.QUEUE.findMany({
         where: whereCondition,
@@ -399,11 +397,22 @@ export class DoctorService {
         });
       }
 
+      const formattedQueue = existedQueue.map((item: any) => {
+        if (item.step?.flow?.booking?.slot?.shift?.date) {
+          item.step.flow.booking.slot.shift.date = formatInTimeZone(
+            item.step.flow.booking.slot.shift.date,
+            'Asia/Ho_Chi_Minh',
+            "yyyy-MM-dd'T'HH:mm:ssXXX"
+          );
+        }
+        return item;
+      });
+
       return {
         code: 200,
         status: 'success',
         message: 'Lấy danh sách bệnh nhân thành công',
-        data: existedQueue,
+        data: formattedQueue,
       };
     } catch (error) {
       throw error;

@@ -6,6 +6,8 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
+  UseGuards,
   Query,
 } from '@nestjs/common';
 import {
@@ -24,12 +26,16 @@ import {
   QueryServiceOrderReqDto,
 } from './dto/req-service_order.dto';
 import { roles } from '../../shared/decorator/role.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 @ApiTags('Service Order')
 @Controller('service-order')
 export class ServiceOrderController {
   constructor(private readonly serviceOrderService: ServiceOrderService) {}
 
   @Post()
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Tạo mới Service Order',
   })
@@ -40,10 +46,12 @@ export class ServiceOrderController {
     description: 'Dữ liệu không hợp lệ hoặc lỗi hệ thống.',
   })
   create(
+    @Req() req: any,
     @Body()
     createServiceOrderReqDto: CreateServiceOrderReqDto,
   ) {
-    return this.serviceOrderService.create(createServiceOrderReqDto);
+    const staffId =  req.user?.sub
+    return this.serviceOrderService.create(createServiceOrderReqDto, staffId);
   }
 
   @Get()
