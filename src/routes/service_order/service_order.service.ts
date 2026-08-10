@@ -259,7 +259,7 @@ export class ServiceOrderService {
               const existingServiceCount = (existingOrder.name?.split(',').length || 0);
               const newServiceCount = existingServiceCount + groupServices.length;
               await this.stepRepository.update(paymentStep.step_id, {
-                step_name: `Thanh toán ${newServiceCount} dịch vụ`,
+                step_name: `Thanh toán ${updatedName}`,
                 step_status: isFree ? StepStatusEnum.COMPLETED : StepStatusEnum.PENDING,
               });
             }
@@ -305,7 +305,7 @@ export class ServiceOrderService {
               flow_id: flow.flow_id,
               step_type: StepTypeEnum.PAYMENT,
               service_code: groupServices[0].service_code,
-              step_name: `Thanh toán ${groupServices.length} dịch vụ`,
+              step_name: `Thanh toán ${newServiceNames}`,
               service_order_id: serviceOrder.service_order_id,
               step_status: isFree ? StepStatusEnum.COMPLETED : StepStatusEnum.PENDING,
             });

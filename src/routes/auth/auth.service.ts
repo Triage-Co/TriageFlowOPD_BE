@@ -291,9 +291,7 @@ export class AuthService {
     const account_id = data.user.id;
 
     const { data: updateUserData, error: updateUserError } =
-      await this.authProvider.updateUserById(account_id, {
-        password: new_password,
-      });
+      await this.authProvider.updatePasswordUserById(account_id, new_password);
 
     if (updateUserError) {
       throw AuthErrors.ResetPasswordFailed(updateUserError.message);
