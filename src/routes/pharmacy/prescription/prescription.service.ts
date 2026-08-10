@@ -9,14 +9,29 @@ import { PrismaService } from '../../../shared/config/prisma.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import {
+  ClinicalRoomType,
   PaymentStatusEnum,
   PrescriptionStatusEnum,
   ServiceOrderStatusEnum,
+  StepStatusEnum,
+  StepTypeEnum,
   TransStatusEnum,
   TransTypeEnum,
 } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { format } from 'date-fns';
+
+const DOCTOR_SELECT = {
+  staff_id: true,
+  full_name: true,
+  license_number: true,
+  account: {
+    select: {
+      email: true,
+      phone: true,
+    },
+  },
+} as const;
 
 @Injectable()
 export class PrescriptionService {
@@ -26,6 +41,20 @@ export class PrescriptionService {
     const dateStr = format(new Date(), 'yyyyMMdd');
     const randomNum = randomInt(1000, 9999);
     return `RX-${dateStr}-${randomNum}`;
+  }
+
+  private buildQrPayload(input: {
+    code: string;
+    visit_session_id?: string | null;
+    service_order_id?: string | null;
+    total_amount: number;
+  }): string {
+    return JSON.stringify({
+      code: input.code,
+      visit_session_id: input.visit_session_id || null,
+      service_order_id: input.service_order_id || null,
+      total_amount: input.total_amount,
+    });
   }
 
   async create(
@@ -41,12 +70,20 @@ export class PrescriptionService {
     } = createPrescriptionDto;
 
     let bookingId: string | undefined = undefined;
+    let flowId: string | undefined = undefined;
 
     if (visit_session_id) {
       // 1. Kiểm tra xem phiên khám có tồn tại không
       const visitSession = await this.prismaService.visit_Session.findUnique({
         where: { visit_session_id },
-        include: { patient: true },
+        include: {
+          patient: true,
+          booking: {
+            include: {
+              flow: true,
+            },
+          },
+        },
       });
 
       if (!visitSession) {
@@ -68,6 +105,7 @@ export class PrescriptionService {
       }
 
       bookingId = visitSession.booking_id ?? undefined;
+      flowId = visitSession.booking?.flow?.flow_id ?? undefined;
     }
 
     if (!details || details.length === 0) {
@@ -139,9 +177,9 @@ export class PrescriptionService {
         targetServiceOrderId = newServiceOrder.service_order_id;
       }
 
-      const qrCodePayload = JSON.stringify({
+      const qrCodePayload = this.buildQrPayload({
         code: prescriptionCode,
-        visit_session_id: visit_session_id || null,
+        visit_session_id,
         service_order_id: targetServiceOrderId,
         total_amount: totalAmount,
       });
@@ -152,6 +190,8 @@ export class PrescriptionService {
           qr_code: qrCodePayload,
           service_order_id: targetServiceOrderId,
           visit_session_id: visit_session_id || null,
+          booking_id: bookingId || null,
+          flow_id: flowId || null,
           prescribed_by: staffId,
           diagnosis_note,
           total_amount: totalAmount,
@@ -165,11 +205,7 @@ export class PrescriptionService {
         include: {
           serviceOrder: true,
           doctor: {
-            select: {
-              staff_id: true,
-              full_name: true,
-              license_number: true,
-            },
+            select: DOCTOR_SELECT,
           },
           prescriptionDetails: {
             include: {
@@ -178,6 +214,54 @@ export class PrescriptionService {
           },
         },
       });
+
+      // Advance flow: gắn bước DISPENSING (nhà thuốc) vào flow hiện tại
+      if (flowId) {
+        const existingDispensing = await tx.step.findFirst({
+          where: {
+            flow_id: flowId,
+            step_type: StepTypeEnum.DISPENSING,
+            step_status: { not: StepStatusEnum.CANCELLED },
+            service_order_id: targetServiceOrderId,
+          },
+        });
+
+        if (!existingDispensing) {
+          const pharmacyRoom = await tx.room.findFirst({
+            where: { room_type: ClinicalRoomType.PHARMACY },
+            orderBy: { created_at: 'asc' },
+          });
+
+          const lastStep = await tx.step.findFirst({
+            where: {
+              flow_id: flowId,
+              parent_step_id: null,
+              step_status: { not: StepStatusEnum.CANCELLED },
+            },
+            orderBy: { created_at: 'desc' },
+          });
+
+          const dispensingStep = await tx.step.create({
+            data: {
+              flow_id: flowId,
+              step_type: StepTypeEnum.DISPENSING,
+              step_name: `Cấp phát thuốc - ${prescriptionCode}`,
+              service_order_id: targetServiceOrderId,
+              room_id: pharmacyRoom?.room_id ?? null,
+              step_status: StepStatusEnum.PENDING,
+            },
+          });
+
+          if (lastStep) {
+            await tx.step_Dependency.create({
+              data: {
+                step_id: dispensingStep.step_id,
+                depends_on_step_id: lastStep.step_id,
+              },
+            });
+          }
+        }
+      }
 
       return prescription;
     });
@@ -235,11 +319,7 @@ export class PrescriptionService {
             },
           },
           doctor: {
-            select: {
-              staff_id: true,
-              full_name: true,
-              license_number: true,
-            },
+            select: DOCTOR_SELECT,
           },
           prescriptionDetails: {
             include: {
@@ -286,11 +366,7 @@ export class PrescriptionService {
           },
         },
         doctor: {
-          select: {
-            staff_id: true,
-            full_name: true,
-            license_number: true,
-          },
+          select: DOCTOR_SELECT,
         },
         prescriptionDetails: {
           include: {
@@ -347,11 +423,7 @@ export class PrescriptionService {
           },
         },
         doctor: {
-          select: {
-            staff_id: true,
-            full_name: true,
-            license_number: true,
-          },
+          select: DOCTOR_SELECT,
         },
         prescriptionDetails: {
           include: {
@@ -404,11 +476,7 @@ export class PrescriptionService {
           },
         },
         doctor: {
-          select: {
-            staff_id: true,
-            full_name: true,
-            license_number: true,
-          },
+          select: DOCTOR_SELECT,
         },
         prescriptionDetails: {
           include: {
@@ -680,6 +748,13 @@ export class PrescriptionService {
       };
     });
 
+    const qrCodePayload = this.buildQrPayload({
+      code: prescription.prescription_code,
+      visit_session_id: prescription.visit_session_id,
+      service_order_id: prescription.service_order_id,
+      total_amount: totalAmount,
+    });
+
     return this.prismaService.$transaction(async (tx) => {
       await tx.prescription_Detail.deleteMany({
         where: { prescription_id: id },
@@ -689,13 +764,26 @@ export class PrescriptionService {
         data: preparedDetails,
       });
 
+      if (prescription.service_order_id) {
+        await tx.service_Order.update({
+          where: { service_order_id: prescription.service_order_id },
+          data: {
+            name: `Đơn thuốc - ${prescription.prescription_code}`,
+          },
+        });
+      }
+
       return tx.prescription.update({
         where: { prescription_id: id },
         data: {
           diagnosis_note,
           total_amount: totalAmount,
+          qr_code: qrCodePayload,
         },
         include: {
+          doctor: {
+            select: DOCTOR_SELECT,
+          },
           prescriptionDetails: {
             include: {
               medicine: true,
@@ -713,6 +801,12 @@ export class PrescriptionService {
 
     if (!prescription) {
       throw new NotFoundException(`Không tìm thấy đơn thuốc với ID: ${id}`);
+    }
+
+    if (prescription.status !== PrescriptionStatusEnum.PENDING) {
+      throw new BadRequestException(
+        'Chỉ có thể xóa đơn thuốc khi ở trạng thái PENDING.',
+      );
     }
 
     return this.prismaService.prescription.delete({
