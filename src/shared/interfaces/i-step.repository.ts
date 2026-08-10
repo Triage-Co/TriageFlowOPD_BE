@@ -21,6 +21,13 @@ export interface IStepRepository {
     data: Prisma.StepUncheckedCreateWithoutParent_stepInput,
     tx?: Prisma.TransactionClient,
   ): Promise<Step>;
+
+  createManyParentStep(
+    data: Prisma.StepCreateManyInput[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step[]>;
+
+
   createSubStep(
     data: Prisma.StepUncheckedCreateWithoutFlowInput,
     tx?: Prisma.TransactionClient,

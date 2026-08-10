@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
@@ -18,28 +19,12 @@ export class CreateServiceOrderReqDto {
   })
   booking_id: string;
 
-  @IsUUID()
+  @IsArray()
   @ApiProperty({
-    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Bác sĩ/Nhân viên chỉ định',
-  })
-  assign_by_staff_id: string;
-
-
-  @IsString()
-  @ApiProperty({
-    example: 'XET_NGHIEM_MAU',
+    example: '["XET_NGHIEM_MAU", "X_QUANG"]',
     description: 'Mã của Service Order',
   })
-  service_code: string;
-
-  @IsOptional()
-  @IsUUID()
-  @ApiPropertyOptional({
-    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Mã chuyên khoa [có thể null]',
-  })
-  specialty_id: string;
+  service_code: string[];
 
   @IsOptional()
   @IsUUID()
@@ -48,7 +33,6 @@ export class CreateServiceOrderReqDto {
     description: 'Phòng chỉ định (nếu có)',
   })
   room_id?: string;
-
 }
 
 export class UpdateServiceOrderReqDto extends PartialType(
@@ -73,7 +57,7 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  page?: number ;
+  page?: number;
 
   @ApiPropertyOptional({
     name: 'limit',

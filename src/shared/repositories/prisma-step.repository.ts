@@ -8,7 +8,13 @@ import { PaymentStatusEnum, Prisma, Step } from '@prisma/client';
 
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly prismaService: PrismaService) { }
+  createManyParentStep(data: Prisma.StepCreateManyInput[], tx?: Prisma.TransactionClient): Promise<Step[]> {
+    const db = tx || this.prismaService;
+    return db.step.createManyAndReturn({
+      data,
+    });
+  }
   getById(id: string): Promise<StepWithBookingAndSlot | null> {
     return this.prismaService.step.findUnique({
       where: { step_id: id },
