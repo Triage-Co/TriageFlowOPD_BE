@@ -112,13 +112,29 @@ export class MedicineController {
     return this.medicineService.getActiveIngredients();
   }
 
+  @Get('manufacturers')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ALL] Lấy danh sách nhà sản xuất thuốc (Dropdown FE)',
+    description:
+      'Trả về mảng danh sách NSX độc nhất phục vụ bộ lọc FE.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách nhà sản xuất thành công.',
+  })
+  getManufacturers() {
+    return this.medicineService.getManufacturers();
+  }
+
   @Get()
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[ALL] Tra cứu danh sách thuốc',
     description:
-      'Endpoint hỗ trợ tìm kiếm thuốc theo tên, mã thuốc, hoạt chất và lọc theo trạng thái hoạt động.',
+      'Endpoint hỗ trợ tìm kiếm thuốc theo tên, mã thuốc, hoạt chất và lọc theo trạng thái hoạt động, đường dùng, NSX.',
   })
   @ApiQuery({
     name: 'search',
@@ -130,6 +146,16 @@ export class MedicineController {
     required: false,
     type: Boolean,
     description: 'Lọc thuốc đang hoạt động',
+  })
+  @ApiQuery({
+    name: 'usage_route',
+    required: false,
+    description: 'Lọc theo đường dùng (VD: Uống, Tiêm)',
+  })
+  @ApiQuery({
+    name: 'manufacturer',
+    required: false,
+    description: 'Lọc theo nhà sản xuất',
   })
   @ApiQuery({
     name: 'page',
@@ -173,10 +199,19 @@ export class MedicineController {
   findAll(
     @Query('search') search?: string,
     @Query('is_active') is_active?: boolean,
+    @Query('usage_route') usage_route?: string,
+    @Query('manufacturer') manufacturer?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.medicineService.findAll({ search, is_active, page, limit });
+    return this.medicineService.findAll({
+      search,
+      is_active,
+      usage_route,
+      manufacturer,
+      page,
+      limit,
+    });
   }
 
   @Get(':id')
