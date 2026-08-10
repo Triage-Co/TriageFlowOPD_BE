@@ -382,7 +382,7 @@ export class QueueService {
     const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
 
     if (result.room_id) {
-      this.broadcastRoomUpdate(result.room_id);
+      await this.broadcastRoomUpdate(result.room_id);
 
       // Fire-and-forget rebalance detector for CLS/procedure queues
       this.prisma.step
@@ -601,7 +601,7 @@ export class QueueService {
     });
 
     const displayPayload = await this.getRoomDisplayPayload(roomId, staffId);
-    this.broadcastRoomUpdate(roomId, staffId, displayPayload);
+    await this.broadcastRoomUpdate(roomId, staffId, displayPayload);
 
     return {
       code: 200,
@@ -701,7 +701,7 @@ export class QueueService {
           }
         : null,
       serving,
-      upcoming_patients: upcomingOrder.slice(0, 5).map((entry) => {
+      upcoming_patients: upcomingOrder.slice(0, 7).map((entry) => {
         const etaInfo = etaMap.get(entry.queue.queue_id);
         return {
           queue_id: entry.queue.queue_id,
