@@ -46,14 +46,12 @@ export class SpecialtyService {
       code: 200,
       message: 'Lấy thông tin thành công',
       status: 'success',
-      data: {
-        data,
-        meta: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit) || 1,
-        },
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1,
       },
     };
   }
