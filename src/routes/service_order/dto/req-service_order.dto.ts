@@ -25,12 +25,6 @@ export class CreateServiceOrderReqDto {
   })
   assign_by_staff_id: string;
 
-  @IsString()
-  @ApiProperty({
-    example: 'Xét nghiệm máu',
-    description: 'Tên của Service Order',
-  })
-  name: string;
 
   @IsString()
   @ApiProperty({
@@ -79,7 +73,7 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  page?: number = 1;
+  page?: number ;
 
   @ApiPropertyOptional({
     name: 'limit',
@@ -90,5 +84,5 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  limit?: number = 10;
+  limit?: number;
 }

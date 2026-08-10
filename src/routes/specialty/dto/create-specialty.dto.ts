@@ -47,14 +47,14 @@ export class QuerySpecialtyDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page?: number;
 
   @ApiPropertyOptional({ example: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  limit?: number = 20;
+  limit?: number;
 
   @ApiPropertyOptional({ example: true })
   @IsOptional()

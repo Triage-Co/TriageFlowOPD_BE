@@ -246,10 +246,22 @@ export class FlowService {
                   `Không tìm thấy dịch vụ với mã: ${step.service_code}`,
                 );
 
+              const orderTargetStepType =
+                svc.room_type === 'LABORATORY'
+                  ? 'LAB_TEST'
+                  : svc.room_type === 'IMAGING_ROOM'
+                    ? 'IMAGING'
+                    : svc.room_type === 'PROCEDURE_ROOM'
+                      ? 'PROCEDURE'
+                      : svc.room_type === 'FUNCTIONAL_EXPLORATION'
+                        ? 'FUNCTIONAL_EXPLORATION'
+                        : 'CLINICAL';
+
               const createdServiceOrder = await tx.service_Order.create({
                 data: {
                   booking_id: existingFlow.booking_id,
-                  name: 'Thanh toán: ' + (step.step_name || svc.service_name),
+                  name: svc.service_name || step.step_name || 'Dịch vụ y tế',
+                  type: orderTargetStepType as any,
                   status: 'PENDING',
                 },
               });

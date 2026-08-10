@@ -22,7 +22,7 @@ export interface IServiceOrderRepository {
       totalPages: number;
     };
   }>;
-  findById(id: string): Promise<Partial<Service_Order> | null>;
+  findById(id: string): Promise<any | null>;
   delete(id: string, tx?: Prisma.TransactionClient): Promise<Service_Order>;
   findPendingByPatientId(patientId: string): Promise<any[]>;
   findOrderServiceByBookingId(booking_id: string): Promise<any[]>;

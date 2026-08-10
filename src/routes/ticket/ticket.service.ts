@@ -15,7 +15,8 @@ import { QueueService } from '../queue/queue.service';
 import { TicketNavigateDto } from './dto/ticket-navigate.dto';
 import { TicketCheckInDto } from './dto/ticket-check-in.dto';
 import { RouteLocationType } from '../navigation/core/dto/get-route.dto';
-import { QueueStatusEnum, QueueTypeEnum, StepStatusEnum } from '@prisma/client';
+import { QueueStatusEnum, QueueTypeEnum, StepStatusEnum, FlowStatusEnum } from '@prisma/client';
+import { formatInTimeZone } from 'date-fns-tz';
 
 @Injectable()
 export class TicketService {
@@ -519,6 +520,244 @@ export class TicketService {
         diagnosis: visitSession?.diagnosis || null,
         final_diagnosis: visitSession?.final_diagnosis || null,
         documents: visitSession?.clinicalDocuments || [],
+      },
+    };
+  }
+
+  /**
+   * 8. GET /ticket/patient/:patientId - Tra cứu thông tin vé theo Patient ID để in lại vé vật lý
+   */
+  async getTicketByPatientId(patientId: string) {
+    if (!patientId) {
+      throw new BadRequestException({
+        message: 'Thiếu tham số patient_id',
+        detail: 'Vui lòng cung cấp patient_id để tra cứu vé',
+      });
+    }
+
+    const patient = await this.prisma.patient.findUnique({
+      where: { patient_id: patientId },
+    });
+
+    if (!patient) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy bệnh nhân',
+        detail: `Không tìm thấy bệnh nhân với ID: ${patientId}`,
+      });
+    }
+
+    const flows = await this.prisma.flow.findMany({
+      where: {
+        booking: {
+          patient_id: patientId,
+        },
+      },
+      orderBy: { created_at: 'desc' },
+      include: {
+        booking: {
+          include: {
+            patient: true,
+            slot: {
+              include: {
+                shift: {
+                  include: {
+                    room: {
+                      include: {
+                        specialty: true,
+                      },
+                    },
+                    staff: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        steps: {
+          orderBy: { created_at: 'asc' },
+          include: {
+            room: {
+              include: {
+                specialty: true,
+              },
+            },
+            staff: true,
+            queues: true,
+          },
+        },
+      },
+    });
+
+    if (!flows || flows.length === 0) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy vé khám',
+        detail: `Bệnh nhân ${patient.full_name} (ID: ${patientId}) chưa có vé/lượt khám nào trong hệ thống`,
+      });
+    }
+
+    // Ưu tiên chọn flow đang thực hiện (IN_PROGRESS) hoặc đang chờ (PENDING), hoặc flow mới nhất
+    const activeFlow =
+      flows.find((f) => f.status === FlowStatusEnum.IN_PROGRESS) ||
+      flows.find((f) => f.status === FlowStatusEnum.PENDING) ||
+      flows[0];
+
+    const booking = activeFlow.booking;
+    const shift = booking?.slot?.shift;
+    const primaryRoom = shift?.room;
+    const primarySpecialty = primaryRoom?.specialty;
+    const primaryDoctor = shift?.staff;
+
+    // Determine current active step
+    const currentStep =
+      activeFlow.steps.find((s) => s.step_status === StepStatusEnum.IN_PROGRESS) ||
+      activeFlow.steps.find((s) => s.step_status === StepStatusEnum.PENDING) ||
+      null;
+
+    let queueInfo: any = null;
+
+    let allQueues: any[] = [];
+    activeFlow.steps.forEach((step) => {
+      if (step.queues && step.queues.length > 0) {
+        allQueues.push(...step.queues);
+      }
+    });
+
+    const activeQueue =
+      allQueues.find(
+        (q) =>
+          q.status !== QueueStatusEnum.FINISHED &&
+          q.status !== QueueStatusEnum.CANCELLED,
+      ) ||
+      allQueues[allQueues.length - 1] ||
+      null;
+
+    if (currentStep && currentStep.room_id) {
+      const stepQueue = await this.prisma.queue.findFirst({
+        where: {
+          step_id: currentStep.step_id,
+          status: { notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED] },
+        },
+      });
+
+      const qToUse = stepQueue || activeQueue;
+
+      if (qToUse) {
+        const isWaiting =
+          qToUse.status === QueueStatusEnum.QUEUED ||
+          qToUse.status === QueueStatusEnum.PENDING;
+
+        if (isWaiting && currentStep.room_id) {
+          try {
+            const roomEta = await this.queueService.computeRoomEta(currentStep.room_id);
+            const entryEta = roomEta.entries.find((e) => e.queueId === qToUse.queue_id);
+
+            queueInfo = {
+              queue_id: qToUse.queue_id,
+              queue_number: qToUse.queue_number,
+              queue_status: qToUse.status,
+              position: entryEta ? entryEta.position : null,
+              waiting_ahead: entryEta ? entryEta.position : null,
+              eta_minutes: entryEta ? Math.round(entryEta.etaSec / 60) : null,
+              eta_time: entryEta?.etaTime || null,
+            };
+          } catch (err) {
+            queueInfo = {
+              queue_id: qToUse.queue_id,
+              queue_number: qToUse.queue_number,
+              queue_status: qToUse.status,
+              position: null,
+              waiting_ahead: null,
+              eta_minutes: null,
+              eta_time: null,
+            };
+          }
+        } else {
+          queueInfo = {
+            queue_id: qToUse.queue_id,
+            queue_number: qToUse.queue_number,
+            queue_status: qToUse.status,
+            position: null,
+            waiting_ahead: null,
+            eta_minutes: null,
+            eta_time: null,
+          };
+        }
+      }
+    } else if (activeQueue) {
+      queueInfo = {
+        queue_id: activeQueue.queue_id,
+        queue_number: activeQueue.queue_number,
+        queue_status: activeQueue.status,
+        position: null,
+        waiting_ahead: null,
+        eta_minutes: null,
+        eta_time: null,
+      };
+    }
+
+    const stepsDetail = activeFlow.steps.map((step) => {
+      const stepQueue = (step.queues || []).find(
+        (q) =>
+          q.status !== QueueStatusEnum.FINISHED &&
+          q.status !== QueueStatusEnum.CANCELLED,
+      ) || (step.queues || [])[0];
+
+      return {
+        step_id: step.step_id,
+        step_name: step.step_name,
+        step_status: step.step_status,
+        step_type: step.step_type,
+        room_name: step.room?.room_name || 'Chưa phân phòng',
+        staff_name: step.staff?.full_name || 'Chưa gán bác sĩ',
+        queue_number: stepQueue?.queue_number || null,
+      };
+    });
+
+    const shiftDate = shift?.date;
+    const formattedDate = shiftDate
+      ? formatInTimeZone(shiftDate, 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd')
+      : null;
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Tra cứu thông tin vé để in lại thành công',
+      data: {
+        ticket_code: activeFlow.ticket_code,
+        flow_id: activeFlow.flow_id,
+        flow_status: activeFlow.status,
+        created_at: activeFlow.created_at,
+        patient: {
+          patient_id: patient.patient_id,
+          full_name: patient.full_name,
+          citizen_id: patient.citizen_id,
+          gender: patient.gender,
+          dob: patient.dob,
+          blood_type: patient.blood_type,
+          allergy_notes: patient.allergy_notes,
+        },
+        booking_info: booking
+          ? {
+              booking_id: booking.booking_id,
+              appointment_date: formattedDate,
+              start_time: booking.slot?.start_time || null,
+              end_time: booking.slot?.end_time || null,
+              specialty_name: primarySpecialty?.specialty_name || null,
+              room_name: primaryRoom?.room_name || null,
+              doctor_name: primaryDoctor?.full_name || null,
+            }
+          : null,
+        current_step: currentStep
+          ? {
+              step_id: currentStep.step_id,
+              step_name: currentStep.step_name,
+              step_status: currentStep.step_status,
+              room_name: currentStep.room?.room_name || 'Đang cập nhật',
+              staff_name: currentStep.staff?.full_name || 'Đang cập nhật',
+            }
+          : null,
+        queue_info: queueInfo,
+        steps: stepsDetail,
       },
     };
   }
