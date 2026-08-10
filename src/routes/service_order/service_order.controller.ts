@@ -28,13 +28,15 @@ import {
 import { roles } from '../../shared/decorator/role.decorator';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 @ApiTags('Service Order')
 @Controller('service-order')
 export class ServiceOrderController {
   constructor(private readonly serviceOrderService: ServiceOrderService) {}
 
   @Post()
-  @UseGuards(IsAuthGuard)
+  @roles("ADMIN", "DOCTOR")
+  @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Tạo mới Service Order',
