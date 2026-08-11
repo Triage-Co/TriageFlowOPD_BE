@@ -26,6 +26,7 @@ export enum SignOutType {
 }
 
 export interface IAuthProvider {
+  updatePasswordUserById(account_id: string, password: string): Promise<any>;
   signUp(email: string, password: string, metadata: any): Promise<AuthResponse>;
   signInWithPassword(
     email: string,

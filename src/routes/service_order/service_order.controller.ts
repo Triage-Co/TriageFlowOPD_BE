@@ -24,6 +24,7 @@ import {
   CreateServiceOrderReqDto,
   UpdateServiceOrderReqDto,
   QueryServiceOrderReqDto,
+  UpdateDetailReqDto,
 } from './dto/req-service_order.dto';
 import { roles } from '../../shared/decorator/role.decorator';
 import { ApiBearerAuth } from '@nestjs/swagger';
@@ -136,6 +137,28 @@ export class ServiceOrderController {
     updateServiceOrderReqDto: UpdateServiceOrderReqDto,
   ) {
     return this.serviceOrderService.update(id, updateServiceOrderReqDto);
+  }
+
+  @Patch('detail/:serviceOrderDetailId')
+  @ApiOperation({
+    summary: 'Cập nhật Service Order Detail',
+  })
+  @ApiOkResponse({
+    description: 'Cập nhật Service Order Detail thành công.',
+  })
+  @ApiNotFoundResponse({
+    description: 'Không tìm thấy Service Order Detail.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Lỗi cập nhật dữ liệu.',
+  })
+  updateDetail(
+    @Param('serviceOrderDetailId')
+    id: string,
+    @Body()
+    updateDto: UpdateDetailReqDto,
+  ) {
+    return this.serviceOrderService.updateDetail(id, updateDto);
   }
 
   @Delete(':id')
