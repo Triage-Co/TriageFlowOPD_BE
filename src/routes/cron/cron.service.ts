@@ -23,7 +23,7 @@ export class CronService {
     private readonly queueRebalanceService: QueueRebalanceService,
   ) {}
 
-  @Cron('59 23 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  @Cron('1 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async updateFlowAndStepExpired() {
     const timeZone = 'Asia/Ho_Chi_Minh';
     const now = new Date();
