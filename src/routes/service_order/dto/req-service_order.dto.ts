@@ -45,6 +45,14 @@ export class UpdateServiceOrderReqDto extends PartialType(
     description: 'Trạng thái Service Order',
   })
   status?: ServiceOrderStatusEnum;
+
+  @IsOptional()
+  @IsString()
+  @ApiPropertyOptional({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    description: 'ID của chi tiết Service Order cần cập nhật (nếu có nhiều dịch vụ)',
+  })
+  detail_id?: string;
 }
 
 export class QueryServiceOrderReqDto {
@@ -69,4 +77,22 @@ export class QueryServiceOrderReqDto {
   @Type(() => Number)
   @Min(1)
   limit?: number;
+}
+
+export class UpdateDetailReqDto {
+  @ApiProperty({
+    name: 'service_code',
+    example: 'XQ_001',
+    description: 'Mã Service mới',
+  })
+  @IsString()
+  service_code: string;
+
+  @ApiPropertyOptional({
+    name: 'room_id',
+    description: 'ID phòng thực hiện (nếu muốn chỉ định rõ)',
+  })
+  @IsOptional()
+  @IsUUID()
+  room_id?: string;
 }
