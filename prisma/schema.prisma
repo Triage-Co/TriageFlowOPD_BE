@@ -263,11 +263,49 @@ model Specialty {
   triageInformations Triage_Information[]
   rooms              Room[]
   queuePriorityRules Queue_Priority_Rule[]
+  aiMappings         AiSpecialtyMapping[]
 
   @@index([specialty_code])
   @@index([specialty_name])
   @@index([is_active])
   @@map("specialty")
+}
+
+model AiSpecialty {
+  ai_specialty_id String   @id @default(uuid()) @db.Uuid
+  ai_code         String   @unique
+  ai_name         String
+  ai_name_vi      String?
+  description     String?
+  is_active       Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  mappings AiSpecialtyMapping[]
+
+  @@index([ai_code])
+  @@index([is_active])
+  @@map("ai_specialty")
+}
+
+model AiSpecialtyMapping {
+  mapping_id      String   @id @default(uuid()) @db.Uuid
+  ai_specialty_id String   @db.Uuid
+  specialty_id    String   @db.Uuid
+  is_primary      Boolean  @default(false)
+  sort_order      Int      @default(0)
+  is_active       Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  aiSpecialty AiSpecialty @relation(fields: [ai_specialty_id], references: [ai_specialty_id], onDelete: Cascade)
+  specialty   Specialty   @relation(fields: [specialty_id], references: [specialty_id], onDelete: Restrict)
+
+  @@unique([ai_specialty_id, specialty_id])
+  @@index([ai_specialty_id])
+  @@index([specialty_id])
+  @@index([is_primary])
+  @@map("ai_specialty_mapping")
 }
 
 model Slot {

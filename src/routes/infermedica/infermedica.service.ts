@@ -8,6 +8,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { AuthError } from '@supabase/supabase-js';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
+import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
 
 @Injectable()
 export class InfermedicaService {
@@ -15,18 +16,17 @@ export class InfermedicaService {
   ACCOUNT: PrismaClient['account'];
   PATIENT: PrismaClient['patient'];
   TRIAGE_INFO: PrismaClient['triage_Information'];
-  SPECIALTY: PrismaClient['specialty'];
 
   constructor(
     private readonly httpService: HttpService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prismaService: PrismaService,
+    private readonly aiSpecialtyService: AiSpecialtyService,
   ) {
     this.PATIENT_ANSWER = prismaService.patient_Answer;
     this.ACCOUNT = prismaService.account;
     this.PATIENT = prismaService.patient;
     this.TRIAGE_INFO = prismaService.triage_Information;
-    this.SPECIALTY = prismaService.specialty;
   }
 
   async parse(parseDto: ParseDto) {
@@ -201,16 +201,12 @@ export class InfermedicaService {
         }),
       );
 
-      const specialty_code = data.recommended_specialist.id || 'SP_1';
+      const specialty_code = data.recommended_specialist.id || 'sp_1';
 
-      const exitedSpecialty = await this.SPECIALTY.findFirst({
-        where: {
-          specialty_code: {
-            equals: specialty_code,
-            mode: 'insensitive',
-          },
-        },
-      });
+      const exitedSpecialty =
+        await this.aiSpecialtyService.resolveHospitalSpecialtyByAiCode(
+          specialty_code,
+        );
 
       const exitedPatientInfo = await this.TRIAGE_INFO.findFirst({
         where: {
