@@ -90,6 +90,16 @@ export class TransactionService {
 
   async payCash(dto: PayCashDto): Promise<ResponseType<any>> {
     try {
+      const isPrescription = await this.prismaService.prescription.findUnique({
+        where: { service_order_id: dto.service_order_id },
+      });
+
+      if (isPrescription) {
+        throw new BadRequestException(
+          'Vui lòng sang quầy Dược để thanh toán đơn thuốc.',
+        );
+      }
+
       const orderCode = parseInt(
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
       );
@@ -115,11 +125,9 @@ export class TransactionService {
         data: { status: 'PAID' },
       });
 
-      // Hook: Nếu là đơn gói khám (có package_id), tự động tạo Flow
       const createdFlowResult =
         await this.flowService.createFlowFromServiceOrder(dto.service_order_id);
 
-      // Nếu là đơn gói khám thì dừng ở đây (không cần xử lý PAYMENT steps bên trong)
       if (createdFlowResult !== null) {
         return {
           code: 200,

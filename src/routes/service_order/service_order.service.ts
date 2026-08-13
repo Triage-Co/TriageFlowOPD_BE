@@ -72,7 +72,6 @@ export class ServiceOrderService {
     const {
       service_code,
       booking_id,
-      room_id: assigned_room_id,
     } = createServiceOrderReqDto;
 
     const is_payment = service_code && service_code.length > 0;
@@ -157,16 +156,7 @@ export class ServiceOrderService {
 
         for (const service of groupServices) {
           let room: any = null;
-          if (assigned_room_id) {
-            room = await this.roomRepository.findById(assigned_room_id);
-            if (!room) {
-              throw new NotFoundException({
-                message: 'Không tìm thấy phòng',
-                detail: `Không tìm thấy phòng với id: ${assigned_room_id}`,
-              });
-            }
-            stepStaffId = null;
-          } else if (service.room_type) {
+          if (service.room_type) {
             const mappedStepType = ROOM_TYPE_TO_STEP_TYPE[service.room_type];
             const isRebalanceable = !!mappedStepType && REBALANCEABLE_STEP_TYPES.includes(mappedStepType);
             if (isRebalanceable) {
@@ -201,7 +191,7 @@ export class ServiceOrderService {
             });
           }
 
-          if (room && !assigned_room_id && stepStaffId === null) {
+          if (room && stepStaffId === null) {
             const staff = room.shifts && room.shifts.length > 0 ? room.shifts[0].staff : null;
             stepStaffId = staff?.staff_id;
           }
@@ -737,7 +727,6 @@ export class ServiceOrderService {
         throw new Error(`Không tìm thấy dịch vụ cũ với id: ${existing.service_id}`);
       }
 
-      // Kiểm tra trùng lặp toàn luồng (giống API create)
       if (existing.order) {
         const existingDuplicate = await this.prisma.service_Order_Detail.findFirst({
           where: {

@@ -26,13 +26,6 @@ export class CreateServiceOrderReqDto {
   })
   service_code: string[];
 
-  @IsOptional()
-  @IsUUID()
-  @ApiPropertyOptional({
-    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Phòng chỉ định (nếu có)',
-  })
-  room_id?: string;
 }
 
 export class UpdateServiceOrderReqDto extends PartialType(
@@ -53,6 +46,14 @@ export class UpdateServiceOrderReqDto extends PartialType(
     description: 'ID của chi tiết Service Order cần cập nhật (nếu có nhiều dịch vụ)',
   })
   detail_id?: string;
+
+  @ApiPropertyOptional({
+    name: 'room_id',
+    description: 'ID phòng thực hiện (nếu muốn chỉ định rõ)',
+  })
+  @IsOptional()
+  @IsUUID()
+  room_id?: string;
 }
 
 export class QueryServiceOrderReqDto {
