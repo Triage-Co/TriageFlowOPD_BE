@@ -50,13 +50,35 @@ export class PrismaStepRepository implements IStepRepository {
   findClinicalStepByServiceOrderId(
     serviceOrderId: string,
   ): Promise<Step | null> {
+    return this.findPrimaryClinicalStepByServiceOrderId(serviceOrderId);
+  }
+
+  findNonPaymentStepsByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step[]> {
+    return this.prismaService.step.findMany({
+      where: {
+        service_order_id: serviceOrderId,
+        step_type: { not: 'PAYMENT' },
+        step_status: { not: 'CANCELLED' },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  findPrimaryClinicalStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null> {
     return this.prismaService.step.findFirst({
       where: {
         service_order_id: serviceOrderId,
-        step_type: 'CLINICAL',
+        step_type: { not: 'PAYMENT' },
+        step_status: { not: 'CANCELLED' },
       },
+      orderBy: { created_at: 'asc' },
     });
   }
+
   findPaymentStepByServiceOrderId(
     serviceOrderId: string,
   ): Promise<Step | null> {

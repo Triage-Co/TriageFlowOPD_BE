@@ -57,6 +57,8 @@ export class MedicineService {
   async findAll(query: {
     search?: string;
     is_active?: boolean;
+    usage_route?: string;
+    manufacturer?: string;
     page?: number;
     limit?: number;
   }) {
@@ -77,6 +79,20 @@ export class MedicineService {
         { medicine_code: { contains: query.search, mode: 'insensitive' } },
         { active_ingredient: { contains: query.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (query.usage_route) {
+      where.usage_route = {
+        equals: query.usage_route,
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.manufacturer) {
+      where.manufacturer = {
+        contains: query.manufacturer,
+        mode: 'insensitive',
+      };
     }
 
     const [data, total] = await Promise.all([
@@ -134,6 +150,19 @@ export class MedicineService {
       .map((m) => m.active_ingredient)
       .filter(Boolean);
     return { data: ingredients };
+  }
+
+  async getManufacturers() {
+    const medicines = await this.prismaService.medicine.findMany({
+      where: { manufacturer: { not: null }, is_active: true },
+      select: { manufacturer: true },
+      distinct: ['manufacturer'],
+    });
+
+    const manufacturers = medicines
+      .map((m) => m.manufacturer)
+      .filter(Boolean);
+    return { data: manufacturers };
   }
 
   async update(id: string, updateMedicineDto: UpdateMedicineDto) {

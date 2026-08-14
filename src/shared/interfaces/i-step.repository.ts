@@ -54,6 +54,14 @@ export interface IStepRepository {
   findClinicalStepByServiceOrderId(
     serviceOrderId: string,
   ): Promise<Step | null>;
+  /** All non-PAYMENT, non-CANCELLED steps for a service order (oldest first). */
+  findNonPaymentStepsByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step[]>;
+  /** Primary clinical step used to hang the single queue ticket for an SO. */
+  findPrimaryClinicalStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null>;
   findPaymentStepByServiceOrderId(serviceOrderId: string): Promise<Step | null>;
   getById(id: string): Promise<StepWithBookingAndSlot | null>;
 }
