@@ -58,6 +58,24 @@ export class PatientController {
   @ApiOperation({
     summary: '[USER] lấy tất bệnh nhân',
   })
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng trên mỗi trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Từ khóa tìm kiếm',
+    type: 'string',
+    required: false,
+  })
   getMyPatients(
     @Req() req: any,
     @Query('page') page?: number,
