@@ -8,6 +8,7 @@ import {
   Delete,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { PatientService } from './patient.service';
 import {
@@ -16,7 +17,7 @@ import {
   UpdatePatientByStaffReqDto,
   UpdatePatientReqDto,
 } from './dto/request-patient.dto';
-import { ApiBearerAuth, ApiOperation, ApiSecurity } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiSecurity } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -24,7 +25,7 @@ import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @Controller('patient')
 export class PatientController {
-  constructor(private readonly patientService: PatientService) { }
+  constructor(private readonly patientService: PatientService) {}
 
   @Get('kiosk')
   @ApiBearerAuth()
@@ -57,9 +58,32 @@ export class PatientController {
   @ApiOperation({
     summary: '[USER] lấy tất bệnh nhân',
   })
-  getMyPatients(@Req() req: any) {
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng trên mỗi trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Từ khóa tìm kiếm',
+    type: 'string',
+    required: false,
+  })
+  getMyPatients(
+    @Req() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
     const id = req.user.sub || req.user.id;
-    return this.patientService.getMyPatients(id);
+    return this.patientService.getMyPatients(id, page, limit, search);
   }
 
   @Delete('me/:patient_id')
@@ -132,8 +156,30 @@ export class PatientController {
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy tất cả bệnh nhân',
   })
-  getAll() {
-    return this.patientService.getAll();
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng trên mỗi trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Từ khóa tìm kiếm',
+    type: 'string',
+    required: false,
+  })
+  getAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.patientService.getAll(page, limit, search);
   }
 
   @Get(':patient_id')

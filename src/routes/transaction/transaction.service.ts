@@ -88,18 +88,36 @@ export class TransactionService {
     }
   }
 
-  async payCash(dto: PayCashDto): Promise<ResponseType<any>> {
+  async payCash(dto: PayCashDto, clientId: string): Promise<ResponseType<any>> {
     try {
+      const isPrescription = await this.prismaService.prescription.findUnique({
+        where: { service_order_id: dto.service_order_id },
+      });
+
+      if (isPrescription) {
+        throw new BadRequestException(
+          'Vui lòng sang quầy Dược để thanh toán đơn thuốc.',
+        );
+      }
+
+      const invoice = await this.prismaService.invoice.findFirst({
+        where: { service_order_id: dto.service_order_id },
+      });
+
+      if (!invoice) {
+        throw new BadRequestException('Không tìm thấy hóa đơn cho đơn dịch vụ này');
+      }
+
       const orderCode = parseInt(
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
       );
 
       const transaction = await this.TRANSACTION.create({
         data: {
-          buyerId: dto.clientId,
+          buyerId: clientId,
           docNo: orderCode,
-          transType: dto.transType,
-          amount: dto.amount,
+          transType: 'ORDER_PAYMENT',
+          amount: invoice.total_amount,
           service_order_id: dto.service_order_id,
           status: 'SUCCESSED',
         },
@@ -115,42 +133,33 @@ export class TransactionService {
         data: { status: 'PAID' },
       });
 
-      // Hook: Nếu là đơn gói khám (có package_id), tự động tạo Flow
       const createdFlowResult =
         await this.flowService.createFlowFromServiceOrder(dto.service_order_id);
 
-      // Nếu là đơn gói khám thì dừng ở đây (không cần xử lý PAYMENT steps bên trong)
-      if (createdFlowResult !== null) {
-        return {
-          code: 200,
-          message: 'Thanh toán gói khám thành công, Flow đã được tạo',
-          status: 'success',
-          data: { transaction, flow: createdFlowResult },
-        };
-      }
+      if (createdFlowResult === null) {
+        const paymentSteps = await this.STEP.findMany({
+          where: {
+            service_order_id: dto.service_order_id,
+            step_type: 'PAYMENT',
+          },
+        });
 
-      const paymentSteps = await this.STEP.findMany({
-        where: {
-          service_order_id: dto.service_order_id,
-          step_type: 'PAYMENT',
-        },
-      });
+        for (const step of paymentSteps) {
+          if (step.step_status === 'PENDING') {
+            await this.STEP.update({
+              where: { step_id: step.step_id },
+              data: { step_status: 'IN_PROGRESS' },
+            });
+          }
 
-      for (const step of paymentSteps) {
-        if (step.step_status === 'PENDING') {
-          await this.STEP.update({
-            where: { step_id: step.step_id },
-            data: { step_status: 'IN_PROGRESS' },
-          });
-        }
+          await this.stepService.completeStep(step.step_id);
 
-        await this.stepService.completeStep(step.step_id);
-
-        if (step.flow_id) {
-          await this.prismaService.flow.updateMany({
-            where: { flow_id: step.flow_id, status: 'PENDING' },
-            data: { status: 'IN_PROGRESS' },
-          });
+          if (step.flow_id) {
+            await this.prismaService.flow.updateMany({
+              where: { flow_id: step.flow_id, status: 'PENDING' },
+              data: { status: 'IN_PROGRESS' },
+            });
+          }
         }
       }
 
@@ -164,6 +173,15 @@ export class TransactionService {
       });
 
       await this.queueService.generateServiceQueueNumber(dto.service_order_id);
+
+      if (createdFlowResult !== null) {
+        return {
+          code: 200,
+          message: 'Thanh toán gói khám thành công, Flow đã được tạo',
+          status: 'success',
+          data: { transaction, flow: createdFlowResult },
+        };
+      }
 
       return {
         code: 200,
@@ -247,19 +265,19 @@ export class TransactionService {
               });
             }
           }
-
-          await this.prismaService.invoice.updateMany({
-            where: { service_order_id: transaction.service_order_id },
-            data: {
-              status: 'PAID',
-              payment_date: new Date(),
-            },
-          });
-
-          await this.queueService.generateServiceQueueNumber(
-            transaction.service_order_id,
-          );
         }
+
+        await this.prismaService.invoice.updateMany({
+          where: { service_order_id: transaction.service_order_id },
+          data: {
+            status: 'PAID',
+            payment_date: new Date(),
+          },
+        });
+
+        await this.queueService.generateServiceQueueNumber(
+          transaction.service_order_id,
+        );
       }
 
       return {

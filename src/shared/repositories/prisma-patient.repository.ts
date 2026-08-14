@@ -48,10 +48,32 @@ export class PrismaPatientRepository implements IPatientRepository {
     });
   }
 
-  findAll(account_id?: string): Promise<any> {
+  findAll(
+    account_id?: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+  ): Promise<any> {
+    const skip =
+      page && limit && page > 0 && limit > 0
+        ? (Number(page) - 1) * Number(limit)
+        : undefined;
+
+    const take = limit && limit > 0 ? Number(limit) : undefined;
+
     return this.prismaService.patient.findMany({
+      take: take,
+      skip: skip,
       where: {
         ...(account_id && { account_id: account_id }),
+        ...(search && {
+          OR: [
+            { citizen_id: { contains: search } },
+            { full_name: { contains: search, mode: 'insensitive' } },
+            { account: { phone: { contains: search } } },
+            { account: { email: { contains: search, mode: 'insensitive' } } },
+          ],
+        }),
       },
     });
   }

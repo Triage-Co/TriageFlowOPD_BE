@@ -6,9 +6,12 @@ import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { AuthError } from '@supabase/supabase-js';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
+import {
+  InfermedicaCreateTriageConfigDto,
+  InfermedicaUpdateTriageConfigDto,
+} from './dto/triage-config.dto';
 
 @Injectable()
 export class InfermedicaService {
@@ -16,6 +19,8 @@ export class InfermedicaService {
   ACCOUNT: PrismaClient['account'];
   PATIENT: PrismaClient['patient'];
   TRIAGE_INFO: PrismaClient['triage_Information'];
+  SPECIALTY: PrismaClient['specialty'];
+  TRIAGE_CONFIG: PrismaClient['triage_Config'];
 
   constructor(
     private readonly httpService: HttpService,
@@ -27,6 +32,8 @@ export class InfermedicaService {
     this.ACCOUNT = prismaService.account;
     this.PATIENT = prismaService.patient;
     this.TRIAGE_INFO = prismaService.triage_Information;
+    this.SPECIALTY = prismaService.specialty;
+    this.TRIAGE_CONFIG = prismaService.triage_Config;
   }
 
   async parse(parseDto: ParseDto) {
@@ -278,6 +285,111 @@ export class InfermedicaService {
     } catch (error) {
       return {
         code: 401,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+  async getTriageConfigs() {
+    try {
+      const data = await this.TRIAGE_CONFIG.findMany();
+      return {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: data,
+      };
+    } catch (error) {
+      return {
+        code: 400,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+
+  async getTriageConfigById(id: string) {
+    try {
+      const data = await this.TRIAGE_CONFIG.findUnique({
+        where: { triage_config: id },
+      });
+      return {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: data,
+      };
+    } catch (error) {
+      return {
+        code: 400,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+
+  async createTriageConfig(createDto: InfermedicaCreateTriageConfigDto) {
+    try {
+      const data = await this.TRIAGE_CONFIG.create({
+        data: createDto,
+      });
+      return {
+        code: 201,
+        message: 'Thành công',
+        status: 'success',
+        data: data,
+      };
+    } catch (error) {
+      return {
+        code: 400,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+
+  async updateTriageConfig(
+    id: string,
+    updateDto: InfermedicaUpdateTriageConfigDto,
+  ) {
+    try {
+      const data = await this.TRIAGE_CONFIG.update({
+        where: { triage_config: id },
+        data: updateDto,
+      });
+      return {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: data,
+      };
+    } catch (error) {
+      return {
+        code: 400,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+
+  async deleteTriageConfig(id: string) {
+    try {
+      await this.TRIAGE_CONFIG.delete({
+        where: { triage_config: id },
+      });
+      return {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+      };
+    } catch (error) {
+      return {
+        code: 400,
         status: 'error',
         message: 'Đã xảy ra lỗi',
         detail: error,

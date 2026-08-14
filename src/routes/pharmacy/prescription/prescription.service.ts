@@ -526,6 +526,13 @@ export class PrescriptionService {
     }
 
     const patientAccountId = prescription.visitSession?.patient?.account_id;
+
+    if (!patientAccountId) {
+      throw new BadRequestException(
+        'Không tìm thấy tài khoản bệnh nhân để ghi nhận giao dịch.',
+      );
+    }
+
     const docNo = parseInt(
       `${Date.now().toString().slice(-4)}${randomInt(10, 99)}`,
     );
@@ -540,18 +547,16 @@ export class PrescriptionService {
           },
         });
 
-        if (patientAccountId) {
-          await tx.transaction.create({
-            data: {
-              buyerId: patientAccountId,
-              docNo: docNo,
-              transType: TransTypeEnum.ORDER_PAYMENT,
-              amount: prescription.total_amount,
-              status: TransStatusEnum.SUCCESSED,
-              service_order_id: prescription.service_order_id,
-            },
-          });
-        }
+        await tx.transaction.create({
+          data: {
+            buyerId: patientAccountId,
+            docNo: docNo,
+            transType: TransTypeEnum.ORDER_PAYMENT,
+            amount: prescription.total_amount,
+            status: TransStatusEnum.SUCCESSED,
+            service_order_id: prescription.service_order_id,
+          },
+        });
       }
 
       return tx.prescription.update({
