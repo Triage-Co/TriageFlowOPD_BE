@@ -17,7 +17,7 @@ import {
   UpdatePatientByStaffReqDto,
   UpdatePatientReqDto,
 } from './dto/request-patient.dto';
-import { ApiBearerAuth, ApiOperation, ApiSecurity } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiSecurity } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -137,6 +137,24 @@ export class PatientController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy tất cả bệnh nhân',
+  })
+  @ApiQuery({
+    name: 'page',
+    description: 'Số trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Số lượng trên mỗi trang',
+    type: 'number',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'search',
+    description: 'Từ khóa tìm kiếm',
+    type: 'string',
+    required: false,
   })
   getAll(
     @Query('page') page?: number,
