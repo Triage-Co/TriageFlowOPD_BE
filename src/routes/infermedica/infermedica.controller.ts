@@ -1,11 +1,12 @@
-import { Body, Controller, Get, Ip, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Ip, Param, Post, Query, Put, Delete } from '@nestjs/common';
 import { InfermedicaService } from './infermedica.service';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
+import { InfermedicaCreateTriageConfigDto, InfermedicaUpdateTriageConfigDto } from './dto/triage-config.dto';
 import { ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 
 @Controller('infermedica')
 export class InfermedicaController {
-  constructor(private readonly infermedicaService: InfermedicaService) {}
+  constructor(private readonly infermedicaService: InfermedicaService) { }
 
   @Post('/parse')
   @ApiOperation({
@@ -301,5 +302,38 @@ export class InfermedicaController {
   })
   search(@Query() searchDto: SearchDto) {
     return this.infermedicaService.search(searchDto);
+  }
+
+  @Get('/config')
+  @ApiOperation({ summary: 'Lấy danh sách cấu hình triage' })
+  getTriageConfigs() {
+    return this.infermedicaService.getTriageConfigs();
+  }
+
+  @Get('/config/:id')
+  @ApiOperation({ summary: 'Lấy cấu hình triage theo ID' })
+  getTriageConfigById(@Param('id') id: string) {
+    return this.infermedicaService.getTriageConfigById(id);
+  }
+
+  @Post('/config')
+  @ApiOperation({ summary: 'Tạo cấu hình triage' })
+  createTriageConfig(@Body() createDto: InfermedicaCreateTriageConfigDto) {
+    return this.infermedicaService.createTriageConfig(createDto);
+  }
+
+  @Put('/config/:id')
+  @ApiOperation({ summary: 'Cập nhật cấu hình triage' })
+  updateTriageConfig(
+    @Param('id') id: string,
+    @Body() updateDto: InfermedicaUpdateTriageConfigDto,
+  ) {
+    return this.infermedicaService.updateTriageConfig(id, updateDto);
+  }
+
+  @Delete('/config/:id')
+  @ApiOperation({ summary: 'Xóa cấu hình triage' })
+  deleteTriageConfig(@Param('id') id: string) {
+    return this.infermedicaService.deleteTriageConfig(id);
   }
 }

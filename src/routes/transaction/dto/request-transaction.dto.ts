@@ -59,29 +59,4 @@ export class PayCashDto {
     example: '97f0a82e-9d22-48ea-8b4e-9f37c35a8bc5',
   })
   service_order_id: string;
-
-  @IsString()
-  @ApiProperty({
-    name: 'clientId',
-    description: 'ID của tài khoản lễ tân / bệnh nhân thực hiện thanh toán',
-    example: '75a51e00-b2e7-447a-b39e-7c00a09cf15c',
-  })
-  clientId: string;
-
-  @IsEnum(TransTypeEnum, { message: 'Transaction type không hợp lệ' })
-  @ApiProperty({
-    name: 'transType',
-    enum: TransTypeEnum,
-    example: 'ORDER_PAYMENT',
-  })
-  transType: TransTypeEnum;
-
-  @IsNumber({}, { message: 'Amount phải là 1 số' })
-  @Min(1000, { message: 'Amount phải lớn hơn 1000' })
-  @ApiProperty({
-    name: 'amount',
-    description: 'Số tiền thanh toán',
-    example: 50000,
-  })
-  amount: number;
 }
