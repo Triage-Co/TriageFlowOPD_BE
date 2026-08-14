@@ -1,20 +1,17 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsObject } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, Max, Min } from 'class-validator';
 
-export class InfermedicaCreateTriageConfigDto {
-  @IsString()
-  @ApiPropertyOptional({
-    description: 'Key của rule (ví dụ: DIAGNOSIS_CONFIG)',
-    example: 'DIAGNOSIS_CONFIG',
+export class UpdateQuestionLimitDto {
+  @ApiProperty({
+    description: 'Số câu hỏi tối đa trong một phiên triage',
+    example: 5,
+    minimum: 1,
+    maximum: 20,
   })
-  rule_key: string;
-
-  @IsObject()
-  @ApiPropertyOptional({
-    description: 'Giá trị cấu hình dạng JSON',
-    example: { number_of_diagnosis: 5 },
-  })
-  rule_value: any;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  number_of_diagnosis: number;
 }
-
-export class InfermedicaUpdateTriageConfigDto extends InfermedicaCreateTriageConfigDto {}

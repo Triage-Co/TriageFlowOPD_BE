@@ -1,8 +1,12 @@
-import { Body, Controller, Get, Ip, Param, Post, Query, Put, Delete } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { RoleTypeEnum } from '@prisma/client';
+import { roles } from '../../shared/decorator/role.decorator';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { InfermedicaService } from './infermedica.service';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
-import { InfermedicaCreateTriageConfigDto, InfermedicaUpdateTriageConfigDto } from './dto/triage-config.dto';
-import { ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
 
 @Controller('infermedica')
 export class InfermedicaController {
@@ -304,36 +308,21 @@ export class InfermedicaController {
     return this.infermedicaService.search(searchDto);
   }
 
-  @Get('/config')
-  @ApiOperation({ summary: 'Lấy danh sách cấu hình triage' })
-  getTriageConfigs() {
-    return this.infermedicaService.getTriageConfigs();
+  @Get('/question-limit')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Lấy số câu hỏi tối đa của phiên triage' })
+  getQuestionLimit() {
+    return this.infermedicaService.getQuestionLimit();
   }
 
-  @Get('/config/:id')
-  @ApiOperation({ summary: 'Lấy cấu hình triage theo ID' })
-  getTriageConfigById(@Param('id') id: string) {
-    return this.infermedicaService.getTriageConfigById(id);
-  }
-
-  @Post('/config')
-  @ApiOperation({ summary: 'Tạo cấu hình triage' })
-  createTriageConfig(@Body() createDto: InfermedicaCreateTriageConfigDto) {
-    return this.infermedicaService.createTriageConfig(createDto);
-  }
-
-  @Put('/config/:id')
-  @ApiOperation({ summary: 'Cập nhật cấu hình triage' })
-  updateTriageConfig(
-    @Param('id') id: string,
-    @Body() updateDto: InfermedicaUpdateTriageConfigDto,
-  ) {
-    return this.infermedicaService.updateTriageConfig(id, updateDto);
-  }
-
-  @Delete('/config/:id')
-  @ApiOperation({ summary: 'Xóa cấu hình triage' })
-  deleteTriageConfig(@Param('id') id: string) {
-    return this.infermedicaService.deleteTriageConfig(id);
+  @Patch('/question-limit')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Cập nhật số câu hỏi tối đa của phiên triage' })
+  updateQuestionLimit(@Body() dto: UpdateQuestionLimitDto) {
+    return this.infermedicaService.updateQuestionLimit(dto);
   }
 }

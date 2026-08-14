@@ -8,10 +8,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
-import {
-  InfermedicaCreateTriageConfigDto,
-  InfermedicaUpdateTriageConfigDto,
-} from './dto/triage-config.dto';
+import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
 
 @Injectable()
 export class InfermedicaService {
@@ -34,6 +31,22 @@ export class InfermedicaService {
     this.TRIAGE_INFO = prismaService.triage_Information;
     this.SPECIALTY = prismaService.specialty;
     this.TRIAGE_CONFIG = prismaService.triage_Config;
+  }
+
+  private static readonly DIAGNOSIS_CONFIG_KEY = 'DIAGNOSIS_CONFIG';
+  private static readonly DEFAULT_NUMBER_OF_DIAGNOSIS = 5;
+
+  private readNumberOfDiagnosis(ruleValue: unknown): number {
+    if (!ruleValue || typeof ruleValue !== 'object') {
+      return InfermedicaService.DEFAULT_NUMBER_OF_DIAGNOSIS;
+    }
+
+    const value = ruleValue as Record<string, unknown>;
+    const raw = value.number_of_diagnosis ?? value.number_of_diagnoise;
+
+    return typeof raw === 'number' && raw > 0
+      ? raw
+      : InfermedicaService.DEFAULT_NUMBER_OF_DIAGNOSIS;
   }
 
   async parse(parseDto: ParseDto) {
@@ -78,20 +91,14 @@ export class InfermedicaService {
     }
 
     try {
-      const configRecord = await this.prismaService.triage_Config.findFirst({
+      const configRecord = await this.TRIAGE_CONFIG.findFirst({
         where: {
-          rule_key: 'DIAGNOSIS_CONFIG',
+          rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
         },
       });
-
-      let numberOfDiagnoses = 5;
-
-      if (configRecord && configRecord.rule_value) {
-        const ruleValue = configRecord.rule_value as any;
-        if (ruleValue.number_of_diagnosis) {
-          numberOfDiagnoses = ruleValue.number_of_diagnosis;
-        }
-      }
+      const numberOfDiagnoses = this.readNumberOfDiagnosis(
+        configRecord?.rule_value,
+      );
 
       const currentToken = interview_token || `new_session_${Date.now()}`;
 
@@ -291,14 +298,24 @@ export class InfermedicaService {
       };
     }
   }
-  async getTriageConfigs() {
+
+  async getQuestionLimit() {
     try {
-      const data = await this.TRIAGE_CONFIG.findMany();
+      const configRecord = await this.TRIAGE_CONFIG.findFirst({
+        where: {
+          rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
+        },
+      });
+
       return {
         code: 200,
         message: 'Thành công',
         status: 'success',
-        data: data,
+        data: {
+          number_of_diagnosis: this.readNumberOfDiagnosis(
+            configRecord?.rule_value,
+          ),
+        },
       };
     } catch (error) {
       return {
@@ -310,82 +327,39 @@ export class InfermedicaService {
     }
   }
 
-  async getTriageConfigById(id: string) {
+  async updateQuestionLimit(dto: UpdateQuestionLimitDto) {
     try {
-      const data = await this.TRIAGE_CONFIG.findUnique({
-        where: { triage_config: id },
+      const ruleValue = {
+        number_of_diagnosis: dto.number_of_diagnosis,
+      };
+
+      const existing = await this.TRIAGE_CONFIG.findFirst({
+        where: {
+          rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
+        },
       });
+
+      if (existing) {
+        await this.TRIAGE_CONFIG.update({
+          where: { triage_config: existing.triage_config },
+          data: { rule_value: ruleValue },
+        });
+      } else {
+        await this.TRIAGE_CONFIG.create({
+          data: {
+            rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
+            rule_value: ruleValue,
+          },
+        });
+      }
+
       return {
         code: 200,
         message: 'Thành công',
         status: 'success',
-        data: data,
-      };
-    } catch (error) {
-      return {
-        code: 400,
-        status: 'error',
-        message: 'Đã xảy ra lỗi',
-        detail: error,
-      };
-    }
-  }
-
-  async createTriageConfig(createDto: InfermedicaCreateTriageConfigDto) {
-    try {
-      const data = await this.TRIAGE_CONFIG.create({
-        data: createDto,
-      });
-      return {
-        code: 201,
-        message: 'Thành công',
-        status: 'success',
-        data: data,
-      };
-    } catch (error) {
-      return {
-        code: 400,
-        status: 'error',
-        message: 'Đã xảy ra lỗi',
-        detail: error,
-      };
-    }
-  }
-
-  async updateTriageConfig(
-    id: string,
-    updateDto: InfermedicaUpdateTriageConfigDto,
-  ) {
-    try {
-      const data = await this.TRIAGE_CONFIG.update({
-        where: { triage_config: id },
-        data: updateDto,
-      });
-      return {
-        code: 200,
-        message: 'Thành công',
-        status: 'success',
-        data: data,
-      };
-    } catch (error) {
-      return {
-        code: 400,
-        status: 'error',
-        message: 'Đã xảy ra lỗi',
-        detail: error,
-      };
-    }
-  }
-
-  async deleteTriageConfig(id: string) {
-    try {
-      await this.TRIAGE_CONFIG.delete({
-        where: { triage_config: id },
-      });
-      return {
-        code: 200,
-        message: 'Thành công',
-        status: 'success',
+        data: {
+          number_of_diagnosis: dto.number_of_diagnosis,
+        },
       };
     } catch (error) {
       return {
