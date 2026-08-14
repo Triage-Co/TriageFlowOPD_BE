@@ -17,6 +17,7 @@ import {
   UpdateShiftRequestDto,
 } from './dto/request-shift.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
+import { BulkImportShiftDto } from './dto/bulk-import-shift.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -65,6 +66,18 @@ export class ShiftController {
   @ApiResponse({ status: 201, description: 'Tạo ca trực theo tuần thành công.' })
   bulkWeekly(@Body() bulkWeeklyShiftDto: BulkWeeklyShiftDto) {
     return this.shiftService.bulkWeekly(bulkWeeklyShiftDto);
+  }
+
+  @Post('bulk-import')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ADMIN] Tạo hàng loạt ca trực từ danh sách đã import (CSV/Excel)',
+  })
+  @ApiResponse({ status: 201, description: 'Tạo ca trực từ file import thành công.' })
+  bulkImport(@Body() bulkImportShiftDto: BulkImportShiftDto) {
+    return this.shiftService.bulkImport(bulkImportShiftDto);
   }
 
   @Get()

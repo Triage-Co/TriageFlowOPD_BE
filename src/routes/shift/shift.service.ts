@@ -9,6 +9,7 @@ import {
   UpdateShiftRequestDto,
 } from './dto/request-shift.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
+import { BulkImportShiftDto } from './dto/bulk-import-shift.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
@@ -439,19 +440,24 @@ export class ShiftService {
     };
   }
 
-  /** yyyy-MM-dd → true nếu là Thứ 2 (Monday), tính theo lịch (không phụ thuộc TZ vì không có phần giờ). */
-  private isMondayDateString(dateStr: string): boolean {
+  /** yyyy-MM-dd → true nếu ngày tồn tại trên lịch. */
+  private isValidDateString(dateStr: string): boolean {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
     if (!match) return false;
     const [, y, m, d] = match;
     const dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
-    if (
-      dateObj.getUTCFullYear() !== Number(y) ||
-      dateObj.getUTCMonth() !== Number(m) - 1 ||
-      dateObj.getUTCDate() !== Number(d)
-    ) {
-      return false; // ngày không tồn tại (vd 31/02)
-    }
+    return (
+      dateObj.getUTCFullYear() === Number(y) &&
+      dateObj.getUTCMonth() === Number(m) - 1 &&
+      dateObj.getUTCDate() === Number(d)
+    );
+  }
+
+  /** yyyy-MM-dd → true nếu là Thứ 2 (Monday), tính theo lịch (không phụ thuộc TZ vì không có phần giờ). */
+  private isMondayDateString(dateStr: string): boolean {
+    if (!this.isValidDateString(dateStr)) return false;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(Date.UTC(y, m - 1, d));
     return dateObj.getUTCDay() === 1; // 1 = Monday
   }
 
@@ -460,6 +466,85 @@ export class ShiftService {
     const dateObj = new Date(Date.UTC(y, m - 1, d));
     dateObj.setUTCDate(dateObj.getUTCDate() + days);
     return formatInTimeZone(dateObj, 'UTC', 'yyyy-MM-dd');
+  }
+
+  private classifyBulkError(error: unknown): string {
+    if (error instanceof ConflictException) return 'CONFLICT';
+    if (error instanceof NotFoundException) return 'NOT_FOUND';
+    if (error instanceof BadRequestException) return 'BAD_REQUEST';
+    const message = (error as { message?: string })?.message;
+    return message ?? 'ERROR';
+  }
+
+  /** Tạo 1 ca + slot; throw Conflict/NotFound/BadRequest nếu không hợp lệ. */
+  private async createShiftWithSlots(params: {
+    room_id: string;
+    staff_id: string;
+    dateStr: string;
+    start_time: string;
+    end_time: string;
+  }) {
+    const { room_id, staff_id, dateStr, start_time, end_time } = params;
+
+    if (!this.isValidDateString(dateStr)) {
+      throw new BadRequestException({
+        message: 'date không hợp lệ',
+        detail: `date (${dateStr}) phải là ngày tồn tại theo định dạng yyyy-MM-dd.`,
+      });
+    }
+
+    if (this.timeToMinutes(end_time) <= this.timeToMinutes(start_time)) {
+      throw new BadRequestException({
+        message: 'Khoảng thời gian không hợp lệ',
+        detail: 'end_time phải lớn hơn start_time.',
+      });
+    }
+
+    const startOfDay = toDate(`${dateStr}T00:00:00`, { timeZone: TIME_ZONE });
+    const endOfDay = toDate(`${dateStr}T23:59:59.999`, { timeZone: TIME_ZONE });
+
+    const existedRoom = await this.ROOM.findUnique({ where: { room_id } });
+    if (!existedRoom) {
+      throw new NotFoundException(`Không tìm thấy phòng với id ${room_id}`);
+    }
+
+    const existedStaff = await this.STAFF.findUnique({
+      where: { staff_id },
+      include: { account: true },
+    });
+    if (!existedStaff) {
+      throw new NotFoundException(`Không tìm thấy nhân viên với id ${staff_id}`);
+    }
+
+    this.assertDoctorSpecialtyMatches(existedRoom, existedStaff);
+
+    const conflictingShift = await this.findConflictingShift(
+      staff_id,
+      startOfDay,
+      endOfDay,
+      start_time,
+      end_time,
+    );
+
+    if (conflictingShift) {
+      throw new ConflictException('CONFLICT');
+    }
+
+    return this.prismaService.$transaction(async (tx) => {
+      const shift = await tx.shift.create({
+        data: {
+          staff_id,
+          room_id,
+          date: startOfDay,
+          start_time,
+          end_time,
+        },
+      });
+
+      const slotsData = this.buildSlotsData(shift.shift_id, start_time, end_time);
+      await tx.slot.createMany({ data: slotsData });
+      return shift;
+    });
   }
 
   async bulkWeekly(dto: BulkWeeklyShiftDto) {
@@ -495,7 +580,7 @@ export class ShiftService {
       });
     }
 
-    const created: any[] = [];
+    const created: unknown[] = [];
     const skipped: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
     const errors: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
 
@@ -506,59 +591,16 @@ export class ShiftService {
         const { room_id, staff_id } = assignment;
 
         try {
-          const startOfDay = toDate(`${dateStr}T00:00:00`, { timeZone: TIME_ZONE });
-          const endOfDay = toDate(`${dateStr}T23:59:59.999`, { timeZone: TIME_ZONE });
-
-          const existedRoom = await this.ROOM.findUnique({ where: { room_id } });
-          if (!existedRoom) {
-            throw new NotFoundException(`Không tìm thấy phòng với id ${room_id}`);
-          }
-
-          const existedStaff = await this.STAFF.findUnique({
-            where: { staff_id },
-            include: { account: true },
-          });
-          if (!existedStaff) {
-            throw new NotFoundException(`Không tìm thấy nhân viên với id ${staff_id}`);
-          }
-
-          this.assertDoctorSpecialtyMatches(existedRoom, existedStaff);
-
-          const conflictingShift = await this.findConflictingShift(
+          const shift = await this.createShiftWithSlots({
+            room_id,
             staff_id,
-            startOfDay,
-            endOfDay,
+            dateStr,
             start_time,
             end_time,
-          );
-
-          if (conflictingShift) {
-            throw new ConflictException('CONFLICT');
-          }
-
-          await this.prismaService.$transaction(async (tx) => {
-            const shift = await tx.shift.create({
-              data: {
-                staff_id,
-                room_id,
-                date: startOfDay,
-                start_time,
-                end_time,
-              },
-            });
-
-            const slotsData = this.buildSlotsData(shift.shift_id, start_time, end_time);
-            await tx.slot.createMany({ data: slotsData });
-
-            created.push(shift);
           });
-        } catch (error: any) {
-          const isConflict = error instanceof ConflictException;
-          const reason = isConflict
-            ? 'CONFLICT'
-            : error instanceof NotFoundException
-              ? 'NOT_FOUND'
-              : (error?.message ?? 'ERROR');
+          created.push(shift);
+        } catch (error: unknown) {
+          const reason = this.classifyBulkError(error);
 
           if (skip_conflicts) {
             skipped.push({ room_id, staff_id, date: dateStr, reason });
@@ -579,6 +621,50 @@ export class ShiftService {
       code: 201,
       status: 'success',
       message: `Đã tạo ${created.length} ca trực theo tuần (${skipped.length} bị bỏ qua).`,
+      data: { created: created.length, skipped, errors },
+    };
+  }
+
+  async bulkImport(dto: BulkImportShiftDto) {
+    const { items, skip_conflicts = true } = dto;
+
+    const created: unknown[] = [];
+    const skipped: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
+    const errors: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
+
+    for (const item of items) {
+      const { room_id, staff_id, date, start_time, end_time } = item;
+
+      try {
+        const shift = await this.createShiftWithSlots({
+          room_id,
+          staff_id,
+          dateStr: date,
+          start_time,
+          end_time,
+        });
+        created.push(shift);
+      } catch (error: unknown) {
+        const reason = this.classifyBulkError(error);
+
+        if (skip_conflicts) {
+          skipped.push({ room_id, staff_id, date, reason });
+        } else {
+          errors.push({ room_id, staff_id, date, reason });
+          return {
+            code: 207,
+            status: 'partial',
+            message: `Import ca trực dừng lại do lỗi (skip_conflicts=false). Đã tạo ${created.length} ca trước khi dừng.`,
+            data: { created: created.length, skipped, errors },
+          };
+        }
+      }
+    }
+
+    return {
+      code: 201,
+      status: 'success',
+      message: `Đã tạo ${created.length} ca trực từ file import (${skipped.length} bị bỏ qua).`,
       data: { created: created.length, skipped, errors },
     };
   }
