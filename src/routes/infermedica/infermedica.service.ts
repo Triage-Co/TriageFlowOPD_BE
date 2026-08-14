@@ -2,7 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import { Inject, Injectable, NotAcceptableException } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
-import { CreateTriageConfigDto, UpdateTriageConfigDto } from './dto/triage-config.dto';
+import { InfermedicaCreateTriageConfigDto, InfermedicaUpdateTriageConfigDto } from './dto/triage-config.dto';
 import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -331,7 +331,7 @@ export class InfermedicaService {
     }
   }
 
-  async createTriageConfig(createDto: CreateTriageConfigDto) {
+  async createTriageConfig(createDto: InfermedicaCreateTriageConfigDto) {
     try {
       const data = await this.TRIAGE_CONFIG.create({
         data: createDto,
@@ -352,7 +352,7 @@ export class InfermedicaService {
     }
   }
 
-  async updateTriageConfig(id: string, updateDto: UpdateTriageConfigDto) {
+  async updateTriageConfig(id: string, updateDto: InfermedicaUpdateTriageConfigDto) {
     try {
       const data = await this.TRIAGE_CONFIG.update({
         where: { triage_config: id },

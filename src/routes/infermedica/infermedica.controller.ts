@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Ip, Param, Post, Query, Put, Delete } from '@nestjs/common';
 import { InfermedicaService } from './infermedica.service';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
-import { CreateTriageConfigDto, UpdateTriageConfigDto } from './dto/triage-config.dto';
+import { InfermedicaCreateTriageConfigDto, InfermedicaUpdateTriageConfigDto } from './dto/triage-config.dto';
 import { ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
 
 @Controller('infermedica')
@@ -318,7 +318,7 @@ export class InfermedicaController {
 
   @Post('/config')
   @ApiOperation({ summary: 'Tạo cấu hình triage' })
-  createTriageConfig(@Body() createDto: CreateTriageConfigDto) {
+  createTriageConfig(@Body() createDto: InfermedicaCreateTriageConfigDto) {
     return this.infermedicaService.createTriageConfig(createDto);
   }
 
@@ -326,7 +326,7 @@ export class InfermedicaController {
   @ApiOperation({ summary: 'Cập nhật cấu hình triage' })
   updateTriageConfig(
     @Param('id') id: string,
-    @Body() updateDto: UpdateTriageConfigDto,
+    @Body() updateDto: InfermedicaUpdateTriageConfigDto,
   ) {
     return this.infermedicaService.updateTriageConfig(id, updateDto);
   }

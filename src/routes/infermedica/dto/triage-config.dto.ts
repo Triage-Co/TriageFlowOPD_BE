@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsObject } from 'class-validator';
 
-export class CreateTriageConfigDto {
+export class InfermedicaCreateTriageConfigDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -21,4 +21,4 @@ export class CreateTriageConfigDto {
   rule_value?: any;
 }
 
-export class UpdateTriageConfigDto extends CreateTriageConfigDto { }
+export class InfermedicaUpdateTriageConfigDto extends InfermedicaCreateTriageConfigDto { }

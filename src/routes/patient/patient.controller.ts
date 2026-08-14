@@ -8,6 +8,7 @@ import {
   Delete,
   Req,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { PatientService } from './patient.service';
 import {
@@ -24,7 +25,7 @@ import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @Controller('patient')
 export class PatientController {
-  constructor(private readonly patientService: PatientService) { }
+  constructor(private readonly patientService: PatientService) {}
 
   @Get('kiosk')
   @ApiBearerAuth()
@@ -57,9 +58,14 @@ export class PatientController {
   @ApiOperation({
     summary: '[USER] lấy tất bệnh nhân',
   })
-  getMyPatients(@Req() req: any) {
+  getMyPatients(
+    @Req() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
     const id = req.user.sub || req.user.id;
-    return this.patientService.getMyPatients(id);
+    return this.patientService.getMyPatients(id, page, limit, search);
   }
 
   @Delete('me/:patient_id')
@@ -132,8 +138,12 @@ export class PatientController {
   @ApiOperation({
     summary: '[STAFF - ADMIN] lấy tất cả bệnh nhân',
   })
-  getAll() {
-    return this.patientService.getAll();
+  getAll(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    return this.patientService.getAll(page, limit, search);
   }
 
   @Get(':patient_id')
