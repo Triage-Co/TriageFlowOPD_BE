@@ -120,7 +120,9 @@ export class QueryServiceReqDto {
   @IsEnum(ClinicalRoomType)
   room_type?: ClinicalRoomType;
 
-  @ApiPropertyOptional({ example: true })
+  @ApiPropertyOptional({ 
+    description: 'Trạng thái hoạt động (nếu bỏ trống sẽ không lọc theo trạng thái)',
+  })
   @IsOptional()
   @Transform(({ value }) => {
     if (value === undefined || value === null || value === '') return undefined;
@@ -131,7 +133,7 @@ export class QueryServiceReqDto {
   @IsBoolean()
   is_active?: boolean;
 
-  @ApiPropertyOptional({ example: 'kham' })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   search?: string;

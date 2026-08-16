@@ -63,48 +63,20 @@ export class ServiceService {
   }
 
   async findAll(queryReqDto: QueryServiceReqDto) {
-    const page = Number(queryReqDto.page) || 1;
-    const limit = Number(queryReqDto.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const where: Prisma.ServiceWhereInput = {};
-    if (queryReqDto.service_type) where.service_type = queryReqDto.service_type;
-    if (queryReqDto.room_type) where.room_type = queryReqDto.room_type;
-    if (queryReqDto.is_active !== undefined) {
-      where.is_active = queryReqDto.is_active;
-    }
-    if (queryReqDto.search?.trim()) {
-      const q = queryReqDto.search.trim();
-      where.OR = [
-        { service_code: { contains: q, mode: 'insensitive' } },
-        { service_name: { contains: q, mode: 'insensitive' } },
-      ];
-    }
-
     try {
-      const [data, total] = await Promise.all([
-        this.prisma.service.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy: { service_name: 'asc' },
-        }),
-        this.prisma.service.count({ where }),
-      ]);
+      const data = await this.serviceRepository.findAll(
+        queryReqDto.page,
+        queryReqDto.limit,
+        queryReqDto.service_type,
+        queryReqDto.search,
+        queryReqDto.is_active,
+      );
 
       return {
         code: 200,
         status: 'success',
         message: 'Lấy danh sách dịch vụ thành công',
-        data: {
-          data,
-          meta: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit) || 1,
-          },
-        },
+        data,
       };
     } catch (error) {
       const errorMessage =

@@ -1,6 +1,10 @@
 import { Prisma, Service_Order_Detail, Staff } from '@prisma/client';
 
 export interface IServiceOrderDetailRepository {
+  existingDuplicates(
+    bookingId: string,
+    services: string[],
+  ): Promise<Service_Order_Detail[]>;
   create(
     data: Prisma.Service_Order_DetailUncheckedCreateInput,
     tx?: Prisma.TransactionClient,

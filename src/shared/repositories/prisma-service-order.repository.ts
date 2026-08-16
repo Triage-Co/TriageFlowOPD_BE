@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
-import { Prisma, RoleTypeEnum, Service_Order, ServiceOrderStatusEnum } from '@prisma/client';
+import {
+  PaymentStatusEnum,
+  Prisma,
+  RoleTypeEnum,
+  Service_Order,
+  ServiceOrderStatusEnum,
+} from '@prisma/client';
 import { IServiceOrderRepository } from '../interfaces/i-service-order.repository';
 
 @Injectable()
 export class PrismaServiceOrderRepository implements IServiceOrderRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
   async findOrderServiceByBookingId(booking_id: string): Promise<any[]> {
     const rawOrders = await this.prismaService.service_Order.findMany({
       where: {
@@ -28,21 +34,21 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
                         specialty: {
                           select: {
                             specialty_name: true,
-                            specialty_id: true
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                            specialty_id: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    return rawOrders.map(order => {
+    return rawOrders.map((order) => {
       const room = order.booking?.slot?.shift?.room;
 
       return {
@@ -66,8 +72,8 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
         service_order_id: id,
       },
       data: {
-        status: ServiceOrderStatusEnum.CANCELLED
-      }
+        status: ServiceOrderStatusEnum.CANCELLED,
+      },
     });
   }
   create(
@@ -160,18 +166,18 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
                         specialty: {
                           select: {
                             specialty_name: true,
-                            specialty_id: true
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+                            specialty_id: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!rawData) return null;
@@ -200,7 +206,7 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
 
     return await this.prismaService.service_Order.findMany({
       where: {
-        status: 'PENDING',
+        payment_status: PaymentStatusEnum.PENDING,
         OR: [
           {
             booking: {
@@ -226,6 +232,4 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
       },
     });
   }
-
-
 }
