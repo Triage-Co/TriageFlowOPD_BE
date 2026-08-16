@@ -217,7 +217,7 @@ export class TransactionService {
           where: { service_order_id: transaction.service_order_id },
           data: { payment_status: 'SUCCESSED' },
         });
-
+ 
         await this.prismaService.prescription.updateMany({
           where: {
             service_order_id: transaction.service_order_id,
@@ -231,13 +231,11 @@ export class TransactionService {
           data: { status: 'PAID' },
         });
 
-        // Hook: Nếu là đơn gói khám (có package_id), tự động tạo Flow
         const createdFlowResult =
           await this.flowService.createFlowFromServiceOrder(
             transaction.service_order_id,
           );
 
-        // Nếu là đơn gói khám thì skip xử lý PAYMENT steps bên trong
         if (createdFlowResult === null) {
           const paymentSteps = await this.STEP.findMany({
             where: {

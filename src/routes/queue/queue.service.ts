@@ -195,7 +195,7 @@ export class QueueService {
     const count = await client.queue.count({
       where: {
         room_id: roomId,
-        created_at: {
+        enqueued_at: {
           gte: startOfDay,
         },
       },

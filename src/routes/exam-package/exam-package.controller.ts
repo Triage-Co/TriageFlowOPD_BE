@@ -12,11 +12,18 @@ import {
 import { ExamPackageService } from './exam-package.service';
 import { CreateExamPackageDto } from './dto/create-exam-package.dto';
 import { UpdateExamPackageDto } from './dto/update-exam-package.dto';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RoleTypeEnum } from '@prisma/client';
 import { roles } from '../../shared/decorator/role.decorator';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { orGuard } from '../../shared/guards/orGuards';
+import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @ApiTags('Exam Package')
 @Controller('exam-package')
@@ -33,7 +40,7 @@ export class ExamPackageController {
   }
 
   @Get()
-  @UseGuards(IsAuthGuard)
+  @UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
   @ApiBearerAuth()
   @ApiQuery({ name: 'is_active', required: false, type: Boolean })
   @ApiOperation({ summary: 'Lấy danh sách tất cả các gói khám' })
@@ -44,7 +51,7 @@ export class ExamPackageController {
   }
 
   @Get(':id')
-  @UseGuards(IsAuthGuard)
+  @UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy chi tiết một gói khám' })
   findOne(@Param('id') id: string) {
@@ -67,7 +74,9 @@ export class ExamPackageController {
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[ADMIN] Vô hiệu hóa gói khám (409 nếu còn service order)' })
+  @ApiOperation({
+    summary: '[ADMIN] Vô hiệu hóa gói khám (409 nếu còn service order)',
+  })
   remove(@Param('id') id: string) {
     return this.examPackageService.remove(id);
   }
