@@ -427,6 +427,107 @@ export class ServiceOrderService {
         createdServiceOrders.push(serviceOrder);
       }
 
+      if (newlyCreatedSubclinicalSteps.length > 0 && initialClinicalStep) {
+        const returnServiceCode = 'DOC_QUA_KET_CAN_LAM_SANG';
+
+        let targetReturnStepId: string | null = null;
+
+        const existingReturnStep = await this.prisma.step.findFirst({
+          where: {
+            flow_id: flow.flow_id,
+            service_code: returnServiceCode,
+            step_status: StepStatusEnum.PENDING,
+          },
+        });
+
+        if (existingReturnStep) {
+          targetReturnStepId = existingReturnStep.step_id;
+
+          for (const subStep of newlyCreatedSubclinicalSteps) {
+            await this.stepRepository.createDependency(
+              targetReturnStepId,
+              subStep.step_id,
+            );
+          }
+        } else {
+          const returnService = await this.prisma.service.findFirst({
+            where: { service_code: returnServiceCode },
+          });
+
+          if (returnService) {
+            const returnOrder = await this.serviceOrderRepository.create({
+              booking_id,
+              name: returnService.service_name,
+              type: StepTypeEnum.CLINICAL,
+              assign_by_staff_id,
+              status: ServiceOrderStatusEnum.PENDING,
+              payment_status: PaymentStatusEnum.SUCCESSED,
+            });
+
+            await this.serviceOrderDetailRepository.create({
+              service_order_id: returnOrder.service_order_id,
+              quantity: 1,
+              price_at_order: 0,
+              service_id: returnService.service_id,
+              name: returnService.service_name,
+            });
+
+            const returnInvoice = await this.invoiceRepository.create({
+              service_order_id: returnOrder.service_order_id,
+              total_amount: 0,
+              status: InvoiceStatusEnum.PAID,
+            });
+
+            await this.invoiceDetailRepository.create({
+              invoice_id: returnInvoice.invoice_id,
+              item_name:
+                returnService.service_name || 'Đọc kết quả cận lâm sàng',
+              quantity: 1,
+              unit_price: 0,
+              sub_total: 0,
+            });
+
+            const returnStep = await this.stepRepository.createParentStep({
+              flow_id: flow.flow_id,
+              step_type: StepTypeEnum.CLINICAL,
+              step_name: returnService.service_name,
+              service_code: returnService.service_code,
+              room_id: initialClinicalStep.room_id,
+              staff_id: initialClinicalStep.staff_id,
+              service_order_id: returnOrder.service_order_id,
+              step_status: StepStatusEnum.PENDING,
+            });
+
+            targetReturnStepId = returnStep.step_id;
+
+            for (const subStep of newlyCreatedSubclinicalSteps) {
+              await this.stepRepository.createDependency(
+                targetReturnStepId,
+                subStep.step_id,
+              );
+            }
+
+            createdServiceOrders.push(returnOrder);
+          }
+        }
+
+        if (targetReturnStepId) {
+          const pharmacyStep = await this.prisma.step.findFirst({
+            where: {
+              flow_id: flow.flow_id,
+              step_type: StepTypeEnum.DISPENSING,
+            },
+          });
+
+          if (pharmacyStep) {
+            await this.stepRepository.createDependency(
+              pharmacyStep.step_id,
+              targetReturnStepId,
+            );
+          }
+        }
+      }
+
       return {
         code: 201,
         status: 'success',
