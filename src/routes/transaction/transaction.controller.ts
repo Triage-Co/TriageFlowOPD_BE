@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -11,6 +19,8 @@ import {
 import { TransactionService } from './transaction.service';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
 
 @Controller('transaction')
 export class TransactionController {
@@ -73,16 +83,16 @@ export class TransactionController {
 
   @Post('/cash')
   @ApiBearerAuth()
-  @UseGuards(IsAuthGuard)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles('RECEPTIONIST')
   @ApiOperation({
     summary: 'Thanh toán bằng tiền mặt (lễ tân xác nhận thu tiền)',
     description:
       'Lễ tân gọi API này sau khi thu tiền mặt từ bệnh nhân. ' +
       'Hệ thống sẽ tự động cập nhật trạng thái thanh toán và mở step tiếp theo cho bệnh nhân.',
   })
-  payCash(@Body() dto: PayCashDto, @Req() req: any) {
-    const clientId = req.user?.id || req.user?.sub;
-    return this.transactionService.payCash(dto, clientId);
+  payCash(@Body() dto: PayCashDto) {
+    return this.transactionService.payCash(dto);
   }
 
   @Get(':id')
