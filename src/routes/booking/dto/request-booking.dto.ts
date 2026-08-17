@@ -2,13 +2,13 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateBookingRequestDto {
-  @IsUUID()
+  @IsUUID('all', { message: 'ID bệnh nhân phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'patient_id',
     example: '4d70c7b0-5b61-4e51-923d-401d14d6c441',
   })
   patient_id: string;
-  @IsUUID()
+  @IsUUID('all', { message: 'ID slot khám phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'slot_id',
     example: '0135e4ec-01df-41f5-8a26-428e759c7cc6',
@@ -21,14 +21,14 @@ export class UpdateBookingRequestDto extends PartialType(
 ) {}
 
 export class BookingSpecialtyDto {
-  @IsUUID()
+  @IsUUID('all', { message: 'ID bệnh nhân phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'patient_id',
     example: '4d70c7b0-5b61-4e51-923d-401d14d6c441',
   })
   patient_id: string;
 
-  @IsString()
+  @IsString({ message: 'Token phỏng vấn phải là một chuỗi ký tự hợp lệ' })
   @ApiProperty({
     name: 'interview_token',
     example:
@@ -42,7 +42,7 @@ export class BookingSpecialtyDto {
  * Flow sẽ được tạo tự động sau khi thanh toán gói xong.
  */
 export class CreateBookingWithPackageDto {
-  @IsUUID()
+  @IsUUID('all', { message: 'ID bệnh nhân phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'patient_id',
     example: '4d70c7b0-5b61-4e51-923d-401d14d6c441',
@@ -50,7 +50,7 @@ export class CreateBookingWithPackageDto {
   })
   patient_id: string;
 
-  @IsUUID()
+  @IsUUID('all', { message: 'ID slot khám phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'slot_id',
     example: '0135e4ec-01df-41f5-8a26-428e759c7cc6',
@@ -58,15 +58,15 @@ export class CreateBookingWithPackageDto {
   })
   slot_id: string;
 
-  @IsUUID()
+  @IsUUID('all', { message: 'ID gói khám phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'package_id',
-    example: 'abc123-...',
+    example: '0135e4ec-01df-41f5-8a26-428e759c7cc6',
     description: 'ID của Exam_Package (gói khám).',
   })
   package_id: string;
 
-  @IsString()
+  @IsString({ message: 'URL chuyển hướng (return_url) phải là một chuỗi ký tự hợp lệ' })
   @IsOptional()
   @ApiPropertyOptional({
     name: 'return_url',
@@ -75,7 +75,7 @@ export class CreateBookingWithPackageDto {
   })
   return_url?: string;
 
-  @IsString()
+  @IsString({ message: 'URL chuyển hướng (cancel_url) phải là một chuỗi ký tự hợp lệ' })
   @IsOptional()
   @ApiPropertyOptional({
     name: 'cancel_url',

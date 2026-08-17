@@ -14,5 +14,5 @@ export interface IAccountRepository {
     tx?: Prisma.TransactionClient,
   ): Promise<any>;
   delete(id: string): Promise<any>;
-  findAll(): Promise<any>;
+  findAllUsers(): Promise<any>;
 }
