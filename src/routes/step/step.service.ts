@@ -185,6 +185,10 @@ export class StepService {
       await this.queueService.closeServingQueueByStepId(stepId, 'complete');
     }
 
+    if (currentStep.flow_id) {
+      await this.checkAndCompleteFlow(currentStep.flow_id);
+    }
+
     const updated = await this.stepRepository.findById(stepId);
     return {
       code: 200,
@@ -237,6 +241,10 @@ export class StepService {
         'refuse',
         options?.reason,
       );
+    }
+
+    if (currentStep.flow_id) {
+      await this.checkAndCompleteFlow(currentStep.flow_id);
     }
 
     const updated = await this.stepRepository.findById(stepId);
@@ -408,5 +416,24 @@ export class StepService {
       message: 'Lấy danh sách các bước thành công',
       data: steps,
     };
+  }
+
+  async checkAndCompleteFlow(flowId: string) {
+    if (!flowId) return;
+    const unfinishedSteps = await this.prisma.step.count({
+      where: {
+        flow_id: flowId,
+        step_status: {
+          notIn: [StepStatusEnum.COMPLETED, StepStatusEnum.DECLINED, StepStatusEnum.CANCELLED],
+        },
+      },
+    });
+
+    if (unfinishedSteps === 0) {
+      await this.prisma.flow.update({
+        where: { flow_id: flowId },
+        data: { status: FlowStatusEnum.COMPLETED },
+      });
+    }
   }
 }

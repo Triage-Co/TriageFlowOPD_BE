@@ -17,6 +17,7 @@ import {
   StepTypeEnum,
   TransStatusEnum,
   TransTypeEnum,
+  FlowStatusEnum,
 } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { format } from 'date-fns';
@@ -657,6 +658,21 @@ export class PrescriptionService {
           where: { service_order_id: prescription.service_order_id },
           data: { step_status: StepStatusEnum.COMPLETED },
         });
+
+        if (prescription.flow_id) {
+          const unfinishedSteps = await tx.step.count({
+            where: {
+              flow_id: prescription.flow_id,
+              step_status: { notIn: [StepStatusEnum.COMPLETED, StepStatusEnum.DECLINED, StepStatusEnum.CANCELLED] },
+            },
+          });
+          if (unfinishedSteps === 0) {
+            await tx.flow.update({
+              where: { flow_id: prescription.flow_id },
+              data: { status: FlowStatusEnum.COMPLETED },
+            });
+          }
+        }
       }
 
       const updated = await tx.prescription.update({
