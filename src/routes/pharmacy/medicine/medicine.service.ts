@@ -211,13 +211,21 @@ export class MedicineService {
   }
 
   private async assertNoPrescriptionDetailRefs(id: string) {
-    const count = await this.prismaService.prescription_Detail.count({
-      where: { medicine_id: id },
+    const activePrescriptionsCount = await this.prismaService.prescription_Detail.count({
+      where: {
+        medicine_id: id,
+        prescription: {
+          status: {
+            in: ['PENDING', 'PROCESSING', 'PREPARED'],
+          },
+        },
+      },
     });
-    if (count > 0) {
+
+    if (activePrescriptionsCount > 0) {
       throw new ConflictException({
-        message: 'Không thể vô hiệu hóa thuốc vì còn tham chiếu trong đơn thuốc',
-        detail: `prescriptionDetails=${count}`,
+        message: 'Không thể vô hiệu hóa thuốc vì vẫn còn nằm trong đơn thuốc chưa được giao',
+        detail: `activePrescriptions=${activePrescriptionsCount}`,
       });
     }
   }
