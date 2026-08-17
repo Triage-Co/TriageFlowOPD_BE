@@ -6,9 +6,10 @@ import {
   Patch,
   Param,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { StaffService } from './staff.service';
-import { CreateStaffReqDto, UpdateStaffReqDto } from './dto/req-staff.dto';
+import { CreateStaffReqDto, UpdateStaffReqDto, FindAllStaffQueryDto } from './dto/req-staff.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -127,8 +128,8 @@ export class StaffController {
       },
     },
   })
-  findAll(): Promise<ResponseType<StaffResDto[]>> {
-    return this.staffService.findAll();
+  findAll(@Query() query: FindAllStaffQueryDto): Promise<ResponseType<any>> {
+    return this.staffService.findAll(query);
   }
 
   @Get(':id')

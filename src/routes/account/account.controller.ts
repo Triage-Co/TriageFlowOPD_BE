@@ -7,9 +7,10 @@ import {
   Param,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { AccountService } from './account.service';
-import { BanReqDto } from './dto/req-account.dto';
+import { BanReqDto, FindAllUsersQueryDto } from './dto/req-account.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -26,8 +27,8 @@ export class AccountController {
   @ApiOperation({
     summary: '[ADMIN] tìm tất cả người dùng là user và không phải staff',
   })
-  findAll() {
-    return this.accountService.findAllUsers();
+  findAll(@Query() query: FindAllUsersQueryDto) {
+    return this.accountService.findAllUsers(query);
   }
 
   @Get(':id')
