@@ -10,7 +10,13 @@ export interface IStaffRepository {
     data: Prisma.StaffUncheckedUpdateInput,
     tx?: Prisma.TransactionClient,
   ): Promise<any>;
-  findAll(): Promise<any>;
+  findAll(
+    page?: number,
+    limit?: number,
+    is_active?: boolean,
+    search?: string,
+    role?: string,
+  ): Promise<any>;
   findById(id: string): Promise<any>;
   findDoctorsBySpecialtyAndDate(specialtyId: string, startTime?: Date, endTime?: Date): Promise<any>;
 }

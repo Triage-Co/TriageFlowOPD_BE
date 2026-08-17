@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Account, Prisma } from '@prisma/client';
 
 export interface IAccountRepository {
   findByEmail(email: string): Promise<any>;
@@ -14,5 +14,18 @@ export interface IAccountRepository {
     tx?: Prisma.TransactionClient,
   ): Promise<any>;
   delete(id: string): Promise<any>;
-  findAllUsers(): Promise<any>;
+  findAllUsers(
+    page?: number,
+    limit?: number,
+    is_active?: boolean,
+    search?: string,
+  ): Promise<{
+    data: Partial<Account>[];
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  }>;
 }

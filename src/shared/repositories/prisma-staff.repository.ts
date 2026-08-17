@@ -125,22 +125,83 @@ export class PrismaStaffRepository implements IStaffRepository {
     });
   }
 
-  findAll(): Promise<any> {
-    return this.prismaService.staff.findMany({
-      include: {
-        account: {
-          omit: {
-            createdAt: true,
-            updatedAt: true,
-            account_id: true
+  async findAll(
+    page?: number,
+    limit?: number,
+    is_active?: boolean,
+    search?: string,
+    role?: string,
+  ): Promise<any> {
+    const skip =
+      page && limit && page > 0 && limit > 0
+        ? (Number(page) - 1) * Number(limit)
+        : undefined;
+
+    const take = limit && limit > 0 ? Number(limit) : undefined;
+
+    const whereCondition: Prisma.StaffWhereInput = {};
+    const accountWhere: Prisma.AccountWhereInput = {};
+    let hasAccountWhere = false;
+
+    if (search) {
+      whereCondition.OR = [
+        { full_name: { contains: search, mode: 'insensitive' } },
+        { account: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (is_active !== undefined) {
+      accountWhere.is_banned = !is_active;
+      hasAccountWhere = true;
+    }
+
+    if (role) {
+      accountWhere.role = role as RoleTypeEnum;
+      hasAccountWhere = true;
+    }
+
+    if (hasAccountWhere) {
+      whereCondition.account = accountWhere;
+    }
+
+    const [dataStaff, total] = await Promise.all([
+      this.prismaService.staff.findMany({
+        skip,
+        take,
+        where: whereCondition,
+        include: {
+          account: {
+            omit: {
+              createdAt: true,
+              updatedAt: true,
+              account_id: true,
+            },
+          },
+          specialty: {
+            select: {
+              specialty_name: true,
+            }
           }
         },
+        omit: {
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      this.prismaService.staff.count({
+        where: whereCondition,
+      }),
+    ]);
+
+    return {
+      data: dataStaff,
+      meta: {
+        total,
+        page: Number(page) || 1,
+        limit: take ?? total,
+        totalPages: take ? Math.ceil(total / take) : 1,
       },
-      omit: {
-        createdAt: true,
-        updatedAt: true
-      }
-    });
+    };
   }
 
   findById(id: string): Promise<any> {
