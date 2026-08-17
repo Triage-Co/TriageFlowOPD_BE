@@ -202,11 +202,19 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
       where: { patient_id: patientId },
       select: { booking_id: true },
     });
+
     const bookingIds = patientBookings.map((b) => b.booking_id);
 
     return await this.prismaService.service_Order.findMany({
       where: {
         payment_status: PaymentStatusEnum.PENDING,
+        status: {
+          notIn: [
+            ServiceOrderStatusEnum.CANCELLED,
+            ServiceOrderStatusEnum.PAID,
+            ServiceOrderStatusEnum.COMPLETED,
+          ],
+        },
         OR: [
           {
             booking: {
