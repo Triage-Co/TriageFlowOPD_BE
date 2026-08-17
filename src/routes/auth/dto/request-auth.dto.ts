@@ -1,11 +1,12 @@
-import { Optional } from '@nestjs/common';
-import { ApiProperty } from '@nestjs/swagger';
+
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GenderTypeEnum } from '@prisma/client';
 import {
   IsDate,
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUrl,
   Matches,
@@ -49,7 +50,7 @@ export class SignUpReqDto {
     name: 'phone',
     example: '0947900432',
   })
-  @Optional()
+  @IsOptional()
   phone?: string;
 }
 
@@ -160,35 +161,37 @@ export class SignOutReqRequestDto {
 
 export class UpdateUserRequestDto {
   @IsString()
-  @ApiProperty({
+  @ApiPropertyOptional({
     name: 'user_name',
     example: 'Dương Minh',
   })
-  user_name: string;
+  @IsOptional()
+  user_name?: string;
 
   @IsEnum(GenderTypeEnum)
-  @ApiProperty({
+  @ApiPropertyOptional({
     name: 'gender',
     example: 'MALE',
   })
-  gender: GenderTypeEnum;
+  @IsOptional()
+  gender?: GenderTypeEnum;
 
   @Matches(/^(03|05|07|08|09|01[2689])[0-9]{8}$/, {
     message: 'Vui lòng nhập số điện thoại hợp lệ',
   })
-  @ApiProperty({
+  @ApiPropertyOptional({
     name: 'phone',
     example: '0947900432',
   })
-  @Optional()
+  @IsOptional()
   phone?: string;
 
   @IsUrl()
-  @ApiProperty({
+  @ApiPropertyOptional({
     name: 'avatar',
     example:
       'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQeRmIK-W5sIz_tViBzl03LTCe8HJuLk79fzIWmYmxJEQ&s=10',
   })
-  @Optional()
+  @IsOptional()
   avatar?: string;
 }
