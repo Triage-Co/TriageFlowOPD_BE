@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IAccountRepository } from '../interfaces/i-account.repository';
 import { PrismaService } from '../config/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, RoleTypeEnum } from '@prisma/client';
 
 @Injectable()
 export class PrismaAccountRepository implements IAccountRepository {
@@ -13,8 +13,12 @@ export class PrismaAccountRepository implements IAccountRepository {
       },
     });
   }
-  findAll(): Promise<any> {
-    return this.prismaService.account.findMany();
+  findAllUsers(): Promise<any> {
+    return this.prismaService.account.findMany({
+      where: {
+        role: RoleTypeEnum.USER,
+      },
+    });
   }
 
   delete(id: string): Promise<any> {
