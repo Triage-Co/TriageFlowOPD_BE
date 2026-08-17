@@ -547,6 +547,11 @@ export class PrescriptionService {
           },
         });
 
+        await tx.step.updateMany({
+          where: { service_order_id: prescription.service_order_id },
+          data: { step_status: StepStatusEnum.IN_PROGRESS },
+        });
+
         await tx.transaction.create({
           data: {
             buyerId: patientAccountId,
@@ -646,6 +651,11 @@ export class PrescriptionService {
         await tx.service_Order.update({
           where: { service_order_id: prescription.service_order_id },
           data: { status: ServiceOrderStatusEnum.COMPLETED },
+        });
+
+        await tx.step.updateMany({
+          where: { service_order_id: prescription.service_order_id },
+          data: { step_status: StepStatusEnum.COMPLETED },
         });
       }
 
