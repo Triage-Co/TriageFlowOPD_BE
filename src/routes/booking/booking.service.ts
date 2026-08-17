@@ -81,7 +81,7 @@ export class BookingService {
     private readonly roomServiceRepository: IRoomServiceRepository,
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
-  ) { }
+  ) {}
 
   private generateTicketCode(): string {
     const dateStr = format(new Date(), 'yyyyMMdd');
@@ -111,7 +111,7 @@ export class BookingService {
     );
 
     if (flowInProgress.length > 0) {
-      throw FlowErrors.FlowInProgress(patient_id, flowInProgress[0].flow_id)
+      throw FlowErrors.FlowInProgress(patient_id, flowInProgress[0].flow_id);
     }
 
     const [room, roomService] = await Promise.all([
@@ -160,7 +160,9 @@ export class BookingService {
       const serviceOrder = await this.serviceOrderRepository.create(
         {
           booking_id: booking.booking_id,
-          name: 'Thanh toán ' + (roomService.service.service_name || 'khám chuyên khoa'),
+          name:
+            'Thanh toán ' +
+            (roomService.service.service_name || 'khám chuyên khoa'),
           payment_status: PaymentStatusEnum.PENDING,
           status: ServiceOrderStatusEnum.PENDING,
         },
@@ -192,16 +194,17 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-          'Lỗi tạo giao dịch thanh toán',
+            'Lỗi tạo giao dịch thanh toán',
         );
       }
 
-      const roomId =
-        room && room.length > 0 ? room[0].room_id : null;
+      const roomId = room && room.length > 0 ? room[0].room_id : null;
 
       const step = await this.stepRepository.createParentStep(
         {
-          step_name: 'Thanh toán khám chuyên khoa',
+          step_name:
+            'Thanh toán ' +
+            (roomService.service.service_name || 'khám chuyên khoa'),
           flow_id: flow.flow_id,
           room_id: roomId,
           step_type: StepTypeEnum.PAYMENT,
@@ -231,6 +234,153 @@ export class BookingService {
         booking_id: rs.booking.booking_id,
         ticket_code: rs.flow.ticket_code,
         payment: rs.paymentLink,
+      },
+    };
+  }
+
+  async createCashBooking(createBookingData: CreateBookingRequestDto) {
+    const { patient_id, slot_id } = createBookingData;
+
+    const [patient, slot] = await Promise.all([
+      this.patientRepository.findOne(patient_id),
+      this.SlotRepository.findAvailableBySlotId(slot_id),
+    ]);
+
+    if (!patient) {
+      throw PatientErrors.PatientNotFoundById(patient_id);
+    }
+
+    if (!slot) {
+      throw SlotErrors.NotFoundAvailableSlot(slot_id);
+    }
+
+    const flowInProgress = await this.flowRepository.findIsActiveByDate(
+      patient_id,
+      slot.shift.date,
+    );
+
+    if (flowInProgress.length > 0) {
+      throw FlowErrors.FlowInProgress(patient_id, flowInProgress[0].flow_id);
+    }
+
+    const [room, roomService] = await Promise.all([
+      this.roomRepository.findByType(ClinicalRoomType.CASHIER),
+      this.roomServiceRepository.findOneByRoomId(slot.shift.room_id),
+    ]);
+
+    if (!roomService || !roomService.service.price) {
+      throw RoomServiceErrors.RoomServiceNotFoundById(slot.shift.room.room_id);
+    }
+
+    const rs = await this.prismaService.$transaction(async (tx) => {
+      const booking = await this.bookingRepository.create(
+        {
+          patient_id,
+          slot_id,
+        },
+        tx,
+      );
+
+      if (slot.capacity <= 0) {
+        throw SlotErrors.SlotFullError();
+      }
+
+      await this.SlotRepository.update(
+        slot_id,
+        {
+          capacity: {
+            decrement: 1,
+          },
+        },
+        tx,
+      );
+
+      const ticketCode = this.generateTicketCode();
+
+      const flow = await this.flowRepository.create(
+        {
+          booking_id: booking.booking_id,
+          status: FlowStatusEnum.PENDING,
+          ticket_code: ticketCode,
+        },
+        tx,
+      );
+
+      const serviceOrder = await this.serviceOrderRepository.create(
+        {
+          booking_id: booking.booking_id,
+          name:
+            'Thanh toán ' +
+            (roomService.service.service_name || 'khám chuyên khoa'),
+          payment_status: PaymentStatusEnum.PENDING,
+          status: ServiceOrderStatusEnum.PENDING,
+        },
+        tx,
+      );
+
+      await this.serviceOrderDetailRepository.create(
+        {
+          price_at_order: roomService.service.price,
+          quantity: 1,
+          service_id: roomService.service.service_id,
+          service_order_id: serviceOrder.service_order_id,
+        },
+        tx,
+      );
+
+      const invoice = await tx.invoice.create({
+        data: {
+          service_order_id: serviceOrder.service_order_id,
+          status: 'PENDING',
+          total_amount: roomService.service.price,
+        },
+      });
+
+      await tx.invoice_Detail.create({
+        data: {
+          invoice_id: invoice.invoice_id,
+          item_name: roomService.service.service_name || 'khám chuyên khoa',
+          quantity: 1,
+          unit_price: roomService.service.price,
+          sub_total: roomService.service.price,
+        },
+      });
+
+      const roomId = room && room.length > 0 ? room[0].room_id : null;
+
+      const step = await this.stepRepository.createParentStep(
+        {
+          step_name:
+            'Thanh toán ' +
+            (roomService.service.service_name || 'khám chuyên khoa'),
+          flow_id: flow.flow_id,
+          room_id: roomId,
+          step_type: StepTypeEnum.PAYMENT,
+          service_code: roomService.service.service_code,
+          service_order_id: serviceOrder.service_order_id,
+          step_status: StepStatusEnum.PENDING,
+        },
+        tx,
+      );
+
+      return { serviceOrder, step, booking, flow };
+    });
+
+    await this.transactionService.payCash({
+      service_order_id: rs.serviceOrder.service_order_id,
+    });
+
+    const generateResult = await this.generateNumber(rs.step.step_id);
+
+    return {
+      code: 200,
+      message: 'Tạo lịch, thanh toán và lấy số khám thành công',
+      status: 'success',
+      data: {
+        step_id: rs.step.step_id,
+        booking_id: rs.booking.booking_id,
+        ticket_code: rs.flow.ticket_code,
+        queue: generateResult.data.queue,
       },
     };
   }
@@ -281,7 +431,7 @@ export class BookingService {
     let stepKhamBenh = await this.prismaService.step.findFirst({
       where: {
         flow_id: step.flow_id,
-        step_name: 'Khám bệnh',
+        step_name: 'Khám chuyên khoa',
       },
       include: {
         room: true,
@@ -316,7 +466,7 @@ export class BookingService {
           flow_id: step.flow_id,
           room_id: fullSlot.shift.room_id,
           staff_id: fullSlot.shift.staff_id,
-          step_name: 'Khám bệnh',
+          step_name: 'Khám chuyên khoa',
           step_status: StepStatusEnum.PENDING,
           step_type: StepTypeEnum.CLINICAL,
         },
@@ -491,7 +641,7 @@ export class BookingService {
     }
 
     if (!slot) {
-      throw SlotErrors.NotFoundAvailableSlot(slot_id)
+      throw SlotErrors.NotFoundAvailableSlot(slot_id);
     }
 
     const flowInProgress = await this.flowRepository.findIsActiveByDate(
@@ -574,7 +724,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-          'Lỗi tạo giao dịch thanh toán',
+            'Lỗi tạo giao dịch thanh toán',
         );
       }
 

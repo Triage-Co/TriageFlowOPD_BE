@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
   CreateServiceOrderReqDto,
   QueryServiceOrderReqDto,
@@ -121,6 +117,11 @@ export class ServiceOrderService {
       //lấy bước cuối tạo dependOn
       const lastStep = latestStep || steps[steps.length - 1];
 
+      const initialClinicalStep = await this.prisma.step.findFirst({
+        where: { flow_id: flow.flow_id, step_type: StepTypeEnum.CLINICAL },
+        orderBy: { created_at: 'asc' },
+      });
+
       //dạng {step_id, [service_id]}
       //lấy các service có cùng kiểu step
       const groupedServices = new Map<StepTypeEnum, any[]>();
@@ -136,6 +137,7 @@ export class ServiceOrderService {
       }
 
       const createdServiceOrders: any[] = [];
+      const newlyCreatedSubclinicalSteps: any[] = [];
 
       for (const [targetStepType, groupServices] of groupedServices.entries()) {
         const serviceRoomMap = new Map();
@@ -408,6 +410,8 @@ export class ServiceOrderService {
             step.step_id,
             paymentStep.step_id ?? lastStep.step_id,
           );
+
+          newlyCreatedSubclinicalSteps.push(step);
         }
 
         for (const service of groupServices) {

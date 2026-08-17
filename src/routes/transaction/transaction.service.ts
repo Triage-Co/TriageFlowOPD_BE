@@ -88,7 +88,7 @@ export class TransactionService {
     }
   }
 
-  async payCash(dto: PayCashDto, clientId: string): Promise<ResponseType<any>> {
+  async payCash(dto: PayCashDto): Promise<ResponseType<any>> {
     try {
       const isPrescription = await this.prismaService.prescription.findUnique({
         where: { service_order_id: dto.service_order_id },
@@ -112,9 +112,14 @@ export class TransactionService {
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
       );
 
+      const serviceOrder = await this.prismaService.service_Order.findUnique({
+        where: { service_order_id: dto.service_order_id },
+        include: { booking: true },
+      });
+
       const transaction = await this.TRANSACTION.create({
         data: {
-          buyerId: clientId,
+          buyerId: serviceOrder?.booking?.patient_id || '',
           docNo: orderCode,
           transType: 'ORDER_PAYMENT',
           amount: invoice.total_amount,
