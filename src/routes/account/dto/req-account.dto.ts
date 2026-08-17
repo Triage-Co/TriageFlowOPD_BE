@@ -10,7 +10,6 @@ export class BanReqDto {
   })
   @IsInt({ message: 'Số giờ phải là một số nguyên hợp lệ' })
   @Min(0, { message: 'Số giờ không được nhỏ hơn 0' })
-  @Max(23, { message: 'Số giờ không được lớn hơn 23' })
   @Type(() => Number)
   hours: number;
 
@@ -21,7 +20,6 @@ export class BanReqDto {
   })
   @IsInt({ message: 'Số phút phải là một số nguyên hợp lệ' })
   @Min(0, { message: 'Số phút không được nhỏ hơn 0' })
-  @Max(59, { message: 'Số phút không được lớn hơn 59' })
   @Type(() => Number)
   minutes: number;
 }
