@@ -131,6 +131,12 @@ export class PrescriptionController {
     type: Number,
     description: 'Số bản ghi trên trang (mặc định 20)',
   })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description: 'Lọc theo ngày (YYYY-MM-DD)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lấy danh sách đơn thuốc thành công.',
@@ -141,6 +147,7 @@ export class PrescriptionController {
     @Query('status') status?: PrescriptionStatusEnum,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('date') date?: string,
   ) {
     return this.prescriptionService.findAll({
       patient_id,
@@ -148,6 +155,7 @@ export class PrescriptionController {
       status,
       page,
       limit,
+      date,
     });
   }
 
