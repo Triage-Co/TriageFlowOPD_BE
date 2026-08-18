@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { format } from 'date-fns';
+import { toDate } from 'date-fns-tz';
 
 const DOCTOR_SELECT = {
   staff_id: true,
@@ -274,6 +275,7 @@ export class PrescriptionService {
     status?: PrescriptionStatusEnum;
     page?: number;
     limit?: number;
+    date?: string;
   }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
@@ -292,6 +294,17 @@ export class PrescriptionService {
     if (query.patient_id) {
       where.visitSession = {
         patient_id: query.patient_id,
+      };
+    }
+
+    if (query.date) {
+      const timeZone = 'Asia/Ho_Chi_Minh';
+      const startOfDay = toDate(`${query.date}T00:00:00`, { timeZone });
+      const endOfDay = toDate(`${query.date}T23:59:59.999`, { timeZone });
+      
+      where.created_at = {
+        gte: startOfDay,
+        lte: endOfDay,
       };
     }
 
