@@ -399,8 +399,6 @@ export class PrescriptionService {
       where: {
         OR: [
           { prescription_code: code },
-          { qr_code: code },
-          { prescription_id: code },
         ],
       },
       include: {
@@ -663,7 +661,13 @@ export class PrescriptionService {
           const unfinishedSteps = await tx.step.count({
             where: {
               flow_id: prescription.flow_id,
-              step_status: { notIn: [StepStatusEnum.COMPLETED, StepStatusEnum.DECLINED, StepStatusEnum.CANCELLED] },
+              step_status: {
+                notIn: [
+                  StepStatusEnum.COMPLETED,
+                  StepStatusEnum.DECLINED,
+                  StepStatusEnum.CANCELLED,
+                ],
+              },
             },
           });
           if (unfinishedSteps === 0) {
