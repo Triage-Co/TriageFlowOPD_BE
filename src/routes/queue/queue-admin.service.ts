@@ -5,11 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  Prisma,
-  QueueRuleTypeEnum,
-  QueueStatusEnum,
-} from '@prisma/client';
+import { Prisma, QueueRuleTypeEnum, QueueStatusEnum } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { PrismaService } from '../../shared/config/prisma.service';
 import {
@@ -37,7 +33,9 @@ export const ALLOWED_CONDITION_KEYS = [
 
 export const ALLOWED_OPERATORS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in'];
 
-export function validateConditions(conditions: Record<string, any> | null | undefined): void {
+export function validateConditions(
+  conditions: Record<string, any> | null | undefined,
+): void {
   if (!conditions || typeof conditions !== 'object') return;
 
   for (const [key, val] of Object.entries(conditions)) {
@@ -77,7 +75,8 @@ export function validateParams(
     const gap = params?.eta_gap_minutes;
     if (typeof gap !== 'number' || gap <= 0) {
       throw new BadRequestException({
-        message: 'Rule REBALANCE bắt buộc có tham số params.eta_gap_minutes là số lớn hơn 0',
+        message:
+          'Rule REBALANCE bắt buộc có tham số params.eta_gap_minutes là số lớn hơn 0',
       });
     }
   }
@@ -236,10 +235,16 @@ export class QueueAdminService {
         ...(dto.weight !== undefined && { weight: dto.weight }),
         ...(dto.aging_rate !== undefined && { aging_rate: dto.aging_rate }),
         ...(dto.max_aging !== undefined && { max_aging: dto.max_aging }),
-        ...(dto.conditions !== undefined && { conditions: dto.conditions ?? Prisma.DbNull }),
-        ...(dto.params !== undefined && { params: dto.params ?? Prisma.DbNull }),
+        ...(dto.conditions !== undefined && {
+          conditions: dto.conditions ?? Prisma.DbNull,
+        }),
+        ...(dto.params !== undefined && {
+          params: dto.params ?? Prisma.DbNull,
+        }),
         ...(dto.room_type !== undefined && { room_type: dto.room_type }),
-        ...(dto.specialty_id !== undefined && { specialty_id: dto.specialty_id }),
+        ...(dto.specialty_id !== undefined && {
+          specialty_id: dto.specialty_id,
+        }),
         ...(dto.is_active !== undefined && { is_active: dto.is_active }),
       },
     });
@@ -505,15 +510,25 @@ export class QueueAdminService {
       let maxCurrentWaitMinutes = 0;
 
       for (const q of roomQueues) {
-        if (q.status === QueueStatusEnum.QUEUED || q.status === QueueStatusEnum.PENDING) {
+        if (
+          q.status === QueueStatusEnum.QUEUED ||
+          q.status === QueueStatusEnum.PENDING
+        ) {
           waitingCount++;
 
-          const enqueuedAt = q.enqueued_at ? new Date(q.enqueued_at) : new Date(q.created_at);
-          const waitedMins = Math.floor(Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000);
+          const enqueuedAt = q.enqueued_at
+            ? new Date(q.enqueued_at)
+            : new Date(q.created_at);
+          const waitedMins = Math.floor(
+            Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000,
+          );
           if (waitedMins > maxCurrentWaitMinutes) {
             maxCurrentWaitMinutes = waitedMins;
           }
-        } else if (q.status === QueueStatusEnum.SERVING || q.status === QueueStatusEnum.CALLED) {
+        } else if (
+          q.status === QueueStatusEnum.SERVING ||
+          q.status === QueueStatusEnum.CALLED
+        ) {
           servingCount++;
         } else if (q.status === QueueStatusEnum.MISSING) {
           missingCount++;
@@ -522,10 +537,13 @@ export class QueueAdminService {
         }
 
         if (q.serving_started_at) {
-          const enqueuedAt = q.enqueued_at ? new Date(q.enqueued_at) : new Date(q.created_at);
+          const enqueuedAt = q.enqueued_at
+            ? new Date(q.enqueued_at)
+            : new Date(q.created_at);
           const waitMins = Math.max(
             0,
-            (new Date(q.serving_started_at).getTime() - enqueuedAt.getTime()) / 60000,
+            (new Date(q.serving_started_at).getTime() - enqueuedAt.getTime()) /
+              60000,
           );
           servedWaitMinutesSum += waitMins;
           servedCount++;
@@ -553,14 +571,22 @@ export class QueueAdminService {
       }
 
       let congestionLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-      if (etaFullQueueMinutes > 30) {
+      if (
+        (waitingCount == 5 && etaFullQueueMinutes > 50) ||
+        waitingCount >= 10
+      ) {
         congestionLevel = 'HIGH';
-      } else if (etaFullQueueMinutes >= 15) {
+      } else if (
+        (waitingCount == 3 && etaFullQueueMinutes > 30) ||
+        waitingCount >= 6
+      ) {
         congestionLevel = 'MEDIUM';
       }
 
       const avgWaitMinutesToday =
-        servedCount > 0 ? Number((servedWaitMinutesSum / servedCount).toFixed(1)) : 0;
+        servedCount > 0
+          ? Number((servedWaitMinutesSum / servedCount).toFixed(1))
+          : 0;
 
       roomResults.push({
         room_id: room.room_id,
@@ -573,7 +599,9 @@ export class QueueAdminService {
         missing_count: missingCount,
         avg_wait_minutes_today: avgWaitMinutesToday,
         max_current_wait_minutes: maxCurrentWaitMinutes,
-        expected_service_minutes: Math.round(etaResult.expectedDurationSec / 60),
+        expected_service_minutes: Math.round(
+          etaResult.expectedDurationSec / 60,
+        ),
         eta_full_queue_minutes: etaFullQueueMinutes,
         completed_today: completedCount,
         congestion_level: congestionLevel,
@@ -581,7 +609,9 @@ export class QueueAdminService {
     }
 
     const avgWaitMinutesAll =
-      totalServedCount > 0 ? Number((totalServedWaitMinutesSum / totalServedCount).toFixed(1)) : 0;
+      totalServedCount > 0
+        ? Number((totalServedWaitMinutesSum / totalServedCount).toFixed(1))
+        : 0;
 
     return {
       code: 200,
