@@ -255,7 +255,8 @@ export class QueueController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Danh sách chi tiết hàng chờ (serving, waiting, missing).',
+    description:
+      'Danh sách chi tiết hàng chờ (serving, waiting, missing, finished).',
   })
   async getRoomQueueView(@Param('roomId') roomId: string, @Req() req: any) {
     const user = this.getUser(req);

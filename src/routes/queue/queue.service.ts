@@ -45,7 +45,15 @@ const SERVING_STEP_INCLUDE = {
     include: {
       booking: {
         include: {
-          patient: true,
+          patient: {
+            include: {
+              account: {
+                select: {
+                  phone: true,
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -1285,25 +1293,44 @@ export class QueueService {
     const finishedEntries = await this.prisma.queue.findMany({
       where: {
         room_id: roomId,
-        status: QueueStatusEnum.FINISHED,
-        finished_at: { gte: startOfDay, lte: endOfDay },
+        OR: [
+          {
+            status: QueueStatusEnum.FINISHED,
+            OR: [
+              { finished_at: { gte: startOfDay, lte: endOfDay } },
+              {
+                finished_at: null,
+                updated_at: { gte: startOfDay, lte: endOfDay },
+              },
+            ],
+          },
+          {
+            status: QueueStatusEnum.CANCELLED,
+            step: {
+              step_status: {
+                in: [StepStatusEnum.DECLINED, StepStatusEnum.CANCELLED],
+              },
+            },
+            OR: [
+              { finished_at: { gte: startOfDay, lte: endOfDay } },
+              { updated_at: { gte: startOfDay, lte: endOfDay } },
+            ],
+          },
+        ],
       },
       include: {
         step: {
-          include: {
-            flow: {
-              include: {
-                booking: {
-                  include: {
-                    patient: true,
-                  },
-                },
-              },
-            },
+          include: SERVING_STEP_INCLUDE,
+        },
+        moveLogs: {
+          where: {
+            action_type: { in: ['DECLINED', 'FINISHED', 'CANCELLED'] },
           },
+          orderBy: { created_at: 'desc' },
+          take: 1,
         },
       },
-      orderBy: { finished_at: 'desc' },
+      orderBy: [{ finished_at: 'desc' }, { updated_at: 'desc' }],
     });
 
     return {
@@ -1346,12 +1373,7 @@ export class QueueService {
           patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
           missed_at: m.missed_at,
         })),
-        finished: finishedEntries.map((f) => ({
-          queue_id: f.queue_id,
-          queue_number: f.queue_number,
-          patient_name: f.step?.flow?.booking?.patient?.full_name || '---',
-          finished_at: f.finished_at,
-        })),
+        finished: finishedEntries.map((f) => this.buildFinishedPayload(f)),
       },
     };
   }
@@ -1371,6 +1393,78 @@ export class QueueService {
             full_name: patient.full_name,
             dob: patient.dob,
             gender: patient.gender,
+            phone: patient.account?.phone ?? null,
+            citizen_id: patient.citizen_id ?? null,
+          }
+        : null,
+      step: step
+        ? {
+            step_id: step.step_id,
+            step_name: step.step_name,
+            step_type: step.step_type,
+            step_status: step.step_status,
+            service_code: step.service_code,
+          }
+        : null,
+      service_order: so
+        ? {
+            service_order_id: so.service_order_id,
+            name: so.name,
+            status: so.status,
+            details: (so.serviceOrderDetails || []).map((d: any) => ({
+              service_order_detail_id: d.service_order_detail_id,
+              name: d.name || d.service?.service_name || null,
+              service_id: d.service_id,
+              service_code: d.service?.service_code || null,
+              service_name: d.service?.service_name || null,
+              quantity: d.quantity,
+              status: d.status,
+            })),
+          }
+        : null,
+    };
+  }
+
+  buildFinishedPayload(finishedQueue: any) {
+    const step = finishedQueue.step;
+    const patient = step?.flow?.booking?.patient ?? null;
+    const so = step?.service_order ?? null;
+    const moveLog = finishedQueue.moveLogs?.[0] ?? null;
+
+    const startedAt = finishedQueue.serving_started_at
+      ? new Date(finishedQueue.serving_started_at)
+      : null;
+    const finishedAt = finishedQueue.finished_at
+      ? new Date(finishedQueue.finished_at)
+      : finishedQueue.updated_at
+        ? new Date(finishedQueue.updated_at)
+        : null;
+
+    let durationMinutes = 0;
+    if (startedAt && finishedAt) {
+      durationMinutes = Math.max(
+        0,
+        Math.round((finishedAt.getTime() - startedAt.getTime()) / 60000),
+      );
+    }
+
+    return {
+      queue_id: finishedQueue.queue_id,
+      queue_number: finishedQueue.queue_number,
+      queue_type: finishedQueue.queue_type,
+      status: finishedQueue.status,
+      serving_started_at: finishedQueue.serving_started_at,
+      finished_at: finishedQueue.finished_at ?? finishedQueue.updated_at,
+      duration_minutes: durationMinutes,
+      refusal_reason: moveLog?.reason ?? null,
+      patient: patient
+        ? {
+            patient_id: patient.patient_id,
+            full_name: patient.full_name,
+            dob: patient.dob,
+            gender: patient.gender,
+            phone: patient.account?.phone ?? null,
+            citizen_id: patient.citizen_id ?? null,
           }
         : null,
       step: step
@@ -1600,7 +1694,7 @@ export class QueueService {
       where: { queue_id: queue.queue_id },
       data: {
         status,
-        finished_at: outcome === 'complete' ? now : queue.finished_at,
+        finished_at: outcome === 'complete' ? now : (queue.finished_at ?? now),
       },
     });
 

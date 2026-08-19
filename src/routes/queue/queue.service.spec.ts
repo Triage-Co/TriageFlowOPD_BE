@@ -88,3 +88,161 @@ describe('buildQueueDateFilter', () => {
     });
   });
 });
+
+describe('QueueService Payload Builders', () => {
+  const service = new (class extends (jest.requireActual('./queue.service').QueueService) {
+    constructor() {
+      super(null, null, null, null, null, null, null);
+    }
+  })();
+
+  it('buildServingPayload should format patient, step, and service order properly', () => {
+    const rawServingQueue = {
+      queue_id: 'q-1',
+      queue_number: 'A001',
+      serving_started_at: new Date('2026-08-20T08:00:00.000Z'),
+      step: {
+        step_id: 'step-1',
+        step_name: 'Khám Nội',
+        step_type: 'CLINICAL',
+        step_status: 'IN_PROGRESS',
+        service_code: 'KNOI',
+        flow: {
+          booking: {
+            patient: {
+              patient_id: 'pat-1',
+              full_name: 'Nguyen Van A',
+              dob: new Date('1990-01-01'),
+              gender: 'MALE',
+              citizen_id: '012345678901',
+              account: { phone: '0901234567' },
+            },
+          },
+        },
+        service_order: {
+          service_order_id: 'so-1',
+          name: 'Đơn khám 1',
+          status: 'IN_PROGRESS',
+          serviceOrderDetails: [
+            {
+              service_order_detail_id: 'sod-1',
+              name: 'Khám tổng quát',
+              service_id: 'srv-1',
+              quantity: 1,
+              status: 'IN_PROGRESS',
+              service: {
+                service_code: 'KTQ',
+                service_name: 'Khám tổng quát',
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    const payload = service.buildServingPayload(rawServingQueue);
+
+    expect(payload).toEqual({
+      queue_id: 'q-1',
+      queue_number: 'A001',
+      serving_started_at: expect.any(Date),
+      patient: {
+        patient_id: 'pat-1',
+        full_name: 'Nguyen Van A',
+        dob: expect.any(Date),
+        gender: 'MALE',
+        phone: '0901234567',
+        citizen_id: '012345678901',
+      },
+      step: {
+        step_id: 'step-1',
+        step_name: 'Khám Nội',
+        step_type: 'CLINICAL',
+        step_status: 'IN_PROGRESS',
+        service_code: 'KNOI',
+      },
+      service_order: {
+        service_order_id: 'so-1',
+        name: 'Đơn khám 1',
+        status: 'IN_PROGRESS',
+        details: [
+          {
+            service_order_detail_id: 'sod-1',
+            name: 'Khám tổng quát',
+            service_id: 'srv-1',
+            service_code: 'KTQ',
+            service_name: 'Khám tổng quát',
+            quantity: 1,
+            status: 'IN_PROGRESS',
+          },
+        ],
+      },
+    });
+  });
+
+  it('buildFinishedPayload should calculate duration and include refusal_reason', () => {
+    const rawFinishedQueue = {
+      queue_id: 'q-2',
+      queue_number: 'B002',
+      queue_type: 'NORMAL',
+      status: 'CANCELLED',
+      serving_started_at: new Date('2026-08-20T08:00:00.000Z'),
+      finished_at: new Date('2026-08-20T08:15:00.000Z'),
+      step: {
+        step_id: 'step-2',
+        step_name: 'Khám Mắt',
+        step_type: 'CLINICAL',
+        step_status: 'DECLINED',
+        service_code: 'KMAT',
+        flow: {
+          booking: {
+            patient: {
+              patient_id: 'pat-2',
+              full_name: 'Tran Thi B',
+              dob: new Date('1995-05-05'),
+              gender: 'FEMALE',
+              citizen_id: '098765432109',
+              account: { phone: '0987654321' },
+            },
+          },
+        },
+        service_order: null,
+      },
+      moveLogs: [
+        {
+          action_type: 'DECLINED',
+          reason: 'Bệnh nhân xin hủy do có việc bận',
+        },
+      ],
+    };
+
+    const payload = service.buildFinishedPayload(rawFinishedQueue);
+
+    expect(payload).toEqual({
+      queue_id: 'q-2',
+      queue_number: 'B002',
+      queue_type: 'NORMAL',
+      status: 'CANCELLED',
+      serving_started_at: expect.any(Date),
+      finished_at: expect.any(Date),
+      duration_minutes: 15,
+      refusal_reason: 'Bệnh nhân xin hủy do có việc bận',
+      patient: {
+        patient_id: 'pat-2',
+        full_name: 'Tran Thi B',
+        dob: expect.any(Date),
+        gender: 'FEMALE',
+        phone: '0987654321',
+        citizen_id: '098765432109',
+      },
+      step: {
+        step_id: 'step-2',
+        step_name: 'Khám Mắt',
+        step_type: 'CLINICAL',
+        step_status: 'DECLINED',
+        service_code: 'KMAT',
+      },
+      service_order: null,
+    });
+  });
+});
