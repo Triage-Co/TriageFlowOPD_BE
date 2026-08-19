@@ -10,6 +10,9 @@ import {
   QueueTypeEnum,
 } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
+
+const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 export interface RuleEvaluationInput {
   patient: { dob: Date | null; gender: GenderTypeEnum } | null;
@@ -392,9 +395,15 @@ export class QueuePriorityService {
       select: { room_type: true, specialty_id: true },
     });
 
+    const now = new Date();
+    const dateFormatted = formatInTimeZone(now, TIME_ZONE, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: TIME_ZONE });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: TIME_ZONE });
+
     const entries = await db.queue.findMany({
       where: {
         status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
+        created_at: { gte: startOfDay, lte: endOfDay },
         // Prefer denormalized queue.room_id; also pick up orphans where only step.room_id is set
         OR: [
           { room_id: roomId },
