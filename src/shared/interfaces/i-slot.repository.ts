@@ -16,12 +16,11 @@ export interface ISlotRepository {
     starOfDate: Date,
   ): Promise<{ slot_id: string }[]>;
 
-
   update(
     slotId: string,
     data: Prisma.SlotUncheckedUpdateInput,
     tx?: Prisma.TransactionClient,
   ): Promise<Slot>;
 
-  findAvailableBySlotId(slotId: string): Promise<SlotWithShiftAndRoom | null>
+  findAvailableBySlotId(slotId: string): Promise<SlotWithShiftAndRoom | null>;
 }

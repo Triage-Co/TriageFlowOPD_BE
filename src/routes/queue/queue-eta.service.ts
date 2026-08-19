@@ -39,9 +39,15 @@ export function calculateEma(
 /**
  * Pure function to check if a service duration is an outlier.
  */
-export function isOutlierDuration(durationSec: number, stepType: StepTypeEnum | null): boolean {
+export function isOutlierDuration(
+  durationSec: number,
+  stepType: StepTypeEnum | null,
+): boolean {
   if (durationSec < 30) return true; // accidental click
-  if (stepType === StepTypeEnum.PROCEDURE || stepType === StepTypeEnum.FUNCTIONAL_EXPLORATION) {
+  if (
+    stepType === StepTypeEnum.PROCEDURE ||
+    stepType === StepTypeEnum.FUNCTIONAL_EXPLORATION
+  ) {
     return durationSec > 14400; // > 4 hours
   }
   return durationSec > 7200; // > 2 hours
@@ -56,11 +62,21 @@ export function computePatientEtas(
   waitingEntries: { queueId: string; stepType: StepTypeEnum | null }[],
   stepTypeExpectedSecMap: Map<StepTypeEnum | 'DEFAULT', number>,
   now: Date = new Date(),
-): { remainingServingSec: number; entries: EntryEtaInfo[]; totalWaitingSec: number } {
+): {
+  remainingServingSec: number;
+  entries: EntryEtaInfo[];
+  totalWaitingSec: number;
+} {
   let remainingServingSec = 0;
   if (servingStartedAt) {
-    const elapsedSec = Math.max(0, (now.getTime() - servingStartedAt.getTime()) / 1000);
-    remainingServingSec = Math.max(0, Math.round(servingExpectedSec - elapsedSec));
+    const elapsedSec = Math.max(
+      0,
+      (now.getTime() - servingStartedAt.getTime()) / 1000,
+    );
+    remainingServingSec = Math.max(
+      0,
+      Math.round(servingExpectedSec - elapsedSec),
+    );
   }
 
   let accumulatedSec = remainingServingSec;
@@ -216,7 +232,9 @@ export class QueueEtaService {
   ): Promise<void> {
     const type = stepType || StepTypeEnum.OTHER;
     if (isOutlierDuration(durationSec, type)) {
-      this.logger.log(`Skipping outlier duration ${durationSec}s for room ${roomId}, stepType ${type}`);
+      this.logger.log(
+        `Skipping outlier duration ${durationSec}s for room ${roomId}, stepType ${type}`,
+      );
       return;
     }
 
@@ -262,7 +280,10 @@ export class QueueEtaService {
     }
   }
 
-  async getExpectedDurationSec(roomId: string, stepType: StepTypeEnum | null): Promise<number> {
+  async getExpectedDurationSec(
+    roomId: string,
+    stepType: StepTypeEnum | null,
+  ): Promise<number> {
     const type = stepType || StepTypeEnum.OTHER;
     const stat = await this.prisma.room_Service_Stat.findUnique({
       where: {

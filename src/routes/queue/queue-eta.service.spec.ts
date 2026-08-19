@@ -38,7 +38,9 @@ describe('QueueEtaService Pure Functions', () => {
 
     it('should allow PROCEDURE and FUNCTIONAL_EXPLORATION up to 14400 seconds', () => {
       expect(isOutlierDuration(10000, StepTypeEnum.PROCEDURE)).toBe(false);
-      expect(isOutlierDuration(10000, StepTypeEnum.FUNCTIONAL_EXPLORATION)).toBe(false);
+      expect(
+        isOutlierDuration(10000, StepTypeEnum.FUNCTIONAL_EXPLORATION),
+      ).toBe(false);
       expect(isOutlierDuration(14401, StepTypeEnum.PROCEDURE)).toBe(true);
     });
   });
@@ -61,7 +63,13 @@ describe('QueueEtaService Pure Functions', () => {
         ['DEFAULT', 900],
       ]);
 
-      const result = computePatientEtas(servingStartedAt, servingExpectedSec, waitingEntries, stepTypeMap, now);
+      const result = computePatientEtas(
+        servingStartedAt,
+        servingExpectedSec,
+        waitingEntries,
+        stepTypeMap,
+        now,
+      );
 
       expect(result.remainingServingSec).toBe(600); // 600s remaining for current serving
       expect(result.entries.length).toBe(2);
@@ -162,6 +170,8 @@ describe('QueueEtaService.computeEtaForRoom', () => {
 
     await service.computeEtaForRoom('room-1');
 
-    expect(queuePriorityService.computeQueueOrder).toHaveBeenCalledWith('room-1');
+    expect(queuePriorityService.computeQueueOrder).toHaveBeenCalledWith(
+      'room-1',
+    );
   });
 });

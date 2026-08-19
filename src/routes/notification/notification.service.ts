@@ -8,7 +8,11 @@ export class NotificationService {
     private readonly notificationRepository: INotificationRepository,
   ) {}
   async findAll(account_id: string, page?: number, limit?: number) {
-    const result = await this.notificationRepository.findAll(account_id, page, limit);
+    const result = await this.notificationRepository.findAll(
+      account_id,
+      page,
+      limit,
+    );
     return {
       code: 200,
       status: 'success',

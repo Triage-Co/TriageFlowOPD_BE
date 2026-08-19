@@ -1,6 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+} from 'class-validator';
 
 export class FindShiftQueryDto {
   @ApiPropertyOptional({ description: 'Số trang', default: 1 })
@@ -10,14 +17,19 @@ export class FindShiftQueryDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ description: 'Số lượng kết quả trên một trang (mặc định không giới hạn nếu không truyền)' })
+  @ApiPropertyOptional({
+    description:
+      'Số lượng kết quả trên một trang (mặc định không giới hạn nếu không truyền)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm (tên nhân viên, loại phòng, email)' })
+  @ApiPropertyOptional({
+    description: 'Từ khóa tìm kiếm (tên nhân viên, loại phòng, email)',
+  })
   @IsOptional()
   @IsString()
   search?: string;

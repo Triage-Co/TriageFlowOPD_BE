@@ -53,7 +53,9 @@ export class CronService {
       });
 
       const flowIds = expiredFlows.map((f) => f.flow_id);
-      const bookingIds = expiredFlows.map((f) => f.booking_id).filter(id => id != null) as string[];
+      const bookingIds = expiredFlows
+        .map((f) => f.booking_id)
+        .filter((id) => id != null);
 
       if (flowIds.length === 0) {
         return {
@@ -109,17 +111,19 @@ export class CronService {
               ],
             },
           },
-          data: { 
+          data: {
             status: ServiceOrderStatusEnum.CANCELLED,
-            payment_status: PaymentStatusEnum.CANCELLED
+            payment_status: PaymentStatusEnum.CANCELLED,
           },
         });
 
         const affectedServiceOrders = await tx.service_Order.findMany({
           where: { booking_id: { in: bookingIds } },
-          select: { service_order_id: true }
+          select: { service_order_id: true },
         });
-        const serviceOrderIds = affectedServiceOrders.map(so => so.service_order_id);
+        const serviceOrderIds = affectedServiceOrders.map(
+          (so) => so.service_order_id,
+        );
 
         if (serviceOrderIds.length > 0) {
           await tx.service_Order_Detail.updateMany({
@@ -138,17 +142,17 @@ export class CronService {
           await tx.invoice.updateMany({
             where: {
               service_order_id: { in: serviceOrderIds },
-              status: InvoiceStatusEnum.PENDING
+              status: InvoiceStatusEnum.PENDING,
             },
-            data: { status: InvoiceStatusEnum.CANCELLED }
+            data: { status: InvoiceStatusEnum.CANCELLED },
           });
 
           await tx.transaction.updateMany({
             where: {
               service_order_id: { in: serviceOrderIds },
-              status: 'PENDING'
+              status: 'PENDING',
             },
-            data: { status: PaymentStatusEnum.CANCELLED }
+            data: { status: PaymentStatusEnum.CANCELLED },
           });
         }
       }
@@ -233,18 +237,18 @@ export class CronService {
                   ],
                 },
               },
-              data: { 
+              data: {
                 status: ServiceOrderStatusEnum.CANCELLED,
-                payment_status: PaymentStatusEnum.CANCELLED
+                payment_status: PaymentStatusEnum.CANCELLED,
               },
             });
 
             // Get Service Order IDs to cancel details, invoices and transactions
             const affectedOrders = await tx.service_Order.findMany({
               where: { booking_id: flow.booking_id },
-              select: { service_order_id: true }
+              select: { service_order_id: true },
             });
-            const sOrderIds = affectedOrders.map(so => so.service_order_id);
+            const sOrderIds = affectedOrders.map((so) => so.service_order_id);
 
             if (sOrderIds.length > 0) {
               await tx.service_Order_Detail.updateMany({
@@ -263,17 +267,17 @@ export class CronService {
               await tx.invoice.updateMany({
                 where: {
                   service_order_id: { in: sOrderIds },
-                  status: InvoiceStatusEnum.PENDING
+                  status: InvoiceStatusEnum.PENDING,
                 },
-                data: { status: InvoiceStatusEnum.CANCELLED }
+                data: { status: InvoiceStatusEnum.CANCELLED },
               });
 
               await tx.transaction.updateMany({
                 where: {
                   service_order_id: { in: sOrderIds },
-                  status: 'PENDING'
+                  status: 'PENDING',
                 },
-                data: { status: PaymentStatusEnum.CANCELLED }
+                data: { status: PaymentStatusEnum.CANCELLED },
               });
             }
           }

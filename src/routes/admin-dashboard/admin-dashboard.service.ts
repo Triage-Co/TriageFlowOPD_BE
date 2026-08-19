@@ -16,8 +16,12 @@ export class AdminDashboardService {
   async getSummary() {
     const now = new Date();
     const todayDateString = formatInTimeZone(now, TIME_ZONE, 'yyyy-MM-dd');
-    const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone: TIME_ZONE });
-    const endOfDay = toDate(`${todayDateString}T23:59:59.999`, { timeZone: TIME_ZONE });
+    const startOfDay = toDate(`${todayDateString}T00:00:00`, {
+      timeZone: TIME_ZONE,
+    });
+    const endOfDay = toDate(`${todayDateString}T23:59:59.999`, {
+      timeZone: TIME_ZONE,
+    });
 
     const [
       heatmapResult,

@@ -159,9 +159,7 @@ export class MedicineService {
       distinct: ['manufacturer'],
     });
 
-    const manufacturers = medicines
-      .map((m) => m.manufacturer)
-      .filter(Boolean);
+    const manufacturers = medicines.map((m) => m.manufacturer).filter(Boolean);
     return { data: manufacturers };
   }
 
@@ -211,20 +209,22 @@ export class MedicineService {
   }
 
   private async assertNoPrescriptionDetailRefs(id: string) {
-    const activePrescriptionsCount = await this.prismaService.prescription_Detail.count({
-      where: {
-        medicine_id: id,
-        prescription: {
-          status: {
-            in: ['PENDING', 'PROCESSING', 'PREPARED'],
+    const activePrescriptionsCount =
+      await this.prismaService.prescription_Detail.count({
+        where: {
+          medicine_id: id,
+          prescription: {
+            status: {
+              in: ['PENDING', 'PROCESSING', 'PREPARED'],
+            },
           },
         },
-      },
-    });
+      });
 
     if (activePrescriptionsCount > 0) {
       throw new ConflictException({
-        message: 'Không thể vô hiệu hóa thuốc vì vẫn còn nằm trong đơn thuốc chưa được giao',
+        message:
+          'Không thể vô hiệu hóa thuốc vì vẫn còn nằm trong đơn thuốc chưa được giao',
         detail: `activePrescriptions=${activePrescriptionsCount}`,
       });
     }

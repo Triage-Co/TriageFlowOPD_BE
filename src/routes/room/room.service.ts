@@ -144,7 +144,11 @@ export class RoomService {
     if (dateStr) {
       const timeZone = 'Asia/Ho_Chi_Minh';
       const targetDate = new Date(dateStr);
-      const dateFormatted = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+      const dateFormatted = formatInTimeZone(
+        targetDate,
+        timeZone,
+        'yyyy-MM-dd',
+      );
       const start = toDate(`${dateFormatted}T00:00:00`, { timeZone });
       const end = toDate(`${dateFormatted}T23:59:59.999`, { timeZone });
       whereCondition.shift.date = {

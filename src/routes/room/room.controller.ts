@@ -51,11 +51,11 @@ export class RoomController {
   }
 
   @Get(':id/slots')
-  @ApiOperation({ summary: 'Lấy danh sách các slot (khung giờ khám) của một phòng. Có thể lọc theo ngày (YYYY-MM-DD)' })
-  getSlotsByRoomId(
-    @Param('id') id: string,
-    @Query('date') date?: string
-  ) {
+  @ApiOperation({
+    summary:
+      'Lấy danh sách các slot (khung giờ khám) của một phòng. Có thể lọc theo ngày (YYYY-MM-DD)',
+  })
+  getSlotsByRoomId(@Param('id') id: string, @Query('date') date?: string) {
     return this.roomService.getSlotsByRoomId(id, date);
   }
 
@@ -64,7 +64,8 @@ export class RoomController {
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '[ADMIN] Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room',
+    summary:
+      '[ADMIN] Cập nhật thông tin phòng logic / Gán hoặc gỡ gán Physical Room',
   })
   update(
     @Param('id') id: string,

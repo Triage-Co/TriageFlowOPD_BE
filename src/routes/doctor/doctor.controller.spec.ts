@@ -41,14 +41,18 @@ describe('DoctorController', () => {
       status: 'success',
       data: [],
     };
-    doctorService.findAllClinicalDoctorsWithSpecialCode.mockResolvedValue(expectedResult);
+    doctorService.findAllClinicalDoctorsWithSpecialCode.mockResolvedValue(
+      expectedResult,
+    );
 
-    const result = await controller.findAllClinicalWithSpecialCode('SP_1', '2026-08-07');
-
-    expect(doctorService.findAllClinicalDoctorsWithSpecialCode).toHaveBeenCalledWith(
+    const result = await controller.findAllClinicalWithSpecialCode(
       'SP_1',
       '2026-08-07',
     );
+
+    expect(
+      doctorService.findAllClinicalDoctorsWithSpecialCode,
+    ).toHaveBeenCalledWith('SP_1', '2026-08-07');
     expect(result).toBe(expectedResult);
   });
 });

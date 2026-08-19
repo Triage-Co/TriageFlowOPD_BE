@@ -42,25 +42,37 @@ export class CreatePriorityRuleDto {
   @IsString({ message: 'description phải là chuỗi' })
   description?: string;
 
-  @ApiProperty({ enum: QueueRuleTypeEnum, example: QueueRuleTypeEnum.PATIENT_CATEGORY })
+  @ApiProperty({
+    enum: QueueRuleTypeEnum,
+    example: QueueRuleTypeEnum.PATIENT_CATEGORY,
+  })
   @IsNotEmpty({ message: 'rule_type không được để trống' })
   @IsEnum(QueueRuleTypeEnum, { message: 'rule_type không hợp lệ' })
   rule_type: QueueRuleTypeEnum;
 
-  @ApiPropertyOptional({ example: 5, description: 'Trọng số ưu tiên (-100 đến 100)' })
+  @ApiPropertyOptional({
+    example: 5,
+    description: 'Trọng số ưu tiên (-100 đến 100)',
+  })
   @IsOptional()
   @IsInt({ message: 'weight phải là số nguyên' })
   @Min(-100, { message: 'weight tối thiểu là -100' })
   @Max(100, { message: 'weight tối đa là 100' })
   weight?: number;
 
-  @ApiPropertyOptional({ example: 0.5, description: 'Điểm tăng mỗi phút chờ (0 đến 10)' })
+  @ApiPropertyOptional({
+    example: 0.5,
+    description: 'Điểm tăng mỗi phút chờ (0 đến 10)',
+  })
   @IsOptional()
   @Min(0, { message: 'aging_rate tối thiểu là 0' })
   @Max(10, { message: 'aging_rate tối đa là 10' })
   aging_rate?: number;
 
-  @ApiPropertyOptional({ example: 15, description: 'Giới hạn điểm aging tối đa (0 = không giới hạn)' })
+  @ApiPropertyOptional({
+    example: 15,
+    description: 'Giới hạn điểm aging tối đa (0 = không giới hạn)',
+  })
   @IsOptional()
   @Min(0, { message: 'max_aging tối thiểu là 0' })
   @Max(100, { message: 'max_aging tối đa là 100' })
@@ -82,7 +94,10 @@ export class CreatePriorityRuleDto {
   @IsObject({ message: 'params phải là object' })
   params?: Record<string, any>;
 
-  @ApiPropertyOptional({ enum: ClinicalRoomType, example: ClinicalRoomType.CLINICAL_ROOM })
+  @ApiPropertyOptional({
+    enum: ClinicalRoomType,
+    example: ClinicalRoomType.CLINICAL_ROOM,
+  })
   @IsOptional()
   @IsEnum(ClinicalRoomType, { message: 'room_type không hợp lệ' })
   room_type?: ClinicalRoomType;
@@ -201,14 +216,20 @@ export class UpdateRebalanceConfigDto {
   @IsBoolean({ message: 'enabled phải là boolean' })
   enabled: boolean;
 
-  @ApiPropertyOptional({ example: 15, description: 'Ngưỡng chênh lệch ETA (phút)' })
+  @ApiPropertyOptional({
+    example: 15,
+    description: 'Ngưỡng chênh lệch ETA (phút)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'eta_gap_minutes phải là số' })
   @Min(1, { message: 'eta_gap_minutes tối thiểu là 1' })
   eta_gap_minutes?: number;
 
-  @ApiPropertyOptional({ example: 10, description: 'TTL gợi ý điều phối (phút)' })
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'TTL gợi ý điều phối (phút)',
+  })
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'suggestion_ttl_minutes phải là số' })

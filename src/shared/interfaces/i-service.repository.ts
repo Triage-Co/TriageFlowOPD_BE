@@ -17,7 +17,7 @@ export interface IServiceRepository {
     limit?: number,
     service_type?: ServiceTypeEnum,
     search?: string,
-    is_active?: boolean | string
+    is_active?: boolean | string,
   ): Promise<
     Partial<{
       data: Partial<Service>[];

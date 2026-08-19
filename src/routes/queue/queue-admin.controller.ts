@@ -11,7 +11,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RoleTypeEnum } from '@prisma/client';
 import { roles } from '../../shared/decorator/role.decorator';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
@@ -62,8 +67,13 @@ export class QueueAdminController {
 
   @Delete('rules/:ruleId')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '[ADMIN] Tắt (soft-delete) quy tắc ưu tiên hàng chờ' })
-  @ApiResponse({ status: 200, description: 'Đã tắt quy tắc ưu tiên thành công.' })
+  @ApiOperation({
+    summary: '[ADMIN] Tắt (soft-delete) quy tắc ưu tiên hàng chờ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã tắt quy tắc ưu tiên thành công.',
+  })
   async deleteRule(@Param('ruleId') ruleId: string) {
     return await this.queueAdminService.deleteRule(ruleId);
   }
@@ -71,8 +81,13 @@ export class QueueAdminController {
   // ─── Room-Service Mapping CRUD ──────────────────────────────────────────
 
   @Get('room-services')
-  @ApiOperation({ summary: '[ADMIN] Lấy danh sách phân công dịch vụ cho phòng' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách phân công thành công.' })
+  @ApiOperation({
+    summary: '[ADMIN] Lấy danh sách phân công dịch vụ cho phòng',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách phân công thành công.',
+  })
   async getRoomServices(
     @Query('room_id') roomId?: string,
     @Query('service_id') serviceId?: string,
@@ -82,14 +97,22 @@ export class QueueAdminController {
 
   @Post('room-services')
   @ApiOperation({ summary: '[ADMIN] Tạo phân công dịch vụ cho phòng' })
-  @ApiResponse({ status: 201, description: 'Tạo phân công dịch vụ thành công.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo phân công dịch vụ thành công.',
+  })
   async createRoomService(@Body() dto: CreateRoomServiceDto) {
     return await this.queueAdminService.createRoomService(dto);
   }
 
   @Patch('room-services/:id')
-  @ApiOperation({ summary: '[ADMIN] Cập nhật trạng thái phân công dịch vụ phòng' })
-  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái phân công thành công.' })
+  @ApiOperation({
+    summary: '[ADMIN] Cập nhật trạng thái phân công dịch vụ phòng',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật trạng thái phân công thành công.',
+  })
   async updateRoomService(
     @Param('id') id: string,
     @Body() dto: UpdateRoomServiceDto,
@@ -108,15 +131,25 @@ export class QueueAdminController {
   // ─── Default Duration Stats & Heatmap ─────────────────────────────────────
 
   @Get('room-stats')
-  @ApiOperation({ summary: '[ADMIN] Xem cấu hình thời gian phục vụ phòng khám' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách cấu hình thời gian thành công.' })
+  @ApiOperation({
+    summary: '[ADMIN] Xem cấu hình thời gian phục vụ phòng khám',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách cấu hình thời gian thành công.',
+  })
   async getRoomStats(@Query('room_id') roomId?: string) {
     return await this.queueAdminService.getRoomStats(roomId);
   }
 
   @Get('heatmap')
-  @ApiOperation({ summary: '[ADMIN] Lấy dữ liệu snapshot heatmap hàng chờ toàn bệnh viện' })
-  @ApiResponse({ status: 200, description: 'Dữ liệu snapshot heatmap hàng chờ.' })
+  @ApiOperation({
+    summary: '[ADMIN] Lấy dữ liệu snapshot heatmap hàng chờ toàn bệnh viện',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Dữ liệu snapshot heatmap hàng chờ.',
+  })
   async getHeatmapData() {
     return await this.queueAdminService.getHeatmapData();
   }
@@ -129,8 +162,13 @@ export class QueueAdminController {
   }
 
   @Patch('rebalance-config')
-  @ApiOperation({ summary: '[ADMIN] Cập nhật cấu hình tự sắp xếp hàng chờ (merge params)' })
-  @ApiResponse({ status: 200, description: 'Cập nhật cấu hình rebalance thành công.' })
+  @ApiOperation({
+    summary: '[ADMIN] Cập nhật cấu hình tự sắp xếp hàng chờ (merge params)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật cấu hình rebalance thành công.',
+  })
   async updateRebalanceConfig(@Body() dto: UpdateRebalanceConfigDto) {
     return await this.queueAdminService.updateRebalanceConfig(dto);
   }

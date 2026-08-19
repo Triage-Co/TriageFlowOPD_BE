@@ -77,7 +77,9 @@ export class ServiceController {
   @ApiOperation({ summary: 'Cập nhật thông tin dịch vụ' })
   @ApiOkResponse({ description: 'Cập nhật dịch vụ thành công.' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy dịch vụ để cập nhật.' })
-  @ApiConflictResponse({ description: 'Mã dịch vụ muốn cập nhật đã tồn tại / còn tham chiếu.' })
+  @ApiConflictResponse({
+    description: 'Mã dịch vụ muốn cập nhật đã tồn tại / còn tham chiếu.',
+  })
   @ApiBadRequestResponse({
     description: 'Dữ liệu đầu vào không hợp lệ hoặc lỗi hệ thống.',
   })
@@ -95,7 +97,9 @@ export class ServiceController {
   @ApiOperation({ summary: 'Vô hiệu hóa dịch vụ (soft-disable)' })
   @ApiOkResponse({ description: 'Vô hiệu hóa dịch vụ thành công.' })
   @ApiNotFoundResponse({ description: 'Không tìm thấy dịch vụ để xóa.' })
-  @ApiConflictResponse({ description: 'Còn room_service hoặc service_order_detail.' })
+  @ApiConflictResponse({
+    description: 'Còn room_service hoặc service_order_detail.',
+  })
   @ApiBadRequestResponse({ description: 'Lỗi hệ thống khi thực hiện xóa.' })
   remove(@Param('id') id: string) {
     return this.serviceService.remove(id);

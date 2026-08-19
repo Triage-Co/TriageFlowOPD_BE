@@ -120,8 +120,9 @@ export class QueryServiceReqDto {
   @IsEnum(ClinicalRoomType)
   room_type?: ClinicalRoomType;
 
-  @ApiPropertyOptional({ 
-    description: 'Trạng thái hoạt động (nếu bỏ trống sẽ không lọc theo trạng thái)',
+  @ApiPropertyOptional({
+    description:
+      'Trạng thái hoạt động (nếu bỏ trống sẽ không lọc theo trạng thái)',
   })
   @IsOptional()
   @Transform(({ value }) => {

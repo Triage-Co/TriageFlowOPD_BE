@@ -40,7 +40,11 @@ export class PrismaShiftRepository implements IShiftRepository {
     if (search) {
       whereCondition.OR = [
         { staff: { full_name: { contains: search, mode: 'insensitive' } } },
-        { staff: { account: { email: { contains: search, mode: 'insensitive' } } } },
+        {
+          staff: {
+            account: { email: { contains: search, mode: 'insensitive' } },
+          },
+        },
         { room: { room_name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -49,11 +53,19 @@ export class PrismaShiftRepository implements IShiftRepository {
     if (room_id) whereCondition.room_id = room_id;
     if (start_time) whereCondition.start_time = start_time;
     if (end_time) whereCondition.end_time = end_time;
-    
+
     if (date) {
-      const dateFormatted = formatInTimeZone(new Date(date), TIME_ZONE, 'yyyy-MM-dd');
-      const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: TIME_ZONE });
-      const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: TIME_ZONE });
+      const dateFormatted = formatInTimeZone(
+        new Date(date),
+        TIME_ZONE,
+        'yyyy-MM-dd',
+      );
+      const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+        timeZone: TIME_ZONE,
+      });
+      const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+        timeZone: TIME_ZONE,
+      });
       whereCondition.date = { gte: startOfDay, lte: endOfDay };
     }
 
@@ -74,12 +86,12 @@ export class PrismaShiftRepository implements IShiftRepository {
               account: {
                 select: {
                   email: true,
-                }
-              }
-            }
-          }
+                },
+              },
+            },
+          },
         },
-        orderBy: { date: 'desc' }
+        orderBy: { date: 'desc' },
       }),
       this.prismaService.shift.count({ where: whereCondition }),
     ]);
@@ -96,7 +108,7 @@ export class PrismaShiftRepository implements IShiftRepository {
         page: Number(page) || 1,
         limit: Number(limit) || total,
         totalPages: take ? Math.ceil(total / take) : 1,
-      }
+      },
     };
   }
 }

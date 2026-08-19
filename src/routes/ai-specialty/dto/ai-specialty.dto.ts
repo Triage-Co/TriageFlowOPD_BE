@@ -87,7 +87,8 @@ export class CreateAiSpecialtyMappingDto {
 
   @ApiPropertyOptional({
     example: false,
-    description: 'Nếu true, mapping này trở thành primary (các primary cũ bị bỏ)',
+    description:
+      'Nếu true, mapping này trở thành primary (các primary cũ bị bỏ)',
   })
   @IsOptional()
   @IsBoolean()

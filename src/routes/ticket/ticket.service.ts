@@ -15,7 +15,12 @@ import { QueueService } from '../queue/queue.service';
 import { TicketNavigateDto } from './dto/ticket-navigate.dto';
 import { TicketCheckInDto } from './dto/ticket-check-in.dto';
 import { RouteLocationType } from '../navigation/core/dto/get-route.dto';
-import { QueueStatusEnum, QueueTypeEnum, StepStatusEnum, FlowStatusEnum } from '@prisma/client';
+import {
+  QueueStatusEnum,
+  QueueTypeEnum,
+  StepStatusEnum,
+  FlowStatusEnum,
+} from '@prisma/client';
 import { formatInTimeZone } from 'date-fns-tz';
 
 @Injectable()
@@ -35,7 +40,7 @@ export class TicketService {
 
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
-  ) { }
+  ) {}
 
   /**
    * 1. GET /ticket/:code - Tra cứu thông tin cơ bản phiếu khám
@@ -94,7 +99,9 @@ export class TicketService {
       const activeQueue = await this.prisma.queue.findFirst({
         where: {
           step_id: currentStep.step_id,
-          status: { notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED] },
+          status: {
+            notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED],
+          },
         },
       });
 
@@ -104,7 +111,9 @@ export class TicketService {
           activeQueue.status === QueueStatusEnum.PENDING;
 
         if (isWaiting) {
-          const roomEta = await this.queueService.computeRoomEta(currentStep.room_id);
+          const roomEta = await this.queueService.computeRoomEta(
+            currentStep.room_id,
+          );
           const entryEta = roomEta.entries.find(
             (e) => e.queueId === activeQueue.queue_id,
           );
@@ -141,21 +150,21 @@ export class TicketService {
         created_at: flow.created_at,
         patient: patient
           ? {
-            patient_id: patient.patient_id,
-            full_name: patient.full_name,
-            citizen_id: patient.citizen_id,
-            gender: patient.gender,
-            dob: patient.dob,
-          }
+              patient_id: patient.patient_id,
+              full_name: patient.full_name,
+              citizen_id: patient.citizen_id,
+              gender: patient.gender,
+              dob: patient.dob,
+            }
           : null,
         current_step: currentStep
           ? {
-            step_id: currentStep.step_id,
-            step_name: currentStep.step_name,
-            step_status: currentStep.step_status,
-            room_name: currentStep.room?.room_name || 'Đang cập nhật',
-            staff_name: currentStep.staff?.full_name || 'Đang cập nhật',
-          }
+              step_id: currentStep.step_id,
+              step_name: currentStep.step_name,
+              step_status: currentStep.step_status,
+              room_name: currentStep.room?.room_name || 'Đang cập nhật',
+              staff_name: currentStep.staff?.full_name || 'Đang cập nhật',
+            }
           : null,
         queue_info: queueInfo,
         progress_summary: {
@@ -468,7 +477,9 @@ export class TicketService {
           step.staff_id || undefined,
         );
       } catch (err: any) {
-        this.logger.warn(`Queue/socket error during check-in: ${err?.message || err}`);
+        this.logger.warn(
+          `Queue/socket error during check-in: ${err?.message || err}`,
+        );
       }
     }
 
@@ -609,13 +620,15 @@ export class TicketService {
 
     // Determine current active step
     const currentStep =
-      activeFlow.steps.find((s) => s.step_status === StepStatusEnum.IN_PROGRESS) ||
+      activeFlow.steps.find(
+        (s) => s.step_status === StepStatusEnum.IN_PROGRESS,
+      ) ||
       activeFlow.steps.find((s) => s.step_status === StepStatusEnum.PENDING) ||
       null;
 
     let queueInfo: any = null;
 
-    let allQueues: any[] = [];
+    const allQueues: any[] = [];
     activeFlow.steps.forEach((step) => {
       if (step.queues && step.queues.length > 0) {
         allQueues.push(...step.queues);
@@ -635,7 +648,9 @@ export class TicketService {
       const stepQueue = await this.prisma.queue.findFirst({
         where: {
           step_id: currentStep.step_id,
-          status: { notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED] },
+          status: {
+            notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED],
+          },
         },
       });
 
@@ -648,8 +663,12 @@ export class TicketService {
 
         if (isWaiting && currentStep.room_id) {
           try {
-            const roomEta = await this.queueService.computeRoomEta(currentStep.room_id);
-            const entryEta = roomEta.entries.find((e) => e.queueId === qToUse.queue_id);
+            const roomEta = await this.queueService.computeRoomEta(
+              currentStep.room_id,
+            );
+            const entryEta = roomEta.entries.find(
+              (e) => e.queueId === qToUse.queue_id,
+            );
 
             queueInfo = {
               queue_id: qToUse.queue_id,
@@ -696,11 +715,12 @@ export class TicketService {
     }
 
     const stepsDetail = activeFlow.steps.map((step) => {
-      const stepQueue = (step.queues || []).find(
-        (q) =>
-          q.status !== QueueStatusEnum.FINISHED &&
-          q.status !== QueueStatusEnum.CANCELLED,
-      ) || (step.queues || [])[0];
+      const stepQueue =
+        (step.queues || []).find(
+          (q) =>
+            q.status !== QueueStatusEnum.FINISHED &&
+            q.status !== QueueStatusEnum.CANCELLED,
+        ) || (step.queues || [])[0];
 
       return {
         step_id: step.step_id,

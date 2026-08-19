@@ -27,7 +27,8 @@ export class ShiftService {
   ROOM: PrismaClient['room'];
   constructor(
     private readonly prismaService: PrismaService,
-    @Inject('IShiftRepository') private readonly shiftRepository: IShiftRepository,
+    @Inject('IShiftRepository')
+    private readonly shiftRepository: IShiftRepository,
   ) {
     this.SHIFT = this.prismaService.shift;
     this.SLOT = this.prismaService.slot;
@@ -75,7 +76,11 @@ export class ShiftService {
   /** Nếu phòng gắn chuyên khoa và nhân viên là DOCTOR, chuyên khoa phải khớp. */
   private assertDoctorSpecialtyMatches(
     room: { room_id: string; specialty_id: string | null },
-    staff: { staff_id: string; specialty_id: string | null; account?: { role: RoleTypeEnum } | null },
+    staff: {
+      staff_id: string;
+      specialty_id: string | null;
+      account?: { role: RoleTypeEnum } | null;
+    },
   ) {
     if (!room.specialty_id) return;
     if (staff.account?.role !== RoleTypeEnum.DOCTOR) return;
@@ -138,8 +143,12 @@ export class ShiftService {
 
     try {
       const dateFormatted = formatInTimeZone(date, TIME_ZONE, 'yyyy-MM-dd');
-      const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: TIME_ZONE });
-      const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: TIME_ZONE });
+      const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+        timeZone: TIME_ZONE,
+      });
+      const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+        timeZone: TIME_ZONE,
+      });
 
       const existedRoom = await this.ROOM.findUnique({
         where: { room_id },
@@ -174,7 +183,12 @@ export class ShiftService {
       );
 
       if (conflictingShift) {
-        this.throwConflictShiftError(conflictingShift, staff_id, room_id, dateFormatted);
+        this.throwConflictShiftError(
+          conflictingShift,
+          staff_id,
+          room_id,
+          dateFormatted,
+        );
       }
 
       const data = await this.prismaService.$transaction(async (tx) => {
@@ -188,7 +202,11 @@ export class ShiftService {
           },
         });
 
-        const slotsData = this.buildSlotsData(shift.shift_id, start_time, end_time);
+        const slotsData = this.buildSlotsData(
+          shift.shift_id,
+          start_time,
+          end_time,
+        );
 
         return await tx.slot.createMany({
           data: slotsData,
@@ -252,7 +270,10 @@ export class ShiftService {
 
   async findAll(query: QueryShiftDto = {}) {
     const page = query.page && query.page > 0 ? query.page : 1;
-    const limit = Math.min(query.limit && query.limit > 0 ? query.limit : 100, 500);
+    const limit = Math.min(
+      query.limit && query.limit > 0 ? query.limit : 100,
+      500,
+    );
     const skip = (page - 1) * limit;
     const where = this.buildFindAllWhere(query);
 
@@ -367,8 +388,12 @@ export class ShiftService {
     const date = updateShiftRequestDto.date ?? existing.date;
 
     const dateFormatted = formatInTimeZone(date, TIME_ZONE, 'yyyy-MM-dd');
-    const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: TIME_ZONE });
-    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: TIME_ZONE });
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+      timeZone: TIME_ZONE,
+    });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+      timeZone: TIME_ZONE,
+    });
 
     const existedRoom = await this.ROOM.findUnique({ where: { room_id } });
     if (!existedRoom) {
@@ -401,10 +426,19 @@ export class ShiftService {
     );
 
     if (conflictingShift) {
-      this.throwConflictShiftError(conflictingShift, staff_id, room_id, dateFormatted);
+      this.throwConflictShiftError(
+        conflictingShift,
+        staff_id,
+        room_id,
+        dateFormatted,
+      );
     }
 
-    const existingDateFormatted = formatInTimeZone(existing.date, TIME_ZONE, 'yyyy-MM-dd');
+    const existingDateFormatted = formatInTimeZone(
+      existing.date,
+      TIME_ZONE,
+      'yyyy-MM-dd',
+    );
     const timeOrDateChanged =
       start_time !== existing.start_time ||
       end_time !== existing.end_time ||
@@ -483,8 +517,12 @@ export class ShiftService {
     }
 
     const dateFormatted = formatInTimeZone(targetDate, TIME_ZONE, 'yyyy-MM-dd');
-    const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: TIME_ZONE });
-    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: TIME_ZONE });
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+      timeZone: TIME_ZONE,
+    });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+      timeZone: TIME_ZONE,
+    });
 
     const shifts = await this.SHIFT.findMany({
       where: {
@@ -592,7 +630,9 @@ export class ShiftService {
       include: { account: true },
     });
     if (!existedStaff) {
-      throw new NotFoundException(`Không tìm thấy nhân viên với id ${staff_id}`);
+      throw new NotFoundException(
+        `Không tìm thấy nhân viên với id ${staff_id}`,
+      );
     }
 
     this.assertDoctorSpecialtyMatches(existedRoom, existedStaff);
@@ -620,7 +660,11 @@ export class ShiftService {
         },
       });
 
-      const slotsData = this.buildSlotsData(shift.shift_id, start_time, end_time);
+      const slotsData = this.buildSlotsData(
+        shift.shift_id,
+        start_time,
+        end_time,
+      );
       await tx.slot.createMany({ data: slotsData });
       return shift;
     });
@@ -660,8 +704,18 @@ export class ShiftService {
     }
 
     const created: unknown[] = [];
-    const skipped: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
-    const errors: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
+    const skipped: Array<{
+      room_id: string;
+      staff_id: string;
+      date: string;
+      reason: string;
+    }> = [];
+    const errors: Array<{
+      room_id: string;
+      staff_id: string;
+      date: string;
+      reason: string;
+    }> = [];
 
     for (const dayOffset of uniqueDays) {
       const dateStr = this.addDaysToDateString(week_start, dayOffset);
@@ -708,8 +762,18 @@ export class ShiftService {
     const { items, skip_conflicts = true } = dto;
 
     const created: unknown[] = [];
-    const skipped: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
-    const errors: Array<{ room_id: string; staff_id: string; date: string; reason: string }> = [];
+    const skipped: Array<{
+      room_id: string;
+      staff_id: string;
+      date: string;
+      reason: string;
+    }> = [];
+    const errors: Array<{
+      room_id: string;
+      staff_id: string;
+      date: string;
+      reason: string;
+    }> = [];
 
     for (const item of items) {
       const { room_id, staff_id, date, start_time, end_time } = item;

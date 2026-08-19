@@ -90,9 +90,7 @@ export class AiSpecialtyService {
       },
     });
     if (!data) {
-      throw new NotFoundException(
-        `Không tìm thấy AI specialty với ID: ${id}`,
-      );
+      throw new NotFoundException(`Không tìm thấy AI specialty với ID: ${id}`);
     }
     return {
       code: 200,
@@ -136,12 +134,10 @@ export class AiSpecialtyService {
       where: { ai_specialty_id: id },
     });
     if (!existing) {
-      throw new NotFoundException(
-        `Không tìm thấy AI specialty với ID: ${id}`,
-      );
+      throw new NotFoundException(`Không tìm thấy AI specialty với ID: ${id}`);
     }
 
-    let ai_code = dto.ai_code ? normalizeAiCode(dto.ai_code) : undefined;
+    const ai_code = dto.ai_code ? normalizeAiCode(dto.ai_code) : undefined;
     if (ai_code && ai_code !== existing.ai_code) {
       const duplicate = await this.prisma.aiSpecialty.findUnique({
         where: { ai_code },
@@ -183,9 +179,7 @@ export class AiSpecialtyService {
       },
     });
     if (!existing) {
-      throw new NotFoundException(
-        `Không tìm thấy AI specialty với ID: ${id}`,
-      );
+      throw new NotFoundException(`Không tìm thấy AI specialty với ID: ${id}`);
     }
     if (existing._count.mappings > 0) {
       throw new ConflictException({
@@ -428,9 +422,7 @@ export class AiSpecialtyService {
       where: { ai_specialty_id: id },
     });
     if (!existing) {
-      throw new NotFoundException(
-        `Không tìm thấy AI specialty với ID: ${id}`,
-      );
+      throw new NotFoundException(`Không tìm thấy AI specialty với ID: ${id}`);
     }
     return existing;
   }

@@ -11,7 +11,7 @@ import { SupabaseMetadata } from '../types/supabase-auth.type';
 
 @Injectable()
 export class SupabaseAuthProvider implements IAuthProvider {
-  constructor(private readonly supabaseService: SupabaseService) { }
+  constructor(private readonly supabaseService: SupabaseService) {}
   ban(account_id: string, banReqDto: BanReqDto): Promise<any> {
     let banDuration = '';
 

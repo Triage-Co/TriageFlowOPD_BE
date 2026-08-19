@@ -100,7 +100,10 @@ describe('DoctorService', () => {
       prismaService.specialty.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.findAllClinicalDoctorsWithSpecialCode('UNKNOWN_CODE', '2026-08-07'),
+        service.findAllClinicalDoctorsWithSpecialCode(
+          'UNKNOWN_CODE',
+          '2026-08-07',
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -114,7 +117,9 @@ describe('DoctorService', () => {
 
     it('should call staffRepository with ClinicalRoomType.CLINICAL_ROOM and return data', async () => {
       prismaService.specialty.findFirst.mockResolvedValue(mockSpecialty);
-      staffRepository.findDoctorsBySpecialtyAndDate.mockResolvedValue([mockDoctor]);
+      staffRepository.findDoctorsBySpecialtyAndDate.mockResolvedValue([
+        mockDoctor,
+      ]);
 
       const result = await service.findAllClinicalDoctorsWithSpecialCode(
         'SP_1',
@@ -130,7 +135,9 @@ describe('DoctorService', () => {
         },
       });
 
-      expect(staffRepository.findDoctorsBySpecialtyAndDate).toHaveBeenCalledWith(
+      expect(
+        staffRepository.findDoctorsBySpecialtyAndDate,
+      ).toHaveBeenCalledWith(
         'spec-123',
         expect.any(Date),
         expect.any(Date),
@@ -158,15 +165,15 @@ describe('DoctorService', () => {
   describe('findAllWithSpecialCode', () => {
     it('should call staffRepository without roomType filter', async () => {
       prismaService.specialty.findFirst.mockResolvedValue(mockSpecialty);
-      staffRepository.findDoctorsBySpecialtyAndDate.mockResolvedValue([mockDoctor]);
+      staffRepository.findDoctorsBySpecialtyAndDate.mockResolvedValue([
+        mockDoctor,
+      ]);
 
       const result = await service.findAllWithSpecialCode('SP_1', '2026-08-07');
 
-      expect(staffRepository.findDoctorsBySpecialtyAndDate).toHaveBeenCalledWith(
-        'spec-123',
-        expect.any(Date),
-        expect.any(Date),
-      );
+      expect(
+        staffRepository.findDoctorsBySpecialtyAndDate,
+      ).toHaveBeenCalledWith('spec-123', expect.any(Date), expect.any(Date));
 
       expect(result.data).toEqual([mockDoctor]);
     });

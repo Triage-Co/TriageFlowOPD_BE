@@ -24,7 +24,10 @@ export class BulkImportShiftItemDto {
   @IsUUID('4', { message: 'room_id phải là định dạng UUID' })
   room_id: string;
 
-  @ApiProperty({ example: '2026-08-17', description: 'Ngày ca trực (yyyy-MM-dd)' })
+  @ApiProperty({
+    example: '2026-08-17',
+    description: 'Ngày ca trực (yyyy-MM-dd)',
+  })
   @IsNotEmpty({ message: 'date không được để trống' })
   @IsString({ message: 'date phải là chuỗi' })
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
@@ -61,7 +64,8 @@ export class BulkImportShiftDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: 'Bỏ qua và báo cáo các ca bị xung đột thay vì fail toàn bộ batch',
+    description:
+      'Bỏ qua và báo cáo các ca bị xung đột thay vì fail toàn bộ batch',
     default: true,
   })
   @IsOptional()

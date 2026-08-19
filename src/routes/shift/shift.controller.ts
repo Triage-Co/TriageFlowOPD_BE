@@ -10,7 +10,13 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ShiftService } from './shift.service';
 import {
   CreateShiftRequestDto,
@@ -28,7 +34,7 @@ import { RoleTypeEnum } from '@prisma/client';
 @ApiTags('Shift')
 @Controller('shift')
 export class ShiftController {
-  constructor(private readonly shiftService: ShiftService) { }
+  constructor(private readonly shiftService: ShiftService) {}
 
   private getUser(req: any) {
     const u = req?.user;
@@ -41,9 +47,18 @@ export class ShiftController {
   @Get('me')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy danh sách ca trực cá nhân của Staff đăng nhập' })
-  @ApiQuery({ name: 'date', required: false, description: 'Ngày cần tra cứu (YYYY-MM-DD), mặc định hôm nay' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách ca trực thành công.' })
+  @ApiOperation({
+    summary: 'Lấy danh sách ca trực cá nhân của Staff đăng nhập',
+  })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    description: 'Ngày cần tra cứu (YYYY-MM-DD), mặc định hôm nay',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy danh sách ca trực thành công.',
+  })
   async findMyShifts(@Req() req: any, @Query('date') dateStr?: string) {
     const user = this.getUser(req);
     return await this.shiftService.findMyShifts(user.id, dateStr);
@@ -63,9 +78,13 @@ export class ShiftController {
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '[ADMIN] Tạo hàng loạt ca trực theo tuần cho nhiều phòng/nhân viên',
+    summary:
+      '[ADMIN] Tạo hàng loạt ca trực theo tuần cho nhiều phòng/nhân viên',
   })
-  @ApiResponse({ status: 201, description: 'Tạo ca trực theo tuần thành công.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo ca trực theo tuần thành công.',
+  })
   bulkWeekly(@Body() bulkWeeklyShiftDto: BulkWeeklyShiftDto) {
     return this.shiftService.bulkWeekly(bulkWeeklyShiftDto);
   }
@@ -77,7 +96,10 @@ export class ShiftController {
   @ApiOperation({
     summary: '[ADMIN] Tạo hàng loạt ca trực từ danh sách đã import (CSV/Excel)',
   })
-  @ApiResponse({ status: 201, description: 'Tạo ca trực từ file import thành công.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Tạo ca trực từ file import thành công.',
+  })
   bulkImport(@Body() bulkImportShiftDto: BulkImportShiftDto) {
     return this.shiftService.bulkImport(bulkImportShiftDto);
   }
@@ -106,8 +128,13 @@ export class ShiftController {
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[ADMIN] Cập nhật ca trực (regenerate slot nếu đổi giờ/ngày)' })
-  update(@Param('id') id: string, @Body() updateShiftRequestDto: UpdateShiftRequestDto) {
+  @ApiOperation({
+    summary: '[ADMIN] Cập nhật ca trực (regenerate slot nếu đổi giờ/ngày)',
+  })
+  update(
+    @Param('id') id: string,
+    @Body() updateShiftRequestDto: UpdateShiftRequestDto,
+  ) {
     return this.shiftService.update(id, updateShiftRequestDto);
   }
 

@@ -203,7 +203,7 @@ export class ServiceOrderService {
         }
 
         //tìm service có cùng loại step trong cùng booking
-        let existingServiceOrder = await this.prisma.service_Order.findFirst({
+        const existingServiceOrder = await this.prisma.service_Order.findFirst({
           where: {
             booking_id: booking_id,
             type: targetStepType,
@@ -669,7 +669,7 @@ export class ServiceOrderService {
 
       const invoice: any =
         await this.invoiceRepository.findByServiceOrderId(id);
-      let paymentStep =
+      const paymentStep =
         await this.stepRepository.findPaymentStepByServiceOrderId(id);
 
       let targetOrderDetail: any = null;
@@ -695,9 +695,9 @@ export class ServiceOrderService {
       let newService: any = null;
       let newPrice: number | undefined = undefined;
       let newServiceName: string | undefined = undefined;
-      let oldPrice = targetOrderDetail?.price_at_order || 0;
-      let oldServiceName = targetOrderDetail?.name;
-      let oldServiceId = targetOrderDetail?.service_id;
+      const oldPrice = targetOrderDetail?.price_at_order || 0;
+      const oldServiceName = targetOrderDetail?.name;
+      const oldServiceId = targetOrderDetail?.service_id;
 
       let service_code_single: string | undefined = undefined;
       if (service_code && service_code.length > 0) {
@@ -923,8 +923,8 @@ export class ServiceOrderService {
         }
       }
 
-      const oldStepType = roomTypeToStepType(oldService.room_type as any);
-      const newStepType = roomTypeToStepType(newService.room_type as any);
+      const oldStepType = roomTypeToStepType(oldService.room_type);
+      const newStepType = roomTypeToStepType(newService.room_type);
 
       const newPrice = newService.price || 0;
       const newServiceName = newService.service_name || '';
@@ -933,7 +933,7 @@ export class ServiceOrderService {
       const oldQuantity = existing.quantity || 1;
       const oldServiceName = existing.name || '';
 
-      let currentServiceOrderId = existing.service_order_id!;
+      const currentServiceOrderId = existing.service_order_id!;
       let targetServiceOrderId = currentServiceOrderId;
 
       let oldInvoice: any = null;
@@ -955,7 +955,7 @@ export class ServiceOrderService {
       }
 
       let isTypeChanged = false;
-      let finalDetailId = id;
+      const finalDetailId = id;
       let finalData: any = null;
 
       // Bước 1 & 2: Xử lý đổi loại dịch vụ
@@ -995,7 +995,7 @@ export class ServiceOrderService {
             const newOrder = await this.serviceOrderRepository.create({
               booking_id: existing.order.booking_id!,
               name: newServiceName,
-              type: newStepType as any,
+              type: newStepType,
               assign_by_staff_id: existing.order.assign_by_staff_id,
               status: ServiceOrderStatusEnum.PENDING,
             });
@@ -1066,8 +1066,8 @@ export class ServiceOrderService {
               await this.prisma.invoice_Detail.update({
                 where: { invoice_detail_id: oldDetail.invoice_detail_id },
                 data: {
-                  quantity: oldDetail.quantity! - oldQuantity,
-                  sub_total: (oldDetail.quantity! - oldQuantity) * oldPrice,
+                  quantity: oldDetail.quantity - oldQuantity,
+                  sub_total: (oldDetail.quantity - oldQuantity) * oldPrice,
                 },
               });
             } else {
@@ -1202,8 +1202,7 @@ export class ServiceOrderService {
             newRoom = await this.roomRepository.findById(restDto.room_id);
           } else {
             const isRebalanceable =
-              !!newStepType &&
-              REBALANCEABLE_STEP_TYPES.includes(newStepType as any);
+              !!newStepType && REBALANCEABLE_STEP_TYPES.includes(newStepType);
             if (isRebalanceable) {
               const roomServices = await this.prisma.room_Service.findMany({
                 where: { service_id: newService.service_id, is_active: true },

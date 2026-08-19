@@ -24,7 +24,7 @@ export class FlowService {
     private readonly serviceOrderRepository: IServiceOrderRepository,
     @Inject('IServiceRepository')
     private readonly serviceRepository: IServiceRepository,
-  ) { }
+  ) {}
 
   private roundRobinTracker = new Map<string, number>();
 

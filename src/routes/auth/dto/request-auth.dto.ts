@@ -1,4 +1,3 @@
-
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GenderTypeEnum } from '@prisma/client';
 import {

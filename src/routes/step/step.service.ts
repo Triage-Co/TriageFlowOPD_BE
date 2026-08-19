@@ -14,7 +14,12 @@ import {
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
-import { QueueTypeEnum, StepStatusEnum, StepTypeEnum, FlowStatusEnum } from '@prisma/client';
+import {
+  QueueTypeEnum,
+  StepStatusEnum,
+  StepTypeEnum,
+  FlowStatusEnum,
+} from '@prisma/client';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
 import { QueueService } from '../queue/queue.service';
 import { PrismaService } from '../../shared/config/prisma.service';
@@ -424,7 +429,11 @@ export class StepService {
       where: {
         flow_id: flowId,
         step_status: {
-          notIn: [StepStatusEnum.COMPLETED, StepStatusEnum.DECLINED, StepStatusEnum.CANCELLED],
+          notIn: [
+            StepStatusEnum.COMPLETED,
+            StepStatusEnum.DECLINED,
+            StepStatusEnum.CANCELLED,
+          ],
         },
       },
     });

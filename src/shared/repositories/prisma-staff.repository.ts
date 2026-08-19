@@ -6,7 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 @Injectable()
 export class PrismaStaffRepository implements IStaffRepository {
-  constructor(private readonly prismaService: PrismaService) { }
+  constructor(private readonly prismaService: PrismaService) {}
   async findDoctorsBySpecialtyAndDate(
     specialtyId: string,
     startTime?: Date,
@@ -40,15 +40,15 @@ export class PrismaStaffRepository implements IStaffRepository {
         omit: {
           createdAt: true,
           updatedAt: true,
-          is_banned: true
-        }
+          is_banned: true,
+        },
       },
       specialty: {
         omit: {
           description: true,
           createdAt: true,
-          updatedAt: true
-        }
+          updatedAt: true,
+        },
       },
       shifts: {
         ...(hasShiftFilter ? { where: shiftWhere } : {}),
@@ -58,11 +58,11 @@ export class PrismaStaffRepository implements IStaffRepository {
             omit: {
               createdAt: true,
               updatedAt: true,
-              slot_index: true
-            }
-          }
-        }
-      }
+              slot_index: true,
+            },
+          },
+        },
+      },
     };
 
     if (hasShiftFilter) {
@@ -76,23 +76,27 @@ export class PrismaStaffRepository implements IStaffRepository {
       include: includeOption,
       omit: {
         createdAt: true,
-        updatedAt: true
-      }
-    })
+        updatedAt: true,
+      },
+    });
 
-    const formatedData = rawData.map(staff => {
+    const formatedData = rawData.map((staff) => {
       return {
         ...staff,
-        shifts: staff.shifts.map(shift => {
+        shifts: staff.shifts.map((shift) => {
           return {
             ...shift,
-            date: formatInTimeZone(shift.date, "Asia/Ho_Chi_Minh", "yyyy-MM-dd")
-          }
-        })
-      }
-    })
+            date: formatInTimeZone(
+              shift.date,
+              'Asia/Ho_Chi_Minh',
+              'yyyy-MM-dd',
+            ),
+          };
+        }),
+      };
+    });
 
-    return formatedData
+    return formatedData;
   }
 
   create(
@@ -178,8 +182,8 @@ export class PrismaStaffRepository implements IStaffRepository {
           specialty: {
             select: {
               specialty_name: true,
-            }
-          }
+            },
+          },
         },
         omit: {
           createdAt: true,
@@ -212,15 +216,14 @@ export class PrismaStaffRepository implements IStaffRepository {
           omit: {
             createdAt: true,
             updatedAt: true,
-            account_id: true
-          }
+            account_id: true,
+          },
         },
       },
       omit: {
         createdAt: true,
-        updatedAt: true
-      }
+        updatedAt: true,
+      },
     });
   }
-
 }

@@ -75,7 +75,6 @@ export class AuthService {
     let isLocalAccountCreated = false;
 
     try {
-
       const newAccount = await this.accountRepository.create({
         account_id: account_id,
         email: email,

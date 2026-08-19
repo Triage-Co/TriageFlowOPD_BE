@@ -105,7 +105,9 @@ export class TransactionService {
       });
 
       if (!invoice) {
-        throw new BadRequestException('Không tìm thấy hóa đơn cho đơn dịch vụ này');
+        throw new BadRequestException(
+          'Không tìm thấy hóa đơn cho đơn dịch vụ này',
+        );
       }
 
       const orderCode = parseInt(
@@ -222,7 +224,7 @@ export class TransactionService {
           where: { service_order_id: transaction.service_order_id },
           data: { payment_status: 'SUCCESSED' },
         });
- 
+
         await this.prismaService.prescription.updateMany({
           where: {
             service_order_id: transaction.service_order_id,

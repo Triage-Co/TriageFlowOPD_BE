@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
 import type { IAuthProvider } from '../../shared/interfaces/i-auth-provider.interface';
-import { CreateStaffReqDto, UpdateStaffReqDto, FindAllStaffQueryDto } from './dto/req-staff.dto';
+import {
+  CreateStaffReqDto,
+  UpdateStaffReqDto,
+  FindAllStaffQueryDto,
+} from './dto/req-staff.dto';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { Account, Staff } from '@prisma/client';
 import { resend } from '../../shared/config/resend.config';

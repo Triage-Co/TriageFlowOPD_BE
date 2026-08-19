@@ -1,7 +1,4 @@
-import {
-  QueueStatusEnum,
-  StepTypeEnum,
-} from '@prisma/client';
+import { QueueStatusEnum, StepTypeEnum } from '@prisma/client';
 import {
   buildStepTypeExpectedSecMap,
   computePatientEtas,
@@ -29,7 +26,9 @@ function legacyTotalWaitingSecByRoom(
   const result = new Map<string, number>();
   for (const roomId of roomIds) {
     const roomQueues = queues.filter((q) => q.room_id === roomId);
-    const serving = roomQueues.find((q) => q.status === QueueStatusEnum.SERVING);
+    const serving = roomQueues.find(
+      (q) => q.status === QueueStatusEnum.SERVING,
+    );
     const waiting = roomQueues.filter(
       (q) =>
         q.status === QueueStatusEnum.PENDING ||
@@ -148,9 +147,7 @@ describe('rebalance totalWaitingSec aggregate vs legacy computeEtaForRoom loop',
 
     assertMapsEqual(nextGen, legacy);
     expect(nextGen.has('orphan')).toBe(false);
-    expect(nextGen.get(roomA)).toBe(
-      0 + 481 + 720,
-    );
+    expect(nextGen.get(roomA)).toBe(0 + 481 + 720);
   });
 
   it('returns 0 for a room with no queues (callers use ?? 0)', () => {
@@ -220,7 +217,9 @@ describe('QueueRebalanceService.detectAndSuggest', () => {
     prisma.queue.findMany.mockResolvedValue([]);
     prisma.room_Service_Stat.findMany.mockResolvedValue([]);
     prisma.room_Service.findMany.mockResolvedValue([]);
-    prisma.queue_Rebalance_Suggestion.updateMany.mockResolvedValue({ count: 0 });
+    prisma.queue_Rebalance_Suggestion.updateMany.mockResolvedValue({
+      count: 0,
+    });
     queueCacheService.tryBeginRebalanceRun.mockResolvedValue(true);
     queuePriorityService.computeQueueOrder.mockResolvedValue([]);
     prisma.queue_Priority_Rule.findFirst.mockResolvedValue({
@@ -237,7 +236,11 @@ describe('QueueRebalanceService.detectAndSuggest', () => {
 
   it('returns early when enabled is false before any heavy query', async () => {
     prisma.queue_Priority_Rule.findFirst.mockResolvedValue({
-      params: { enabled: false, eta_gap_minutes: 15, suggestion_ttl_minutes: 10 },
+      params: {
+        enabled: false,
+        eta_gap_minutes: 15,
+        suggestion_ttl_minutes: 10,
+      },
     });
 
     const result = await service.detectAndSuggest();
@@ -336,7 +339,9 @@ describe('QueueRebalanceService.scheduleDetectAndSuggest debounce', () => {
 
   it('coalesces multiple post-enqueue triggers into a single run after 15s', async () => {
     const prisma = {
-      queue_Priority_Rule: { findFirst: jest.fn().mockResolvedValue({ params: { enabled: false } }) },
+      queue_Priority_Rule: {
+        findFirst: jest.fn().mockResolvedValue({ params: { enabled: false } }),
+      },
       queue: { findMany: jest.fn() },
       room_Service_Stat: { findMany: jest.fn() },
       room_Service: { findMany: jest.fn() },

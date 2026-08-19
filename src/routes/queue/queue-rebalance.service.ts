@@ -203,7 +203,10 @@ export class QueueRebalanceService {
 
     let createdCount = 0;
 
-    for (const [serviceId, { roomIds, serviceCode }] of serviceRoomsMap.entries()) {
+    for (const [
+      serviceId,
+      { roomIds, serviceCode },
+    ] of serviceRoomsMap.entries()) {
       if (roomIds.length < 2 || !serviceCode) continue;
 
       const roomEtas = roomIds.map((roomId) => ({
@@ -256,45 +259,52 @@ export class QueueRebalanceService {
         if (moved >= 3 || currentGap <= etaGapSec) break;
 
         const queueId = candidate.queue.queue_id;
-        const expiresAt = new Date(Date.now() + suggestionTtlMinutes * 60 * 1000);
+        const expiresAt = new Date(
+          Date.now() + suggestionTtlMinutes * 60 * 1000,
+        );
 
         try {
-          const createdSuggestion = await this.prisma.$transaction(async (tx) => {
-            const existingPending = await tx.queue_Rebalance_Suggestion.findFirst({
-              where: {
-                queue_id: queueId,
-                status: RebalanceSuggestionStatusEnum.PENDING,
-                expires_at: { gt: now },
-              },
-            });
-            if (existingPending) return null;
+          const createdSuggestion = await this.prisma.$transaction(
+            async (tx) => {
+              const existingPending =
+                await tx.queue_Rebalance_Suggestion.findFirst({
+                  where: {
+                    queue_id: queueId,
+                    status: RebalanceSuggestionStatusEnum.PENDING,
+                    expires_at: { gt: now },
+                  },
+                });
+              if (existingPending) return null;
 
-            return tx.queue_Rebalance_Suggestion.create({
-              data: {
-                from_room_id: maxRoom.roomId,
-                to_room_id: minRoom.roomId,
-                queue_id: queueId,
-                eta_gain_sec: Math.round(currentGap),
-                status: RebalanceSuggestionStatusEnum.PENDING,
-                expires_at: expiresAt,
-              },
-              include: {
-                queue: {
-                  include: {
-                    step: {
-                      include: {
-                        flow: {
-                          include: { booking: { include: { patient: true } } },
+              return tx.queue_Rebalance_Suggestion.create({
+                data: {
+                  from_room_id: maxRoom.roomId,
+                  to_room_id: minRoom.roomId,
+                  queue_id: queueId,
+                  eta_gain_sec: Math.round(currentGap),
+                  status: RebalanceSuggestionStatusEnum.PENDING,
+                  expires_at: expiresAt,
+                },
+                include: {
+                  queue: {
+                    include: {
+                      step: {
+                        include: {
+                          flow: {
+                            include: {
+                              booking: { include: { patient: true } },
+                            },
+                          },
                         },
                       },
                     },
                   },
+                  fromRoom: true,
+                  toRoom: true,
                 },
-                fromRoom: true,
-                toRoom: true,
-              },
-            });
-          });
+              });
+            },
+          );
 
           if (!createdSuggestion) continue;
 
@@ -408,7 +418,10 @@ export class QueueRebalanceService {
     };
   }
 
-  async confirmSuggestion(suggestionId: string, user: { id: string; role: string }) {
+  async confirmSuggestion(
+    suggestionId: string,
+    user: { id: string; role: string },
+  ) {
     const suggestion = await this.prisma.queue_Rebalance_Suggestion.findUnique({
       where: { suggestion_id: suggestionId },
       include: {
@@ -559,7 +572,10 @@ export class QueueRebalanceService {
     };
   }
 
-  async rejectSuggestion(suggestionId: string, user: { id: string; role: string }) {
+  async rejectSuggestion(
+    suggestionId: string,
+    user: { id: string; role: string },
+  ) {
     const suggestion = await this.prisma.queue_Rebalance_Suggestion.findUnique({
       where: { suggestion_id: suggestionId },
     });

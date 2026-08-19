@@ -66,7 +66,9 @@ export class CreateBookingWithPackageDto {
   })
   package_id: string;
 
-  @IsString({ message: 'URL chuyển hướng (return_url) phải là một chuỗi ký tự hợp lệ' })
+  @IsString({
+    message: 'URL chuyển hướng (return_url) phải là một chuỗi ký tự hợp lệ',
+  })
   @IsOptional()
   @ApiPropertyOptional({
     name: 'return_url',
@@ -75,7 +77,9 @@ export class CreateBookingWithPackageDto {
   })
   return_url?: string;
 
-  @IsString({ message: 'URL chuyển hướng (cancel_url) phải là một chuỗi ký tự hợp lệ' })
+  @IsString({
+    message: 'URL chuyển hướng (cancel_url) phải là một chuỗi ký tự hợp lệ',
+  })
   @IsOptional()
   @ApiPropertyOptional({
     name: 'cancel_url',

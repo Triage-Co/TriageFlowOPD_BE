@@ -260,7 +260,8 @@ export function orderEntries(
     ) || interleaveRules.find((r) => !r.room_type && !r.specialty_id);
 
   const rawRatio = Number((scopedInterleave?.params as any)?.interleave_ratio);
-  const ratio = Number.isFinite(rawRatio) && rawRatio >= 1 ? Math.floor(rawRatio) : 1;
+  const ratio =
+    Number.isFinite(rawRatio) && rawRatio >= 1 ? Math.floor(rawRatio) : 1;
 
   const merged: (typeof evaluated)[0][] = [];
   let regIdx = 0;
@@ -342,7 +343,7 @@ export class QueuePriorityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queueCacheService: QueueCacheService,
-  ) { }
+  ) {}
 
   clearRulesCache(): void {
     this.rulesCache = null;
@@ -458,24 +459,25 @@ export class QueuePriorityService {
       roomContext !== undefined
         ? roomContext
         : await db.room.findUnique({
-          where: { room_id: roomId },
-          select: { room_type: true, specialty_id: true },
-        });
+            where: { room_id: roomId },
+            select: { room_type: true, specialty_id: true },
+          });
 
     const now = new Date();
     const dateFormatted = formatInTimeZone(now, TIME_ZONE, 'yyyy-MM-dd');
-    const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: TIME_ZONE });
-    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: TIME_ZONE });
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+      timeZone: TIME_ZONE,
+    });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+      timeZone: TIME_ZONE,
+    });
 
     const entries = await db.queue.findMany({
       where: {
         status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
         created_at: { gte: startOfDay, lte: endOfDay },
         // Prefer denormalized queue.room_id; also pick up orphans where only step.room_id is set
-        OR: [
-          { room_id: roomId },
-          { room_id: null, step: { room_id: roomId } },
-        ],
+        OR: [{ room_id: roomId }, { room_id: null, step: { room_id: roomId } }],
       },
       select: QUEUE_ORDER_SELECT,
     });
@@ -492,7 +494,7 @@ export class QueuePriorityService {
       }
     }
 
-    return orderEntries(entries as OrderedQueueRecord[], rules, new Date(), {
+    return orderEntries(entries, rules, new Date(), {
       room_type: room?.room_type,
       specialty_id: room?.specialty_id,
     });

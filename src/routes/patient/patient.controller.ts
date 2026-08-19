@@ -17,7 +17,12 @@ import {
   UpdatePatientByStaffReqDto,
   UpdatePatientReqDto,
 } from './dto/request-patient.dto';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiSecurity } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';

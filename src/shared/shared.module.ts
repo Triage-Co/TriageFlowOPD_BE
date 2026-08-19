@@ -129,9 +129,9 @@ import { PrismaRoomServiceRepository } from './repositories/prisma.room-service.
       useClass: PrismaInvoiceDetailRepository,
     },
     {
-      provide: "IRoomServiceRepository",
-      useClass: PrismaRoomServiceRepository
-    }
+      provide: 'IRoomServiceRepository',
+      useClass: PrismaRoomServiceRepository,
+    },
   ],
   exports: [
     SupabaseService,
@@ -164,4 +164,4 @@ import { PrismaRoomServiceRepository } from './repositories/prisma.room-service.
     PassportModule,
   ],
 })
-export class SharedModule { }
+export class SharedModule {}

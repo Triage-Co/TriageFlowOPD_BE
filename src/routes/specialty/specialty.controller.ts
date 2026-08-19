@@ -9,11 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { RoleTypeEnum } from '@prisma/client';
 import { roles } from '../../shared/decorator/role.decorator';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';

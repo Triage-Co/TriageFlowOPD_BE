@@ -13,8 +13,15 @@ export class PrismaNotificationRepository implements INotificationRepository {
       },
     });
   }
-  async findAll(account_id: string, page?: number, limit?: number): Promise<any> {
-    const skip = page && limit && page > 0 && limit > 0 ? (Number(page) - 1) * Number(limit) : undefined;
+  async findAll(
+    account_id: string,
+    page?: number,
+    limit?: number,
+  ): Promise<any> {
+    const skip =
+      page && limit && page > 0 && limit > 0
+        ? (Number(page) - 1) * Number(limit)
+        : undefined;
     const take = limit && limit > 0 ? Number(limit) : undefined;
 
     const [data, total_items] = await Promise.all([

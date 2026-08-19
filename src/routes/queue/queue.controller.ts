@@ -11,7 +11,12 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -47,7 +52,8 @@ export class QueueController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám (tự động theo engine hoặc gọi đích danh)',
+    summary:
+      'Bác sĩ gọi bệnh nhân tiếp theo vào phòng khám (tự động theo engine hoặc gọi đích danh)',
   })
   @ApiResponse({
     status: 200,
@@ -56,29 +62,46 @@ export class QueueController {
   async callNextPatient(@Body() body: CallPatientDto, @Req() req: any) {
     const { step_id, room_id, staff_id } = body;
     const user = this.getUser(req);
-    return await this.queueService.callNextPatient(step_id, room_id, staff_id, user);
+    return await this.queueService.callNextPatient(
+      step_id,
+      room_id,
+      staff_id,
+      user,
+    );
   }
 
   @Post('transfer')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Bác sĩ chuyển bệnh nhân sang phòng khám / hội chẩn mới' })
+  @ApiOperation({
+    summary: 'Bác sĩ chuyển bệnh nhân sang phòng khám / hội chẩn mới',
+  })
   @ApiResponse({
     status: 200,
     description: 'Chuyển phòng thành công, cấp số mới và phát sóng realtime.',
   })
   async transferQueue(@Body() body: TransferQueueDto, @Req() req: any) {
     const user = this.getUser(req);
-    return await this.queueService.transferQueue(body.step_id, body.to_room_id, body.staff_id, user);
+    return await this.queueService.transferQueue(
+      body.step_id,
+      body.to_room_id,
+      body.staff_id,
+      user,
+    );
   }
 
   @Post(':queueId/override')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Can thiệp thứ tự hàng chờ (PIN_TOP, MOVE_TO_POSITION, UNPIN)' })
-  @ApiResponse({ status: 200, description: 'Đã cập nhật vị trí ưu tiên lượt chờ.' })
+  @ApiOperation({
+    summary: 'Can thiệp thứ tự hàng chờ (PIN_TOP, MOVE_TO_POSITION, UNPIN)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã cập nhật vị trí ưu tiên lượt chờ.',
+  })
   async overrideQueuePosition(
     @Param('queueId') queueId: string,
     @Body() body: OverrideQueueDto,
@@ -104,7 +127,10 @@ export class QueueController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Gọi lại bệnh nhân vắng mặt vào lại hàng chờ' })
-  @ApiResponse({ status: 200, description: 'Đã đưa bệnh nhân quay lại hàng chờ.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã đưa bệnh nhân quay lại hàng chờ.',
+  })
   async recallQueue(@Param('queueId') queueId: string, @Req() req: any) {
     const user = this.getUser(req);
     return await this.queueService.recallQueue(queueId, user);
@@ -115,10 +141,14 @@ export class QueueController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Hoàn thành lượt SERVING tại phòng (Step COMPLETED, đóng queue, sync SO)',
+    summary:
+      'Hoàn thành lượt SERVING tại phòng (Step COMPLETED, đóng queue, sync SO)',
   })
   @ApiResponse({ status: 200, description: 'Đã hoàn thành lượt phục vụ.' })
-  async completeServingQueue(@Param('queueId') queueId: string, @Req() req: any) {
+  async completeServingQueue(
+    @Param('queueId') queueId: string,
+    @Req() req: any,
+  ) {
     const user = this.getUser(req);
     return await this.queueService.completeServingQueue(queueId, user);
   }
@@ -128,7 +158,8 @@ export class QueueController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Từ chối lượt SERVING tại phòng (Step DECLINED, đóng queue, sync SO)',
+    summary:
+      'Từ chối lượt SERVING tại phòng (Step DECLINED, đóng queue, sync SO)',
   })
   @ApiResponse({ status: 200, description: 'Đã từ chối lượt phục vụ.' })
   async refuseServingQueue(
@@ -137,42 +168,60 @@ export class QueueController {
     @Req() req: any,
   ) {
     const user = this.getUser(req);
-    return await this.queueService.refuseServingQueue(queueId, user, body?.reason);
+    return await this.queueService.refuseServingQueue(
+      queueId,
+      user,
+      body?.reason,
+    );
   }
 
   @Post(':queueId/service-order-details/:detailId/complete')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Hoàn thành một Service Order Detail (queue vẫn SERVING)' })
+  @ApiOperation({
+    summary: 'Hoàn thành một Service Order Detail (queue vẫn SERVING)',
+  })
   async completeServiceOrderDetail(
     @Param('queueId') queueId: string,
     @Param('detailId') detailId: string,
     @Req() req: any,
   ) {
     const user = this.getUser(req);
-    return await this.queueService.completeServiceOrderDetail(queueId, detailId, user);
+    return await this.queueService.completeServiceOrderDetail(
+      queueId,
+      detailId,
+      user,
+    );
   }
 
   @Post(':queueId/service-order-details/:detailId/refuse')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Từ chối một Service Order Detail → CANCELLED (queue vẫn SERVING)' })
+  @ApiOperation({
+    summary: 'Từ chối một Service Order Detail → CANCELLED (queue vẫn SERVING)',
+  })
   async refuseServiceOrderDetail(
     @Param('queueId') queueId: string,
     @Param('detailId') detailId: string,
     @Req() req: any,
   ) {
     const user = this.getUser(req);
-    return await this.queueService.refuseServiceOrderDetail(queueId, detailId, user);
+    return await this.queueService.refuseServiceOrderDetail(
+      queueId,
+      detailId,
+      user,
+    );
   }
 
   @Post(':queueId/service-orders/:orderId/complete')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Hoàn thành toàn bộ Service Order (queue vẫn SERVING)' })
+  @ApiOperation({
+    summary: 'Hoàn thành toàn bộ Service Order (queue vẫn SERVING)',
+  })
   async completeServiceOrder(
     @Param('queueId') queueId: string,
     @Param('orderId') orderId: string,
@@ -186,7 +235,9 @@ export class QueueController {
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Từ chối toàn bộ Service Order → CANCELLED (queue vẫn SERVING)' })
+  @ApiOperation({
+    summary: 'Từ chối toàn bộ Service Order → CANCELLED (queue vẫn SERVING)',
+  })
   async refuseServiceOrder(
     @Param('queueId') queueId: string,
     @Param('orderId') orderId: string,
@@ -199,7 +250,9 @@ export class QueueController {
   @Get('room/:roomId')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Xem chi tiết hàng chờ phòng khám dành cho Staff / Doctor' })
+  @ApiOperation({
+    summary: 'Xem chi tiết hàng chờ phòng khám dành cho Staff / Doctor',
+  })
   @ApiResponse({
     status: 200,
     description: 'Danh sách chi tiết hàng chờ (serving, waiting, missing).',
@@ -213,8 +266,13 @@ export class QueueController {
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Admin cấu hình thời gian phục vụ mặc định cho phòng khám' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thời gian mặc định thành công.' })
+  @ApiOperation({
+    summary: 'Admin cấu hình thời gian phục vụ mặc định cho phòng khám',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật thời gian mặc định thành công.',
+  })
   async updateRoomDefaultDurationSec(
     @Param('roomId') roomId: string,
     @Body() body: UpdateRoomStatDto,
@@ -250,13 +308,19 @@ export class QueueController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xác nhận thực thi gợi ý chuyển phòng khám' })
-  @ApiResponse({ status: 200, description: 'Đã chuyển bệnh nhân sang phòng mới thành công.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã chuyển bệnh nhân sang phòng mới thành công.',
+  })
   async confirmRebalanceSuggestion(
     @Param('id') suggestionId: string,
     @Req() req: any,
   ) {
     const user = this.getUser(req);
-    return await this.queueRebalanceService.confirmSuggestion(suggestionId, user);
+    return await this.queueRebalanceService.confirmSuggestion(
+      suggestionId,
+      user,
+    );
   }
 
   @Post('rebalance/suggestions/:id/reject')
@@ -270,6 +334,9 @@ export class QueueController {
     @Req() req: any,
   ) {
     const user = this.getUser(req);
-    return await this.queueRebalanceService.rejectSuggestion(suggestionId, user);
+    return await this.queueRebalanceService.rejectSuggestion(
+      suggestionId,
+      user,
+    );
   }
 }

@@ -17,7 +17,9 @@ export class QueueCacheService {
 
   async getRulesVersion(): Promise<number> {
     try {
-      const raw = await this.cache.get<number | string>(QUEUE_RULES_VERSION_KEY);
+      const raw = await this.cache.get<number | string>(
+        QUEUE_RULES_VERSION_KEY,
+      );
       if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
       if (typeof raw === 'string') {
         const parsed = Number(raw);

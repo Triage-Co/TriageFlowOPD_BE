@@ -9,7 +9,11 @@ import {
   Query,
 } from '@nestjs/common';
 import { StaffService } from './staff.service';
-import { CreateStaffReqDto, UpdateStaffReqDto, FindAllStaffQueryDto } from './dto/req-staff.dto';
+import {
+  CreateStaffReqDto,
+  UpdateStaffReqDto,
+  FindAllStaffQueryDto,
+} from './dto/req-staff.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';

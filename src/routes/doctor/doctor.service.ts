@@ -1,6 +1,16 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
-import { ClinicalRoomType, Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
+import {
+  ClinicalRoomType,
+  Prisma,
+  PrismaClient,
+  RoleTypeEnum,
+} from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
@@ -14,9 +24,10 @@ export class DoctorService {
   STEP: PrismaClient['step'];
   QUEUE: PrismaClient['queue'];
   constructor(
-    @Inject("IStaffRepository")
+    @Inject('IStaffRepository')
     private readonly staffRepository: IStaffRepository,
-    private readonly prismaService: PrismaService) {
+    private readonly prismaService: PrismaService,
+  ) {
     this.STAFF = prismaService.staff;
     this.SLOT = prismaService.slot;
     this.SHIFT = prismaService.shift;
@@ -144,7 +155,6 @@ export class DoctorService {
       let start: Date | undefined;
       let end: Date | undefined;
 
-
       if (dateTimeStr) {
         const targetDate = new Date(dateTimeStr);
 
@@ -162,14 +172,18 @@ export class DoctorService {
         end = toDate(`${dateString}T23:59:59.999`, { timeZone });
       }
 
-      const data = await this.staffRepository.findDoctorsBySpecialtyAndDate(existedSpecialtyCode.specialty_id, start, end)
-
+      const data = await this.staffRepository.findDoctorsBySpecialtyAndDate(
+        existedSpecialtyCode.specialty_id,
+        start,
+        end,
+      );
 
       if (data.length <= 0) {
         throw new NotFoundException({
           message: 'Danh sách rỗng',
-          detail: `Không tìm thấy bác sĩ nào với chuyên ngành ${existedSpecialtyCode.specialty_name} có ca trực ${dateTimeStr ? 'trong ngày ' + dateTimeStr : ''
-            } trong hệ thống`,
+          detail: `Không tìm thấy bác sĩ nào với chuyên ngành ${existedSpecialtyCode.specialty_name} có ca trực ${
+            dateTimeStr ? 'trong ngày ' + dateTimeStr : ''
+          } trong hệ thống`,
         });
       }
       return {
@@ -363,7 +377,7 @@ export class DoctorService {
     }
   }
 
-   async getPatients(staff_id: string, dateStr?: string) {
+  async getPatients(staff_id: string, dateStr?: string) {
     try {
       const whereCondition: any = {
         step: {
@@ -377,7 +391,7 @@ export class DoctorService {
 
       const start = toDate(`${dateString}T00:00:00`, { timeZone });
       const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
-     
+
       whereCondition.step.flow = {
         booking: {
           slot: {
@@ -469,7 +483,7 @@ export class DoctorService {
           item.step.flow.booking.slot.shift.date = formatInTimeZone(
             item.step.flow.booking.slot.shift.date,
             'Asia/Ho_Chi_Minh',
-            "yyyy-MM-dd'T'HH:mm:ssXXX"
+            "yyyy-MM-dd'T'HH:mm:ssXXX",
           );
         }
         return item;

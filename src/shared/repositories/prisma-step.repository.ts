@@ -8,8 +8,11 @@ import { PaymentStatusEnum, Prisma, Step } from '@prisma/client';
 
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
-  constructor(private readonly prismaService: PrismaService) { }
-  createManyParentStep(data: Prisma.StepCreateManyInput[], tx?: Prisma.TransactionClient): Promise<Step[]> {
+  constructor(private readonly prismaService: PrismaService) {}
+  createManyParentStep(
+    data: Prisma.StepCreateManyInput[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step[]> {
     const db = tx || this.prismaService;
     return db.step.createManyAndReturn({
       data,
@@ -53,9 +56,7 @@ export class PrismaStepRepository implements IStepRepository {
     return this.findPrimaryClinicalStepByServiceOrderId(serviceOrderId);
   }
 
-  findNonPaymentStepsByServiceOrderId(
-    serviceOrderId: string,
-  ): Promise<Step[]> {
+  findNonPaymentStepsByServiceOrderId(serviceOrderId: string): Promise<Step[]> {
     return this.prismaService.step.findMany({
       where: {
         service_order_id: serviceOrderId,

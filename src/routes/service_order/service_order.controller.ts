@@ -36,7 +36,7 @@ export class ServiceOrderController {
   constructor(private readonly serviceOrderService: ServiceOrderService) {}
 
   @Post()
-  @roles("ADMIN", "DOCTOR")
+  @roles('ADMIN', 'DOCTOR')
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiBearerAuth()
   @ApiOperation({
@@ -53,7 +53,7 @@ export class ServiceOrderController {
     @Body()
     createServiceOrderReqDto: CreateServiceOrderReqDto,
   ) {
-    const staffId =  req.user?.sub
+    const staffId = req.user?.sub;
     return this.serviceOrderService.create(createServiceOrderReqDto, staffId);
   }
 
@@ -86,16 +86,21 @@ export class ServiceOrderController {
   }
 
   @Get('booking/:bookingId')
-  @roles('ADMIN', 'DOCTOR', 'NURSE', 'LAB_TECHNICIAN', 'PHARMACIST', 'RECEPTIONIST')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'RECEPTIONIST',
+  )
   @ApiOperation({
     summary: 'Lấy danh sách Service Order theo booking (chỉ Admin và Staff)',
   })
   @ApiOkResponse({
     description: 'Lấy danh sách thành công.',
   })
-  findOrderServiceByBookingId(
-    @Param('bookingId') bookingId: string,
-  ) {
+  findOrderServiceByBookingId(@Param('bookingId') bookingId: string) {
     return this.serviceOrderService.findOrderServiceByBookingId(bookingId);
   }
 

@@ -16,9 +16,9 @@ describe('service-order.helpers', () => {
       expect(roomTypeToStepType(ClinicalRoomType.PROCEDURE_ROOM)).toBe(
         StepTypeEnum.PROCEDURE,
       );
-      expect(
-        roomTypeToStepType(ClinicalRoomType.FUNCTIONAL_EXPLORATION),
-      ).toBe(StepTypeEnum.FUNCTIONAL_EXPLORATION);
+      expect(roomTypeToStepType(ClinicalRoomType.FUNCTIONAL_EXPLORATION)).toBe(
+        StepTypeEnum.FUNCTIONAL_EXPLORATION,
+      );
       expect(roomTypeToStepType(ClinicalRoomType.CLINICAL_ROOM)).toBe(
         StepTypeEnum.CLINICAL,
       );

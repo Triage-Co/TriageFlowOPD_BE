@@ -17,19 +17,19 @@ export class PrismaSlotRepository implements ISlotRepository {
     const targetDate = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const startOfToday = toDate(`${targetDate}T00:00:00`, { timeZone });
     return this.prismaService.slot.findFirst({
-      where:{
+      where: {
         slot_id: slotId,
         capacity: {
           gt: 0,
         },
-        OR:[
+        OR: [
           {
             shift: {
               date: startOfToday,
             },
             start_time: {
-              gt: currentHours
-            }
+              gt: currentHours,
+            },
           },
           {
             shift: {
@@ -48,9 +48,9 @@ export class PrismaSlotRepository implements ISlotRepository {
           },
         },
       },
-    })
+    });
   }
-  
+
   update(
     slotId: string,
     data: Prisma.SlotUncheckedUpdateInput,

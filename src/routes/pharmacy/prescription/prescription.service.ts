@@ -301,7 +301,7 @@ export class PrescriptionService {
       const timeZone = 'Asia/Ho_Chi_Minh';
       const startOfDay = toDate(`${query.date}T00:00:00`, { timeZone });
       const endOfDay = toDate(`${query.date}T23:59:59.999`, { timeZone });
-      
+
       where.created_at = {
         gte: startOfDay,
         lte: endOfDay,
@@ -410,9 +410,7 @@ export class PrescriptionService {
   async findByCode(code: string, currentUser?: any) {
     const prescription = await this.prismaService.prescription.findFirst({
       where: {
-        OR: [
-          { prescription_code: code },
-        ],
+        OR: [{ prescription_code: code }],
       },
       include: {
         serviceOrder: true,

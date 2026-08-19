@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { RoleTypeEnum } from '@prisma/client';
 import { roles } from '../../shared/decorator/role.decorator';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
@@ -10,7 +23,7 @@ import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
 
 @Controller('infermedica')
 export class InfermedicaController {
-  constructor(private readonly infermedicaService: InfermedicaService) { }
+  constructor(private readonly infermedicaService: InfermedicaService) {}
 
   @Post('/parse')
   @ApiOperation({
@@ -321,7 +334,9 @@ export class InfermedicaController {
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: '[ADMIN] Cập nhật số câu hỏi tối đa của phiên triage' })
+  @ApiOperation({
+    summary: '[ADMIN] Cập nhật số câu hỏi tối đa của phiên triage',
+  })
   updateQuestionLimit(@Body() dto: UpdateQuestionLimitDto) {
     return this.infermedicaService.updateQuestionLimit(dto);
   }

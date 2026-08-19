@@ -11,7 +11,12 @@ describe('ai-specialty.util', () => {
   describe('selectNextPrimary', () => {
     const mapping = (
       id: string,
-      opts: { primary?: boolean; active?: boolean; sort?: number; created?: number },
+      opts: {
+        primary?: boolean;
+        active?: boolean;
+        sort?: number;
+        created?: number;
+      },
     ) => ({
       mapping_id: id,
       is_primary: opts.primary ?? false,
@@ -39,9 +44,7 @@ describe('ai-specialty.util', () => {
 
     it('returns undefined when no active mapping remains', () => {
       expect(
-        selectNextPrimary([
-          mapping('x', { primary: true, active: false }),
-        ]),
+        selectNextPrimary([mapping('x', { primary: true, active: false })]),
       ).toBeUndefined();
     });
   });

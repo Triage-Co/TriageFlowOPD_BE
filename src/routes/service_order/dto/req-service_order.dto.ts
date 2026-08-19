@@ -25,7 +25,6 @@ export class CreateServiceOrderReqDto {
     description: 'Mã của Service Order',
   })
   service_code: string[];
-
 }
 
 export class UpdateServiceOrderReqDto extends PartialType(
@@ -43,7 +42,8 @@ export class UpdateServiceOrderReqDto extends PartialType(
   @IsString()
   @ApiPropertyOptional({
     example: '123e4567-e89b-12d3-a456-426614174000',
-    description: 'ID của chi tiết Service Order cần cập nhật (nếu có nhiều dịch vụ)',
+    description:
+      'ID của chi tiết Service Order cần cập nhật (nếu có nhiều dịch vụ)',
   })
   detail_id?: string;
 

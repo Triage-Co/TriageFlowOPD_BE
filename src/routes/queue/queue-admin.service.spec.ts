@@ -19,15 +19,15 @@ describe('QueueAdminService Pure Validators', () => {
     });
 
     it('should throw BadRequestException for unsupported condition field', () => {
-      expect(() =>
-        validateConditions({ unknown_field: { eq: 10 } }),
-      ).toThrow(BadRequestException);
+      expect(() => validateConditions({ unknown_field: { eq: 10 } })).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException for unsupported operator', () => {
-      expect(() =>
-        validateConditions({ age: { regex: '.*' } }),
-      ).toThrow(BadRequestException);
+      expect(() => validateConditions({ age: { regex: '.*' } })).toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -42,9 +42,9 @@ describe('QueueAdminService Pure Validators', () => {
       expect(() =>
         validateParams(QueueRuleTypeEnum.MISSED_TURN, { hold_positions: 0 }),
       ).toThrow(BadRequestException);
-      expect(() =>
-        validateParams(QueueRuleTypeEnum.MISSED_TURN, {}),
-      ).toThrow(BadRequestException);
+      expect(() => validateParams(QueueRuleTypeEnum.MISSED_TURN, {})).toThrow(
+        BadRequestException,
+      );
     });
 
     it('should pass for valid REBALANCE params', () => {
@@ -64,7 +64,12 @@ describe('QueueAdminService Pure Validators', () => {
 describe('mergeRebalanceParams', () => {
   it('preserves eta_gap_minutes and suggestion_ttl_minutes when only enabled changes', () => {
     const merged = mergeRebalanceParams(
-      { eta_gap_minutes: 20, enabled: true, suggestion_ttl_minutes: 8, extra: 1 },
+      {
+        eta_gap_minutes: 20,
+        enabled: true,
+        suggestion_ttl_minutes: 8,
+        extra: 1,
+      },
       { enabled: false },
     );
     expect(merged.enabled).toBe(false);
@@ -105,9 +110,11 @@ describe('QueueAdminService rebalance-config', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.queue_Rebalance_Suggestion.findMany.mockResolvedValue([]);
-    prisma.queue_Rebalance_Suggestion.updateMany.mockResolvedValue({ count: 0 });
-    prisma.$transaction.mockImplementation(async (fn: (tx: typeof prisma) => unknown) =>
-      fn(prisma),
+    prisma.queue_Rebalance_Suggestion.updateMany.mockResolvedValue({
+      count: 0,
+    });
+    prisma.$transaction.mockImplementation(
+      async (fn: (tx: typeof prisma) => unknown) => fn(prisma),
     );
     service = new QueueAdminService(
       prisma as never,
@@ -144,9 +151,9 @@ describe('QueueAdminService rebalance-config', () => {
     const res = await service.updateRebalanceConfig({ enabled: false });
 
     expect(prisma.queue_Priority_Rule.create).toHaveBeenCalled();
-    expect(prisma.queue_Priority_Rule.create.mock.calls[0][0].data.rule_code).toBe(
-      'REBALANCE_DEFAULT',
-    );
+    expect(
+      prisma.queue_Priority_Rule.create.mock.calls[0][0].data.rule_code,
+    ).toBe('REBALANCE_DEFAULT');
     expect(queuePriorityService.clearRulesCache).toHaveBeenCalled();
     expect(res.data.enabled).toBe(false);
     expect(res.data.rule_id).toBe('new-id');
@@ -159,12 +166,18 @@ describe('QueueAdminService rebalance-config', () => {
     });
     prisma.queue_Priority_Rule.update.mockResolvedValue({
       rule_id: 'rule-1',
-      params: { enabled: false, eta_gap_minutes: 20, suggestion_ttl_minutes: 8 },
+      params: {
+        enabled: false,
+        eta_gap_minutes: 20,
+        suggestion_ttl_minutes: 8,
+      },
     });
     prisma.queue_Rebalance_Suggestion.findMany.mockResolvedValue([
       { suggestion_id: 's1', from_room_id: 'r1', to_room_id: 'r2' },
     ]);
-    prisma.queue_Rebalance_Suggestion.updateMany.mockResolvedValue({ count: 1 });
+    prisma.queue_Rebalance_Suggestion.updateMany.mockResolvedValue({
+      count: 1,
+    });
 
     await service.updateRebalanceConfig({ enabled: false });
 
@@ -197,11 +210,19 @@ describe('QueueAdminService rebalance-config', () => {
   it('does not expire suggestions when enabling', async () => {
     prisma.queue_Priority_Rule.findFirst.mockResolvedValue({
       rule_id: 'rule-1',
-      params: { enabled: false, eta_gap_minutes: 15, suggestion_ttl_minutes: 10 },
+      params: {
+        enabled: false,
+        eta_gap_minutes: 15,
+        suggestion_ttl_minutes: 10,
+      },
     });
     prisma.queue_Priority_Rule.update.mockResolvedValue({
       rule_id: 'rule-1',
-      params: { enabled: true, eta_gap_minutes: 15, suggestion_ttl_minutes: 10 },
+      params: {
+        enabled: true,
+        eta_gap_minutes: 15,
+        suggestion_ttl_minutes: 10,
+      },
     });
 
     await service.updateRebalanceConfig({ enabled: true });

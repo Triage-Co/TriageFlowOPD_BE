@@ -43,7 +43,6 @@ export class BookingController {
     return this.bookingService.createCashBooking(createBookingRequestDto);
   }
 
-
   @Post('/with-package')
   @ApiOperation({
     summary: 'Tạo booking + chọn gói khám (Exam_Package)',

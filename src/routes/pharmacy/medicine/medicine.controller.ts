@@ -117,8 +117,7 @@ export class MedicineController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[ALL] Lấy danh sách nhà sản xuất thuốc (Dropdown FE)',
-    description:
-      'Trả về mảng danh sách NSX độc nhất phục vụ bộ lọc FE.',
+    description: 'Trả về mảng danh sách NSX độc nhất phục vụ bộ lọc FE.',
   })
   @ApiResponse({
     status: 200,

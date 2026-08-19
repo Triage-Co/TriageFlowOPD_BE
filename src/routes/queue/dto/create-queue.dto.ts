@@ -1,9 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 import { StepTypeEnum } from '@prisma/client';
 
 export class CallPatientDto {
-  @ApiPropertyOptional({ example: 'a1b2c3d4-e5f6-7890-abcd-ef0123456789', description: 'Gọi đích danh (optional)' })
+  @ApiPropertyOptional({
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef0123456789',
+    description: 'Gọi đích danh (optional)',
+  })
   @IsOptional()
   @IsUUID('4', { message: 'step_id phải là định dạng UUID' })
   step_id?: string;
@@ -43,9 +55,14 @@ export enum OverrideActionEnum {
 }
 
 export class OverrideQueueDto {
-  @ApiProperty({ enum: OverrideActionEnum, example: OverrideActionEnum.PIN_TOP })
+  @ApiProperty({
+    enum: OverrideActionEnum,
+    example: OverrideActionEnum.PIN_TOP,
+  })
   @IsNotEmpty({ message: 'action không được để trống' })
-  @IsEnum(OverrideActionEnum, { message: 'action phải là PIN_TOP, MOVE_TO_POSITION hoặc UNPIN' })
+  @IsEnum(OverrideActionEnum, {
+    message: 'action phải là PIN_TOP, MOVE_TO_POSITION hoặc UNPIN',
+  })
   action: OverrideActionEnum;
 
   @ApiPropertyOptional({ example: 3, description: 'Đứng sau ít nhất n người' })
@@ -66,11 +83,18 @@ export class UpdateRoomStatDto {
   @IsEnum(StepTypeEnum, { message: 'step_type không hợp lệ' })
   step_type: StepTypeEnum;
 
-  @ApiProperty({ example: 900, description: 'Thời gian phục vụ mặc định tính bằng giây (60 - 7200)' })
+  @ApiProperty({
+    example: 900,
+    description: 'Thời gian phục vụ mặc định tính bằng giây (60 - 7200)',
+  })
   @IsNotEmpty({ message: 'default_duration_sec không được để trống' })
   @IsInt({ message: 'default_duration_sec phải là số nguyên' })
-  @Min(60, { message: 'default_duration_sec phải lớn hơn hoặc bằng 60 (1 phút)' })
-  @Max(7200, { message: 'default_duration_sec phải nhỏ hơn hoặc bằng 7200 (2 giờ)' })
+  @Min(60, {
+    message: 'default_duration_sec phải lớn hơn hoặc bằng 60 (1 phút)',
+  })
+  @Max(7200, {
+    message: 'default_duration_sec phải nhỏ hơn hoặc bằng 7200 (2 giờ)',
+  })
   default_duration_sec: number;
 }
 

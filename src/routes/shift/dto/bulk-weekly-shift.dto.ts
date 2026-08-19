@@ -31,7 +31,8 @@ export class BulkWeeklyAssignmentDto {
 export class BulkWeeklyShiftDto {
   @ApiProperty({
     example: '2026-08-10',
-    description: 'Ngày bắt đầu tuần (yyyy-MM-dd), bắt buộc phải là Thứ 2 theo giờ Việt Nam',
+    description:
+      'Ngày bắt đầu tuần (yyyy-MM-dd), bắt buộc phải là Thứ 2 theo giờ Việt Nam',
   })
   @IsNotEmpty({ message: 'week_start không được để trống' })
   @IsString({ message: 'week_start phải là chuỗi' })
@@ -81,7 +82,8 @@ export class BulkWeeklyShiftDto {
 
   @ApiPropertyOptional({
     example: true,
-    description: 'Bỏ qua và báo cáo các ca bị xung đột thay vì fail toàn bộ batch',
+    description:
+      'Bỏ qua và báo cáo các ca bị xung đột thay vì fail toàn bộ batch',
     default: true,
   })
   @IsOptional()

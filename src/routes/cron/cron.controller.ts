@@ -18,7 +18,7 @@ import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 
 @Controller('cron')
 export class CronController {
-  constructor(private readonly cronService: CronService) { }
+  constructor(private readonly cronService: CronService) {}
 
   @Get('update-flows')
   @ApiBearerAuth()

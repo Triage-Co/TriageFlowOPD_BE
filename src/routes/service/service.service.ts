@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 import { ServiceErrors } from '../../shared/exceptions/service.exceptions';
@@ -145,7 +141,9 @@ export class ServiceService {
     await this.assertCanDeactivate(id);
 
     try {
-      const data = await this.serviceRepository.update(id, { is_active: false });
+      const data = await this.serviceRepository.update(id, {
+        is_active: false,
+      });
       return {
         code: 200,
         status: 'success',
