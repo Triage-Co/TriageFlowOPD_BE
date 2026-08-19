@@ -19,6 +19,7 @@ import {
 } from './dto/request-shift.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
 import { BulkImportShiftDto } from './dto/bulk-import-shift.dto';
+import { FindShiftQueryDto } from './dto/find-shift-query.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -27,7 +28,7 @@ import { RoleTypeEnum } from '@prisma/client';
 @ApiTags('Shift')
 @Controller('shift')
 export class ShiftController {
-  constructor(private readonly shiftService: ShiftService) {}
+  constructor(private readonly shiftService: ShiftService) { }
 
   private getUser(req: any) {
     const u = req?.user;

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import {
   CreateShiftRequestDto,
@@ -12,6 +13,7 @@ import {
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
 import { BulkImportShiftDto } from './dto/bulk-import-shift.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
+import type { IShiftRepository } from '../../shared/interfaces/i-shift.repository';
 import { Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 
@@ -23,7 +25,10 @@ export class ShiftService {
   SLOT: PrismaClient['slot'];
   STAFF: PrismaClient['staff'];
   ROOM: PrismaClient['room'];
-  constructor(private readonly prismaService: PrismaService) {
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Inject('IShiftRepository') private readonly shiftRepository: IShiftRepository,
+  ) {
     this.SHIFT = this.prismaService.shift;
     this.SLOT = this.prismaService.slot;
     this.STAFF = this.prismaService.staff;

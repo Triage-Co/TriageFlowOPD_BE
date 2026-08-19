@@ -1152,10 +1152,16 @@ export class QueueService {
   async getRoomQueueView(roomId: string, user: { id: string; role: string }) {
     await this.assertCanManageRoom(user, roomId);
 
+    const now = new Date();
+    const dateFormatted = formatInTimeZone(now, 'Asia/Ho_Chi_Minh', 'yyyy-MM-dd');
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, { timeZone: 'Asia/Ho_Chi_Minh' });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, { timeZone: 'Asia/Ho_Chi_Minh' });
+
     const servingQueue = await this.prisma.queue.findFirst({
       where: {
         room_id: roomId,
         status: QueueStatusEnum.SERVING,
+        created_at: { gte: startOfDay, lte: endOfDay },
       },
       include: {
         step: {
@@ -1178,6 +1184,7 @@ export class QueueService {
       where: {
         room_id: roomId,
         status: QueueStatusEnum.MISSING,
+        created_at: { gte: startOfDay, lte: endOfDay },
       },
       include: {
         step: {
@@ -1197,7 +1204,29 @@ export class QueueService {
       orderBy: { missed_at: 'asc' },
     });
 
-    const now = new Date();
+    const finishedEntries = await this.prisma.queue.findMany({
+      where: {
+        room_id: roomId,
+        status: QueueStatusEnum.FINISHED,
+        finished_at: { gte: startOfDay, lte: endOfDay },
+      },
+      include: {
+        step: {
+          include: {
+            flow: {
+              include: {
+                booking: {
+                  include: {
+                    patient: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { finished_at: 'desc' },
+    });
 
     return {
       code: 200,
@@ -1239,6 +1268,12 @@ export class QueueService {
           queue_number: m.queue_number,
           patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
           missed_at: m.missed_at,
+        })),
+        finished: finishedEntries.map((f) => ({
+          queue_id: f.queue_id,
+          queue_number: f.queue_number,
+          patient_name: f.step?.flow?.booking?.patient?.full_name || '---',
+          finished_at: f.finished_at,
         })),
       },
     };

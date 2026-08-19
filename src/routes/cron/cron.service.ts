@@ -354,7 +354,6 @@ export class CronService {
     });
   }
 
-  @Cron('*/2 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async handleRebalanceDetector() {
     try {
       await this.queueRebalanceService.detectAndSuggest();
