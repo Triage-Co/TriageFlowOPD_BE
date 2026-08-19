@@ -14,6 +14,7 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@ne
 import { ShiftService } from './shift.service';
 import {
   CreateShiftRequestDto,
+  QueryShiftDto,
   UpdateShiftRequestDto,
 } from './dto/request-shift.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
@@ -83,9 +84,13 @@ export class ShiftController {
   @Get()
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy danh sách tất cả ca trực' })
-  findAll() {
-    return this.shiftService.findAll();
+  @ApiOperation({
+    summary: 'Lấy danh sách ca trực (lọc + phân trang)',
+    description:
+      'Mặc định chỉ trả ca trực của ngày hôm nay (Asia/Ho_Chi_Minh) khi không truyền date/from/to. Trả kèm meta { total, page, limit }.',
+  })
+  findAll(@Query() query: QueryShiftDto) {
+    return this.shiftService.findAll(query);
   }
 
   @Get(':id')

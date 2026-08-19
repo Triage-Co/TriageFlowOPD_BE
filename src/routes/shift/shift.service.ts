@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   CreateShiftRequestDto,
+  QueryShiftDto,
   UpdateShiftRequestDto,
 } from './dto/request-shift.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
@@ -200,39 +201,112 @@ export class ShiftService {
     }
   }
 
-  async findAll() {
-    try {
-      const data = await this.SHIFT.findMany({
-        include: {
+  private toDayBounds(dateStr: string) {
+    if (!this.isValidDateString(dateStr)) {
+      throw new BadRequestException({
+        message: 'Ngày không hợp lệ',
+        detail: `${dateStr} phải là ngày tồn tại theo định dạng yyyy-MM-dd.`,
+      });
+    }
+    return {
+      start: toDate(`${dateStr}T00:00:00`, { timeZone: TIME_ZONE }),
+      end: toDate(`${dateStr}T23:59:59.999`, { timeZone: TIME_ZONE }),
+    };
+  }
+
+  private buildFindAllWhere(query: QueryShiftDto): Prisma.ShiftWhereInput {
+    const where: Prisma.ShiftWhereInput = {};
+    if (query.room_id) where.room_id = query.room_id;
+    if (query.staff_id) where.staff_id = query.staff_id;
+
+    if (query.date) {
+      const { start, end } = this.toDayBounds(query.date);
+      where.date = { gte: start, lte: end };
+      return where;
+    }
+
+    if (query.from || query.to) {
+      if (query.from && query.to && query.from > query.to) {
+        throw new BadRequestException({
+          message: 'Khoảng ngày không hợp lệ',
+          detail: 'from phải nhỏ hơn hoặc bằng to.',
+        });
+      }
+      const dateFilter: Prisma.DateTimeFilter = {};
+      if (query.from) dateFilter.gte = this.toDayBounds(query.from).start;
+      if (query.to) dateFilter.lte = this.toDayBounds(query.to).end;
+      where.date = dateFilter;
+      return where;
+    }
+
+    const today = formatInTimeZone(new Date(), TIME_ZONE, 'yyyy-MM-dd');
+    const { start, end } = this.toDayBounds(today);
+    where.date = { gte: start, lte: end };
+    return where;
+  }
+
+  async findAll(query: QueryShiftDto = {}) {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit = Math.min(query.limit && query.limit > 0 ? query.limit : 100, 500);
+    const skip = (page - 1) * limit;
+    const where = this.buildFindAllWhere(query);
+
+    const [data, total] = await Promise.all([
+      this.SHIFT.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ date: 'asc' }, { start_time: 'asc' }],
+        select: {
+          shift_id: true,
+          staff_id: true,
+          room_id: true,
+          date: true,
+          start_time: true,
+          end_time: true,
+          createdAt: true,
+          updatedAt: true,
+          physicalRoomId: true,
           room: {
-            include: {
-              specialty: true,
+            select: {
+              room_id: true,
+              room_name: true,
+              room_type: true,
+              specialty_id: true,
+              physical_room_id: true,
+              specialty: {
+                select: {
+                  specialty_id: true,
+                  specialty_name: true,
+                  specialty_code: true,
+                },
+              },
+            },
+          },
+          staff: {
+            select: {
+              staff_id: true,
+              full_name: true,
             },
           },
         },
-      });
+      }),
+      this.SHIFT.count({ where }),
+    ]);
 
-      if (!data) {
-        throw new NotFoundException({
-          message: 'Danh sách rỗng',
-          datail: 'Không tìm thấy ca trực trong hệ thống',
-        });
-      }
+    const formattedData = data.map((shift) => ({
+      ...shift,
+      date: formatInTimeZone(shift.date, TIME_ZONE, 'yyyy-MM-dd'),
+      staff_name: shift.staff?.full_name ?? null,
+    }));
 
-      const formattedData = data.map((shift) => ({
-        ...shift,
-        date: formatInTimeZone(shift.date, TIME_ZONE, 'yyyy-MM-dd'),
-      }));
-
-      return {
-        code: 200,
-        message: 'Lấy danh sách ca trực thành công',
-        status: 'success',
-        data: formattedData,
-      };
-    } catch (error) {
-      throw error;
-    }
+    return {
+      code: 200,
+      message: 'Lấy danh sách ca trực thành công',
+      status: 'success',
+      data: formattedData,
+      meta: { total, page, limit },
+    };
   }
 
   async findOne(id: string) {
