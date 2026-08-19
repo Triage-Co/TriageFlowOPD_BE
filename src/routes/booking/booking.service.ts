@@ -306,6 +306,24 @@ export class BookingService {
         tx,
       );
 
+      await this.notificationRepository.create(
+        {
+          account_id: patient.account_id,
+          message: `Bạn đã đặt lịch khám thành công. Mã vé: ${ticketCode}`,
+        },
+        tx,
+      );
+
+      if (slot.shift?.staff_id) {
+        await this.notificationRepository.create(
+          {
+            account_id: slot.shift.staff_id,
+            message: `Có bệnh nhân mới đặt lịch lúc ${slot.start_time} - ${slot.end_time}. Mã vé: ${ticketCode}`,
+          },
+          tx,
+        );
+      }
+
       const serviceOrder = await this.serviceOrderRepository.create(
         {
           booking_id: booking.booking_id,
@@ -495,6 +513,13 @@ export class BookingService {
       undefined,
       { forceType: true },
     );
+
+    if (fullSlot.shift?.staff_id) {
+      await this.notificationRepository.create({
+        account_id: fullSlot.shift.staff_id,
+        message: `Bạn có lượt khám mới lúc ${fullSlot.start_time} tại phòng ${fullSlot.shift.room.room_name} với số ${queue.queue_number}`,
+      });
+    }
 
     if (step.flow_id) {
       await this.prismaService.flow.update({
@@ -732,6 +757,24 @@ export class BookingService {
         where: { service_order_id: serviceOrder.service_order_id },
         data: { qr_code: paymentLink.data.qrCode },
       });
+
+      await this.notificationRepository.create(
+        {
+          account_id: patient.account_id,
+          message: `Bạn đã đặt lịch gói khám ${examPackage.package_name} thành công.`,
+        },
+        tx,
+      );
+
+      if (slot.shift?.staff_id) {
+        await this.notificationRepository.create(
+          {
+            account_id: slot.shift.staff_id,
+            message: `Có bệnh nhân mới đặt lịch gói ${examPackage.package_name} lúc ${slot.start_time} - ${slot.end_time}.`,
+          },
+          tx,
+        );
+      }
 
       return { booking, serviceOrder, paymentLink };
     });

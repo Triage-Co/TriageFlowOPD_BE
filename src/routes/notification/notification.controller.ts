@@ -1,7 +1,15 @@
-import { Controller, Get, Param, Delete, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Delete,
+  Req,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { NotificationService } from './notification.service';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 @ApiBearerAuth()
@@ -11,9 +19,15 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Get()
-  findAll(@Req() req: any) {
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  findAll(
+    @Req() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
     const id = req.user.id || req.user.sub;
-    return this.notificationService.findAll(id);
+    return this.notificationService.findAll(id, page, limit);
   }
 
   @Delete('all')
