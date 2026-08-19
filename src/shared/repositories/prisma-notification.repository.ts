@@ -5,8 +5,9 @@ import { INotificationRepository } from '../interfaces/i-notification.repository
 @Injectable()
 export class PrismaNotificationRepository implements INotificationRepository {
   constructor(private readonly prismaService: PrismaService) {}
-  create(data: any): Promise<any> {
-    return this.prismaService.notification.create({
+  create(data: any, tx?: any): Promise<any> {
+    const context = tx || this.prismaService;
+    return context.notification.create({
       data: {
         ...data,
       },

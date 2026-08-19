@@ -25,9 +25,13 @@ const getCorsOrigins = (): string[] | string => {
       'http://localhost:8000',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:3001',
+      'https://triageflow.me',
     ];
   }
-  const origins = allowed.split(',').map((o) => o.trim()).filter(Boolean);
+  const origins = allowed
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   return origins.length > 0 ? origins : '*';
 };
 
@@ -62,7 +66,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
         try {
           const payload = await this.jwtService.verifyAsync(token);
           client.data = { ...client.data, user: payload };
-          this.logger.log(`Client authenticated: ${client.id} (user: ${payload.sub || payload.id || 'valid'})`);
+          this.logger.log(
+            `Client authenticated: ${client.id} (user: ${payload.sub || payload.id || 'valid'})`,
+          );
         } catch (err: any) {
           // Staff Supabase JWTs are not signed with KIOSK_KEY — fall back to anonymous TV mode
           // instead of disconnecting (TV only listens; mutations stay on authenticated HTTP APIs).
@@ -77,7 +83,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.logger.log(`Client connected anonymously (TV mode): ${client.id}`);
       }
     } catch (error: any) {
-      this.logger.error(`Error handling connection for ${client.id}: ${error.message}`);
+      this.logger.error(
+        `Error handling connection for ${client.id}: ${error.message}`,
+      );
       client.disconnect(true);
     }
   }
@@ -103,9 +111,18 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { roomId: string; staffId?: string },
   ) {
-    if (!payload || !payload.roomId || typeof payload.roomId !== 'string' || payload.roomId.trim() === '') {
-      this.logger.warn(`Client ${client.id} passed invalid roomId in joinRoomDisplay`);
-      client.emit('onError', { message: 'roomId is required and must be a non-empty string' });
+    if (
+      !payload ||
+      !payload.roomId ||
+      typeof payload.roomId !== 'string' ||
+      payload.roomId.trim() === ''
+    ) {
+      this.logger.warn(
+        `Client ${client.id} passed invalid roomId in joinRoomDisplay`,
+      );
+      client.emit('onError', {
+        message: 'roomId is required and must be a non-empty string',
+      });
       return;
     }
 
@@ -114,7 +131,8 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!UUID_RE.test(roomId)) {
       this.logger.warn(`Client ${client.id} passed non-UUID roomId: ${roomId}`);
       client.emit('onError', {
-        message: 'roomId phải là UUID phòng hợp lệ (không dùng mã phòng kiểu 101)',
+        message:
+          'roomId phải là UUID phòng hợp lệ (không dùng mã phòng kiểu 101)',
         roomId,
       });
       return;
@@ -150,7 +168,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       client.emit('onQueueUpdate', currentState);
     } catch (error: any) {
-      this.logger.error(`Error fetching initial TV state for room ${roomId}: ${error?.message || error}`);
+      this.logger.error(
+        `Error fetching initial TV state for room ${roomId}: ${error?.message || error}`,
+      );
       client.emit('onError', {
         message: 'Không thể lấy dữ liệu phòng',
         roomId,
@@ -162,9 +182,17 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`room_${roomId}`).emit('onQueueUpdate', data);
   }
 
-  emitRebalanceSuggestion(fromRoomId: string, toRoomId: string, suggestionData: any) {
-    this.server.to(`room_${fromRoomId}`).emit('onRebalanceSuggestion', suggestionData);
-    this.server.to(`room_${toRoomId}`).emit('onRebalanceSuggestion', suggestionData);
+  emitRebalanceSuggestion(
+    fromRoomId: string,
+    toRoomId: string,
+    suggestionData: any,
+  ) {
+    this.server
+      .to(`room_${fromRoomId}`)
+      .emit('onRebalanceSuggestion', suggestionData);
+    this.server
+      .to(`room_${toRoomId}`)
+      .emit('onRebalanceSuggestion', suggestionData);
   }
 
   emitRebalanceResolved(
