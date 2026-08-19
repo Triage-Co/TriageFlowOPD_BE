@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 
-import { Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
+import { ClinicalRoomType, Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import type { IStaffRepository } from '../../shared/interfaces/i-staff.repository';
@@ -48,6 +48,73 @@ export class DoctorService {
       return {
         code: 200,
         message: 'Lấy danh sách bác sĩ thành công',
+        status: 'success',
+        data: data,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async findAllClinicalDoctorsWithSpecialCode(
+    specialCode: string,
+    dateTimeStr: string,
+  ) {
+    try {
+      const existedSpecialtyCode = await this.SPECIALTY.findFirst({
+        where: {
+          specialty_code: {
+            equals: specialCode,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (!existedSpecialtyCode) {
+        throw new NotFoundException({
+          message: 'Danh sách rỗng',
+          detail: `Không tìm thấy chuyên ngành nào với mã ${specialCode} trong hệ thống`,
+        });
+      }
+
+      let start: Date | undefined;
+      let end: Date | undefined;
+
+      if (dateTimeStr) {
+        const targetDate = new Date(dateTimeStr);
+
+        if (isNaN(targetDate.getTime())) {
+          throw new BadRequestException({
+            message: 'Định dạng ngày không hợp lệ.',
+            detail: `Giá trị dateTimeStr [${dateTimeStr}] không thể parse thành Date.`,
+          });
+        }
+
+        const timeZone = 'Asia/Ho_Chi_Minh';
+        const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
+
+        start = toDate(`${dateString}T00:00:00`, { timeZone });
+        end = toDate(`${dateString}T23:59:59.999`, { timeZone });
+      }
+
+      const data = await this.staffRepository.findDoctorsBySpecialtyAndDate(
+        existedSpecialtyCode.specialty_id,
+        start,
+        end,
+        ClinicalRoomType.CLINICAL_ROOM,
+      );
+
+      if (data.length <= 0) {
+        throw new NotFoundException({
+          message: 'Danh sách rỗng',
+          detail: `Không tìm thấy bác sĩ phòng khám nào với chuyên ngành ${existedSpecialtyCode.specialty_name} có ca trực ${
+            dateTimeStr ? 'trong ngày ' + dateTimeStr : ''
+          } trong hệ thống`,
+        });
+      }
+      return {
+        code: 200,
+        message: `Lấy danh sách bác sĩ thành công`,
         status: 'success',
         data: data,
       };

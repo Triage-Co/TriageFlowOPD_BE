@@ -1,4 +1,4 @@
-import { Prisma, Staff } from '@prisma/client';
+import { ClinicalRoomType, Prisma, Staff } from '@prisma/client';
 
 export interface IStaffRepository {
   create(
@@ -18,5 +18,10 @@ export interface IStaffRepository {
     role?: string,
   ): Promise<any>;
   findById(id: string): Promise<any>;
-  findDoctorsBySpecialtyAndDate(specialtyId: string, startTime?: Date, endTime?: Date): Promise<any>;
+  findDoctorsBySpecialtyAndDate(
+    specialtyId: string,
+    startTime?: Date,
+    endTime?: Date,
+    roomType?: ClinicalRoomType,
+  ): Promise<any>;
 }

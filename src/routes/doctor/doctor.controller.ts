@@ -75,6 +75,34 @@ export class DoctorController {
     );
   }
 
+  @Get('specialty/clinical')
+  @ApiOperation({
+    summary: 'Lấy danh sách bác sĩ phòng khám thường theo chuyên khoa và ngày',
+    description: 'Chỉ trả về các bác sĩ được phân công ca trực tại phòng khám thường (CLINICAL_ROOM), loại trừ phòng thủ thuật',
+  })
+  @ApiQuery({
+    name: 'date_time',
+    type: 'string',
+    example: '2026-05-26',
+    required: false,
+  })
+  @ApiQuery({
+    name: 'specialty_code',
+    type: 'string',
+    example: 'SP_1',
+    required: false,
+    description: 'Mã chuyên khoa (specialty_code)',
+  })
+  findAllClinicalWithSpecialCode(
+    @Query('specialty_code') specialty_code: string,
+    @Query('date_time') dateTimeStr: string,
+  ) {
+    return this.doctorService.findAllClinicalDoctorsWithSpecialCode(
+      specialty_code,
+      dateTimeStr,
+    );
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.doctorService.findOne(id);

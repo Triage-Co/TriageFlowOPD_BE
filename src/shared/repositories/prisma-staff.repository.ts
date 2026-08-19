@@ -1,19 +1,39 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { IStaffRepository } from '../interfaces/i-staff.repository';
-import { Prisma, RoleTypeEnum } from '@prisma/client';
+import { ClinicalRoomType, Prisma, RoleTypeEnum } from '@prisma/client';
 import { formatInTimeZone } from 'date-fns-tz';
 
 @Injectable()
 export class PrismaStaffRepository implements IStaffRepository {
   constructor(private readonly prismaService: PrismaService) { }
-  async findDoctorsBySpecialtyAndDate(specialtyId: string, startTime?: Date, endTime?: Date): Promise<any> {
+  async findDoctorsBySpecialtyAndDate(
+    specialtyId: string,
+    startTime?: Date,
+    endTime?: Date,
+    roomType?: ClinicalRoomType,
+  ): Promise<any> {
     const whereCondition: Prisma.StaffWhereInput = {
       specialty_id: specialtyId,
       account: {
         role: RoleTypeEnum.DOCTOR,
       },
     };
+
+    const shiftWhere: Prisma.ShiftWhereInput = {};
+    if (startTime && endTime) {
+      shiftWhere.date = {
+        gte: startTime,
+        lte: endTime,
+      };
+    }
+    if (roomType) {
+      shiftWhere.room = {
+        room_type: roomType,
+      };
+    }
+
+    const hasShiftFilter = (startTime && endTime) || roomType;
 
     const includeOption: Prisma.StaffInclude = {
       account: {
@@ -31,6 +51,7 @@ export class PrismaStaffRepository implements IStaffRepository {
         }
       },
       shifts: {
+        ...(hasShiftFilter ? { where: shiftWhere } : {}),
         select: {
           date: true,
           slots: {
@@ -44,32 +65,9 @@ export class PrismaStaffRepository implements IStaffRepository {
       }
     };
 
-    if (startTime && endTime) {
+    if (hasShiftFilter) {
       whereCondition.shifts = {
-        some: {
-          date: {
-            gte: startTime,
-            lte: endTime,
-          },
-        },
-      };
-      includeOption.shifts = {
-        where: {
-          date: {
-            gte: startTime,
-            lte: endTime,
-          },
-        },
-        select: {
-          date: true,
-          slots: {
-            omit: {
-              createdAt: true,
-              updatedAt: true,
-              slot_index: true
-            }
-          }
-        }
+        some: shiftWhere,
       };
     }
 
