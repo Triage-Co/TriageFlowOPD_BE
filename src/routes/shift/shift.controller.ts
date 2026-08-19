@@ -18,6 +18,7 @@ import {
 } from './dto/request-shift.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
 import { BulkImportShiftDto } from './dto/bulk-import-shift.dto';
+import { FindShiftQueryDto } from './dto/find-shift-query.dto';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -84,8 +85,8 @@ export class ShiftController {
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách tất cả ca trực' })
-  findAll() {
-    return this.shiftService.findAll();
+  findAll(@Query() query: FindShiftQueryDto) {
+    return this.shiftService.findAll(query);
   }
 
   @Get(':id')
