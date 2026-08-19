@@ -9,6 +9,8 @@ import { PrismaService } from '../../shared/config/prisma.service';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
 import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
+import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
 
 @Injectable()
 export class InfermedicaService {
@@ -24,6 +26,8 @@ export class InfermedicaService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prismaService: PrismaService,
     private readonly aiSpecialtyService: AiSpecialtyService,
+    @Inject('ISlotRepository')
+    private readonly slotRepository: ISlotRepository,
   ) {
     this.PATIENT_ANSWER = prismaService.patient_Answer;
     this.ACCOUNT = prismaService.account;
@@ -228,7 +232,27 @@ export class InfermedicaService {
         },
       });
 
+      let best_slot_id: string | null = null;
+
       if (exitedSpecialty) {
+        const timeZone = 'Asia/Ho_Chi_Minh';
+        const now = new Date();
+        const currentHours = formatInTimeZone(now, timeZone, 'HH:mm');
+        const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+        const startOfToday = toDate(`${todayDateString}T00:00:00`, {
+          timeZone,
+        });
+
+        const availableSlots = await this.slotRepository.findAvailableSlots(
+          exitedSpecialty.specialty_id,
+          currentHours,
+          startOfToday,
+        );
+
+        if (availableSlots && availableSlots.length > 0) {
+          best_slot_id = availableSlots[0].slot_id;
+        }
+
         if (!exitedPatientInfo) {
           await this.TRIAGE_INFO.create({
             data: {
@@ -259,6 +283,7 @@ export class InfermedicaService {
             specialty_code: exitedSpecialty?.specialty_code,
             name: exitedSpecialty?.specialty_name,
           },
+          best_slot_id: best_slot_id,
         },
       };
     } catch (error) {
