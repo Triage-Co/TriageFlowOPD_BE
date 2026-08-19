@@ -25,6 +25,7 @@ import {
 import { QueueEtaService } from './queue-eta.service';
 import { QueuePriorityService } from './queue-priority.service';
 import {
+  buildQueueDateFilter,
   DEFAULT_REBALANCE_PARAMS,
   mergeRebalanceParams,
   toRebalanceConfig,
@@ -579,11 +580,13 @@ export class QueueAdminService {
     const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone });
 
+    const endOfDay = toDate(`${todayDateString}T23:59:59.999`, { timeZone });
+
     // 1. Fetch today's queues first, then only rooms with activity
     const todayQueues = await this.prisma.queue.findMany({
       where: {
-        created_at: { gte: startOfDay },
         room_id: { not: null },
+        ...buildQueueDateFilter(startOfDay, endOfDay),
       },
     });
 

@@ -28,7 +28,10 @@ import { QueuePriorityService } from './queue-priority.service';
 import { EntryEtaInfo, QueueEtaService } from './queue-eta.service';
 import { QueueRebalanceService } from './queue-rebalance.service';
 import { QueueCacheService } from './queue-cache.service';
-import { REBALANCEABLE_STEP_TYPES } from './queue.constants';
+import {
+  buildQueueDateFilter,
+  REBALANCEABLE_STEP_TYPES,
+} from './queue.constants';
 import { StepService } from '../step/step.service';
 
 const ACTIVE_SOD_STATUSES: ServiceOrderDetailStatusEnum[] = [
@@ -194,16 +197,16 @@ export class QueueService {
   async generateQueueNumberForRoom(
     roomId: string,
     tx?: Prisma.TransactionClient,
+    targetDate: Date = new Date(),
   ): Promise<string> {
     const client = tx || this.prisma;
-    const startOfDay = getStartOfDayVn();
+    const startOfDay = getStartOfDayVn(targetDate);
+    const endOfDay = getEndOfDayVn(targetDate);
 
     const count = await client.queue.count({
       where: {
         room_id: roomId,
-        enqueued_at: {
-          gte: startOfDay,
-        },
+        ...buildQueueDateFilter(startOfDay, endOfDay),
       },
     });
 
@@ -374,9 +377,14 @@ export class QueueService {
         });
       }
 
+      const targetDate = step.flow?.booking?.slot?.shift?.date
+        ? new Date(step.flow.booking.slot.shift.date)
+        : new Date();
+
       const nextNumber = await this.generateQueueNumberForRoom(
         step.room_id,
         prismaTx,
+        targetDate,
       );
       const { basePriority, appliedRules } = await this.evaluatePriorityForStep(
         step,
@@ -1230,7 +1238,7 @@ export class QueueService {
       where: {
         room_id: roomId,
         status: QueueStatusEnum.SERVING,
-        created_at: { gte: startOfDay, lte: endOfDay },
+        ...buildQueueDateFilter(startOfDay, endOfDay),
       },
       include: {
         step: {
@@ -1254,7 +1262,7 @@ export class QueueService {
       where: {
         room_id: roomId,
         status: QueueStatusEnum.MISSING,
-        created_at: { gte: startOfDay, lte: endOfDay },
+        ...buildQueueDateFilter(startOfDay, endOfDay),
       },
       include: {
         step: {

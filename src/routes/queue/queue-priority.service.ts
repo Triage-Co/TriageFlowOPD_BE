@@ -13,6 +13,7 @@ import {
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueCacheService } from './queue-cache.service';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
+import { buildQueueDateFilter } from './queue.constants';
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -475,9 +476,16 @@ export class QueuePriorityService {
     const entries = await db.queue.findMany({
       where: {
         status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
-        created_at: { gte: startOfDay, lte: endOfDay },
-        // Prefer denormalized queue.room_id; also pick up orphans where only step.room_id is set
-        OR: [{ room_id: roomId }, { room_id: null, step: { room_id: roomId } }],
+        AND: [
+          buildQueueDateFilter(startOfDay, endOfDay),
+          {
+            // Prefer denormalized queue.room_id; also pick up orphans where only step.room_id is set
+            OR: [
+              { room_id: roomId },
+              { room_id: null, step: { room_id: roomId } },
+            ],
+          },
+        ],
       },
       select: QUEUE_ORDER_SELECT,
     });

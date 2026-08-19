@@ -1,4 +1,4 @@
-import { StepTypeEnum } from '@prisma/client';
+import { Prisma, StepTypeEnum } from '@prisma/client';
 
 /** Step types allowed for cross-room load balancing (non-booking queues). */
 export const REBALANCEABLE_STEP_TYPES: StepTypeEnum[] = [
@@ -76,3 +76,42 @@ export function toRebalanceConfig(params: unknown): RebalanceRuleParams {
 export function displayCacheKey(roomId: string, rulesVersion: number): string {
   return `queue:display:${roomId}:v${rulesVersion}`;
 }
+
+/**
+ * Builds a Prisma `where` filter for Queue queries to match the target date range.
+ * - For bookings with scheduled shifts: matches `shift.date` within the date range.
+ * - For walk-in / triage / steps without a booking shift: falls back to `created_at` within the date range.
+ */
+export function buildQueueDateFilter(
+  startOfDay: Date,
+  endOfDay?: Date,
+): Prisma.QueueWhereInput {
+  const dateRange = endOfDay
+    ? { gte: startOfDay, lte: endOfDay }
+    : { gte: startOfDay };
+
+  return {
+    OR: [
+      {
+        step: {
+          flow: {
+            booking: {
+              slot: {
+                shift: {
+                  date: dateRange,
+                },
+              },
+            },
+          },
+        },
+      },
+      {
+        step: {
+          OR: [{ flow_id: null }, { flow: null }],
+        },
+        created_at: dateRange,
+      },
+    ],
+  };
+}
+

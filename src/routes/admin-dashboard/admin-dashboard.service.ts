@@ -3,6 +3,7 @@ import { QueueStatusEnum } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueAdminService } from '../queue/queue-admin.service';
+import { buildQueueDateFilter } from '../queue/queue.constants';
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -47,19 +48,19 @@ export class AdminDashboardService {
       this.prisma.queue.count({
         where: {
           status: { in: [QueueStatusEnum.QUEUED, QueueStatusEnum.PENDING] },
-          created_at: { gte: startOfDay },
+          ...buildQueueDateFilter(startOfDay, endOfDay),
         },
       }),
       this.prisma.queue.count({
         where: {
           status: { in: [QueueStatusEnum.SERVING, QueueStatusEnum.CALLED] },
-          created_at: { gte: startOfDay },
+          ...buildQueueDateFilter(startOfDay, endOfDay),
         },
       }),
       this.prisma.queue.count({
         where: {
           status: QueueStatusEnum.FINISHED,
-          created_at: { gte: startOfDay },
+          finished_at: { gte: startOfDay, lte: endOfDay },
         },
       }),
     ]);

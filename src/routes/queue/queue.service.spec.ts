@@ -1,4 +1,5 @@
 import { isAppointmentOnTime } from './queue.service';
+import { buildQueueDateFilter } from './queue.constants';
 
 describe('QueueService isAppointmentOnTime', () => {
   const shiftDate = new Date('2026-08-04T00:00:00.000Z');
@@ -41,5 +42,49 @@ describe('QueueService isAppointmentOnTime', () => {
 
   it('should return false if parameters are missing', () => {
     expect(isAppointmentOnTime('', '10:00', shiftDate)).toBe(false);
+  });
+});
+
+describe('buildQueueDateFilter', () => {
+  const startOfDay = new Date('2026-08-19T00:00:00.000Z');
+  const endOfDay = new Date('2026-08-19T23:59:59.999Z');
+
+  it('should build OR condition with shift date range and fallback created_at range', () => {
+    const filter = buildQueueDateFilter(startOfDay, endOfDay);
+    expect(filter.OR).toBeDefined();
+    expect(filter.OR).toHaveLength(2);
+
+    const appointmentBranch = filter.OR![0] as any;
+    expect(
+      appointmentBranch.step.flow.booking.slot.shift.date,
+    ).toEqual({
+      gte: startOfDay,
+      lte: endOfDay,
+    });
+
+    const walkInBranch = filter.OR![1] as any;
+    expect(walkInBranch.created_at).toEqual({
+      gte: startOfDay,
+      lte: endOfDay,
+    });
+    expect(walkInBranch.step.OR).toEqual([
+      { flow_id: null },
+      { flow: null },
+    ]);
+  });
+
+  it('should build open-ended condition when endOfDay is omitted', () => {
+    const filter = buildQueueDateFilter(startOfDay);
+    const appointmentBranch = filter.OR![0] as any;
+    expect(
+      appointmentBranch.step.flow.booking.slot.shift.date,
+    ).toEqual({
+      gte: startOfDay,
+    });
+
+    const walkInBranch = filter.OR![1] as any;
+    expect(walkInBranch.created_at).toEqual({
+      gte: startOfDay,
+    });
   });
 });
