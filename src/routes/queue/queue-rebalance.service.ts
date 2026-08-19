@@ -16,28 +16,57 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
-import { QueueEtaService } from './queue-eta.service';
+import {
+  computeTotalWaitingSecByRoom,
+  expectedSecFromStat,
+} from './queue-eta.service';
 import { QueuePriorityService } from './queue-priority.service';
 import { QueueService } from './queue.service';
-import { REBALANCEABLE_STEP_TYPES } from './queue.constants';
+import { QueueCacheService } from './queue-cache.service';
+import {
+  DEFAULT_REBALANCE_PARAMS,
+  QUEUE_REBALANCE_ENQUEUE_DEBOUNCE_MS,
+  REBALANCEABLE_STEP_TYPES,
+  toRebalanceConfig,
+} from './queue.constants';
 
 export { REBALANCEABLE_STEP_TYPES } from './queue.constants';
 
 @Injectable()
 export class QueueRebalanceService {
   private readonly logger = new Logger(QueueRebalanceService.name);
+  private isRunning = false;
+  private coalesceQueued = false;
+  private enqueueDebounceTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly queuePriorityService: QueuePriorityService,
-    private readonly queueEtaService: QueueEtaService,
 
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
 
     @Inject(forwardRef(() => QueueGateway))
     private readonly queueGateway: QueueGateway,
+
+    private readonly queueCacheService: QueueCacheService,
   ) {}
+
+  /**
+   * Trailing debounce for post-enqueue trigger: many enqueues in 15s run once.
+   */
+  scheduleDetectAndSuggest(): void {
+    if (this.enqueueDebounceTimer) {
+      clearTimeout(this.enqueueDebounceTimer);
+    }
+    this.enqueueDebounceTimer = setTimeout(() => {
+      this.enqueueDebounceTimer = undefined;
+      this.detectAndSuggest().catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Post-enqueue rebalance failed: ${message}`);
+      });
+    }, QUEUE_REBALANCE_ENQUEUE_DEBOUNCE_MS);
+  }
 
   private async isAdmin(userId: string): Promise<boolean> {
     const account = await this.prisma.account.findUnique({
@@ -51,7 +80,50 @@ export class QueueRebalanceService {
    * Run congestion detector and generate rebalance suggestions.
    */
   async detectAndSuggest(): Promise<{ created: number }> {
+    if (this.isRunning) {
+      this.coalesceQueued = true;
+      return { created: 0 };
+    }
+
+    this.isRunning = true;
+    let created = 0;
+    try {
+      let skipThrottle = false;
+      do {
+        this.coalesceQueued = false;
+        const result = await this.runDetectAndSuggest(skipThrottle);
+        created += result.created;
+        skipThrottle = true;
+      } while (this.coalesceQueued);
+    } finally {
+      this.isRunning = false;
+    }
+    return { created };
+  }
+
+  private async runDetectAndSuggest(
+    skipThrottle: boolean,
+  ): Promise<{ created: number }> {
     const now = new Date();
+
+    const rule = await this.prisma.queue_Priority_Rule.findFirst({
+      where: {
+        rule_type: QueueRuleTypeEnum.REBALANCE,
+        is_active: true,
+      },
+    });
+
+    const ruleConfig = toRebalanceConfig(rule?.params);
+    if (ruleConfig.enabled === false) {
+      return { created: 0 };
+    }
+
+    if (!skipThrottle) {
+      const acquired = await this.queueCacheService.tryBeginRebalanceRun();
+      if (!acquired) {
+        return { created: 0 };
+      }
+    }
 
     await this.prisma.queue_Rebalance_Suggestion.updateMany({
       where: {
@@ -63,26 +135,53 @@ export class QueueRebalanceService {
       },
     });
 
-    const rule = await this.prisma.queue_Priority_Rule.findFirst({
-      where: {
-        rule_type: QueueRuleTypeEnum.REBALANCE,
-        is_active: true,
-      },
-    });
-
-    const ruleConfig = (rule?.params as any) || {};
-    if ((ruleConfig.enabled ?? true) === false) {
-      return { created: 0 };
-    }
-
-    const etaGapMinutes = ruleConfig.eta_gap_minutes ?? 15;
-    const suggestionTtlMinutes = ruleConfig.suggestion_ttl_minutes ?? 10;
+    const etaGapMinutes =
+      ruleConfig.eta_gap_minutes ?? DEFAULT_REBALANCE_PARAMS.eta_gap_minutes;
+    const suggestionTtlMinutes =
+      ruleConfig.suggestion_ttl_minutes ??
+      DEFAULT_REBALANCE_PARAMS.suggestion_ttl_minutes;
     const etaGapSec = etaGapMinutes * 60;
 
-    const roomServices = await this.prisma.room_Service.findMany({
-      where: { is_active: true },
-      include: { room: true, service: true },
-    });
+    const [queues, allStats, roomServices] = await Promise.all([
+      this.prisma.queue.findMany({
+        where: {
+          status: {
+            in: [
+              QueueStatusEnum.PENDING,
+              QueueStatusEnum.QUEUED,
+              QueueStatusEnum.SERVING,
+            ],
+          },
+        },
+        select: {
+          queue_id: true,
+          room_id: true,
+          status: true,
+          serving_started_at: true,
+          step: { select: { step_type: true, service_code: true } },
+        },
+      }),
+      this.prisma.room_Service_Stat.findMany(),
+      this.prisma.room_Service.findMany({
+        where: { is_active: true },
+        select: {
+          room_id: true,
+          service_id: true,
+          service: { select: { service_code: true } },
+        },
+      }),
+    ]);
+
+    const waitingSecByRoom = computeTotalWaitingSecByRoom(
+      queues,
+      allStats,
+      now,
+    );
+
+    const statsByRoomType = new Map<string, (typeof allStats)[number]>();
+    for (const stat of allStats) {
+      statsByRoomType.set(`${stat.room_id}:${stat.step_type}`, stat);
+    }
 
     const serviceRoomsMap = new Map<
       string,
@@ -107,11 +206,10 @@ export class QueueRebalanceService {
     for (const [serviceId, { roomIds, serviceCode }] of serviceRoomsMap.entries()) {
       if (roomIds.length < 2 || !serviceCode) continue;
 
-      const roomEtas: { roomId: string; totalWaitingSec: number }[] = [];
-      for (const roomId of roomIds) {
-        const etaResult = await this.queueEtaService.computeEtaForRoom(roomId);
-        roomEtas.push({ roomId, totalWaitingSec: etaResult.totalWaitingSec });
-      }
+      const roomEtas = roomIds.map((roomId) => ({
+        roomId,
+        totalWaitingSec: waitingSecByRoom.get(roomId) ?? 0,
+      }));
 
       roomEtas.sort((a, b) => b.totalWaitingSec - a.totalWaitingSec);
       const maxRoom = roomEtas[0];
@@ -123,22 +221,20 @@ export class QueueRebalanceService {
       const maxRoomOrdered = await this.queuePriorityService.computeQueueOrder(
         maxRoom.roomId,
       );
-      const maxRoomExpectedSec = await this.queueEtaService.getExpectedDurationSec(
-        maxRoom.roomId,
-        null,
+      const maxRoomExpectedSec = expectedSecFromStat(
+        statsByRoomType.get(`${maxRoom.roomId}:${StepTypeEnum.OTHER}`),
       );
-      const minRoomExpectedSec = await this.queueEtaService.getExpectedDurationSec(
-        minRoom.roomId,
-        null,
+      const minRoomExpectedSec = expectedSecFromStat(
+        statsByRoomType.get(`${minRoom.roomId}:${StepTypeEnum.OTHER}`),
       );
 
       const candidates: typeof maxRoomOrdered = [];
       for (let i = maxRoomOrdered.length - 1; i >= 0; i--) {
         const entry = maxRoomOrdered[i];
         const q = entry.queue;
-        const step = (q as any).step;
-        const stepType = step?.step_type as StepTypeEnum | undefined;
-        const stepServiceCode = step?.service_code as string | null | undefined;
+        const step = q.step;
+        const stepType = step?.step_type ?? undefined;
+        const stepServiceCode = step?.service_code ?? null;
 
         // Only move patients whose step belongs to this service group
         if (stepServiceCode !== serviceCode) continue;
@@ -218,7 +314,7 @@ export class QueueRebalanceService {
               queue_id: queueId,
               queue_number: createdSuggestion.queue.queue_number,
               patient_name:
-                (createdSuggestion.queue as any).step?.flow?.booking?.patient
+                createdSuggestion.queue.step?.flow?.booking?.patient
                   ?.full_name || '---',
               eta_gain_minutes: Math.round(createdSuggestion.eta_gain_sec / 60),
               expires_at: createdSuggestion.expires_at,

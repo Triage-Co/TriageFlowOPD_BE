@@ -6,6 +6,7 @@ import { QueueEtaService } from './queue-eta.service';
 import { QueueRebalanceService } from './queue-rebalance.service';
 import { QueueAdminController } from './queue-admin.controller';
 import { QueueAdminService } from './queue-admin.service';
+import { QueueCacheService } from './queue-cache.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
 import { StepModule } from '../step/step.module';
 
@@ -19,6 +20,7 @@ import { StepModule } from '../step/step.module';
     QueueEtaService,
     QueueRebalanceService,
     QueueAdminService,
+    QueueCacheService,
   ],
   exports: [
     QueueGateway,
@@ -27,6 +29,7 @@ import { StepModule } from '../step/step.module';
     QueueEtaService,
     QueueRebalanceService,
     QueueAdminService,
+    QueueCacheService,
   ],
 })
 export class QueueModule {}

@@ -27,6 +27,7 @@ import { QueueGateway } from '../../shared/gateways/queue.gateway';
 import { QueuePriorityService } from './queue-priority.service';
 import { EntryEtaInfo, QueueEtaService } from './queue-eta.service';
 import { QueueRebalanceService } from './queue-rebalance.service';
+import { QueueCacheService } from './queue-cache.service';
 import { REBALANCEABLE_STEP_TYPES } from './queue.constants';
 import { StepService } from '../step/step.service';
 
@@ -117,6 +118,8 @@ export class QueueService {
 
     @Inject(forwardRef(() => StepService))
     private readonly stepService: StepService,
+
+    private readonly queueCacheService: QueueCacheService,
   ) {}
 
   async assertCanManageRoom(
@@ -392,7 +395,7 @@ export class QueueService {
         })
         .then((step) => {
           if (step?.step_type && REBALANCEABLE_STEP_TYPES.includes(step.step_type)) {
-            return this.queueRebalanceService.detectAndSuggest();
+            this.queueRebalanceService.scheduleDetectAndSuggest();
           }
         })
         .catch((err) =>
@@ -734,9 +737,11 @@ export class QueueService {
     };
   }
 
-  async broadcastRoomUpdate(roomId: string, staffId?: string, preloadedPayload?: any): Promise<void> {
+  async broadcastRoomUpdate(roomId: string, staffId?: string, preloadedPayload?: unknown): Promise<void> {
     try {
-      const payload = preloadedPayload || (await this.getRoomDisplayPayload(roomId, staffId));
+      await this.queueCacheService.invalidateRoom(roomId);
+      const payload =
+        preloadedPayload || (await this.getRoomDisplayPayload(roomId, staffId));
       this.queueGateway.emitQueueUpdate(roomId, payload);
     } catch (err: any) {
       this.logger.warn(`WS emit failed for room ${roomId}: ${err?.message || err}`);
@@ -744,23 +749,22 @@ export class QueueService {
   }
 
   async getRoomDisplayPayload(roomId: string, staffId?: string) {
-    // Heal orphans first so upcoming/current queries by room_id stay consistent
-    await this.prisma.queue.updateMany({
-      where: {
-        room_id: null,
-        status: {
-          in: [
-            QueueStatusEnum.PENDING,
-            QueueStatusEnum.QUEUED,
-            QueueStatusEnum.CALLED,
-            QueueStatusEnum.SERVING,
-            QueueStatusEnum.MISSING,
-          ],
-        },
-        step: { room_id: roomId },
-      },
-      data: { room_id: roomId },
-    });
+    const bypassCache = Boolean(staffId);
+    if (!bypassCache) {
+      const cached = await this.queueCacheService.getDisplayPayload<
+        Awaited<ReturnType<QueueService['buildRoomDisplayPayload']>>
+      >(roomId);
+      if (cached) return cached;
+    }
+
+    const payload = await this.buildRoomDisplayPayload(roomId, staffId);
+    if (!bypassCache) {
+      await this.queueCacheService.setDisplayPayload(roomId, payload);
+    }
+    return payload;
+  }
+
+  private async buildRoomDisplayPayload(roomId: string, staffId?: string) {
 
     const currentQueue = await this.prisma.queue.findFirst({
       where: {
@@ -792,8 +796,15 @@ export class QueueService {
       currentQueue?.step?.staff ?? null,
     );
 
-    const upcomingOrder = await this.queuePriorityService.computeQueueOrder(roomId);
-    const roomEta = await this.queueEtaService.computeEtaForRoom(roomId);
+    const upcomingOrder = await this.queuePriorityService.computeQueueOrder(
+      roomId,
+      undefined,
+      { room_type: room?.room_type, specialty_id: room?.specialty_id },
+    );
+    const roomEta = await this.queueEtaService.computeEtaForRoom(
+      roomId,
+      upcomingOrder,
+    );
     const etaMap = new Map<string, EntryEtaInfo>();
     for (const e of roomEta.entries) {
       etaMap.set(e.queueId, e);
@@ -812,8 +823,8 @@ export class QueueService {
         ? {
             queue_id: currentQueue.queue_id,
             queue_number: currentQueue.queue_number,
-            patient_name:
-              (currentQueue.step as any)?.flow?.booking?.patient?.full_name ||
+          patient_name:
+              currentQueue.step?.flow?.booking?.patient?.full_name ||
               '---',
             status:
               currentQueue.status === QueueStatusEnum.CALLED
@@ -829,7 +840,7 @@ export class QueueService {
         return {
           queue_id: entry.queue.queue_id,
           queue_number: entry.queue.queue_number,
-          patient_name: (entry.queue as any).step?.flow?.booking?.patient?.full_name || '---',
+          patient_name: entry.queue.step?.flow?.booking?.patient?.full_name || '---',
           queue_type: entry.queue.queue_type,
           priority_reasons: entry.reasons,
           eta_minutes: etaInfo ? Math.round(etaInfo.etaSec / 60) : 0,
@@ -1153,13 +1164,15 @@ export class QueueService {
       },
     });
 
-    const roomEta = await this.queueEtaService.computeEtaForRoom(roomId);
+    const waitingOrder = await this.queuePriorityService.computeQueueOrder(roomId);
+    const roomEta = await this.queueEtaService.computeEtaForRoom(
+      roomId,
+      waitingOrder,
+    );
     const etaMap = new Map<string, EntryEtaInfo>();
     for (const e of roomEta.entries) {
       etaMap.set(e.queueId, e);
     }
-
-    const waitingOrder = await this.queuePriorityService.computeQueueOrder(roomId);
 
     const missingEntries = await this.prisma.queue.findMany({
       where: {
@@ -1209,7 +1222,7 @@ export class QueueService {
             queue_id: entry.queue.queue_id,
             queue_number: entry.queue.queue_number,
             patient_name:
-              (entry.queue as any).step?.flow?.booking?.patient?.full_name ||
+              entry.queue.step?.flow?.booking?.patient?.full_name ||
               '---',
             queue_type: entry.queue.queue_type,
             effective_score: entry.effectiveScore,

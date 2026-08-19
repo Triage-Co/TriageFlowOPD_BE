@@ -532,6 +532,7 @@ model Queue {
   rebalanceSuggestions Queue_Rebalance_Suggestion[]
 
   @@index([room_id, status])
+  @@index([status, room_id])
   @@index([room_id, enqueued_at])
   @@map("queue")
 }
