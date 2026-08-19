@@ -7,13 +7,14 @@ export class NotificationService {
     @Inject('INotificationRepository')
     private readonly notificationRepository: INotificationRepository,
   ) {}
-  async findAll(account_id: string) {
-    const data = await this.notificationRepository.findAll(account_id);
+  async findAll(account_id: string, page?: number, limit?: number) {
+    const result = await this.notificationRepository.findAll(account_id, page, limit);
     return {
       code: 200,
       status: 'success',
       message: 'Lấy thông báo thành công',
-      data: data,
+      data: result.data,
+      meta: result.meta,
     };
   }
 

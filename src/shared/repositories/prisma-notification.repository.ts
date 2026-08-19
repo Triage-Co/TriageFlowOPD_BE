@@ -13,12 +13,31 @@ export class PrismaNotificationRepository implements INotificationRepository {
       },
     });
   }
-  findAll(account_id: string): Promise<any> {
-    return this.prismaService.notification.findMany({
-      where: {
-        account_id: account_id,
+  async findAll(account_id: string, page?: number, limit?: number): Promise<any> {
+    const skip = page && limit && page > 0 && limit > 0 ? (Number(page) - 1) * Number(limit) : undefined;
+    const take = limit && limit > 0 ? Number(limit) : undefined;
+
+    const [data, total_items] = await Promise.all([
+      this.prismaService.notification.findMany({
+        where: { account_id: account_id },
+        take: take,
+        skip: skip,
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prismaService.notification.count({
+        where: { account_id: account_id },
+      }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total: total_items,
+        page: Number(page) || 1,
+        limit: take ?? total_items,
+        totalPages: take ? Math.ceil(total_items / take) : 1,
       },
-    });
+    };
   }
   deleteAll(account_id: string): Promise<any> {
     return this.prismaService.notification.deleteMany({
