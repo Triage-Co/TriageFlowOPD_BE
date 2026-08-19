@@ -5,18 +5,30 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, QueueRuleTypeEnum, QueueStatusEnum } from '@prisma/client';
+import {
+  Prisma,
+  QueueRuleTypeEnum,
+  QueueStatusEnum,
+  RebalanceSuggestionStatusEnum,
+} from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueGateway } from '../../shared/gateways/queue.gateway';
 import {
   CreatePriorityRuleDto,
   CreateRoomServiceDto,
   QueryPriorityRuleDto,
   UpdatePriorityRuleDto,
+  UpdateRebalanceConfigDto,
   UpdateRoomServiceDto,
 } from './dto/admin-rule.dto';
 import { QueueEtaService } from './queue-eta.service';
 import { QueuePriorityService } from './queue-priority.service';
+import {
+  DEFAULT_REBALANCE_PARAMS,
+  mergeRebalanceParams,
+  toRebalanceConfig,
+} from './queue.constants';
 
 export const ALLOWED_CONDITION_KEYS = [
   'age',
@@ -90,6 +102,7 @@ export class QueueAdminService {
     private readonly prisma: PrismaService,
     private readonly queuePriorityService: QueuePriorityService,
     private readonly queueEtaService: QueueEtaService,
+    private readonly queueGateway: QueueGateway,
   ) {}
 
   // ─── 1. Priority Rules CRUD ──────────────────────────────────────────────────
@@ -283,6 +296,113 @@ export class QueueAdminService {
       status: 'success',
       message: 'Đã tắt (soft-delete) quy tắc ưu tiên thành công.',
       data: updated,
+    };
+  }
+
+  async getRebalanceConfig() {
+    const rule = await this.prisma.queue_Priority_Rule.findFirst({
+      where: { rule_type: QueueRuleTypeEnum.REBALANCE },
+      orderBy: { created_at: 'asc' },
+    });
+    const config = toRebalanceConfig(rule?.params);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy cấu hình tự sắp xếp hàng chờ thành công.',
+      data: {
+        ...config,
+        rule_id: rule?.rule_id ?? null,
+      },
+    };
+  }
+
+  async updateRebalanceConfig(dto: UpdateRebalanceConfigDto) {
+    const existing = await this.prisma.queue_Priority_Rule.findFirst({
+      where: { rule_type: QueueRuleTypeEnum.REBALANCE },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const wasEnabled = existing
+      ? toRebalanceConfig(existing.params).enabled
+      : DEFAULT_REBALANCE_PARAMS.enabled;
+    const mergedParams = mergeRebalanceParams(existing?.params, dto);
+    const disabling = wasEnabled && mergedParams.enabled === false;
+
+    const { rule, expiredSuggestions } = await this.prisma.$transaction(
+      async (tx) => {
+        let expired: Array<{
+          suggestion_id: string;
+          from_room_id: string;
+          to_room_id: string;
+        }> = [];
+
+        if (disabling) {
+          expired = await tx.queue_Rebalance_Suggestion.findMany({
+            where: { status: RebalanceSuggestionStatusEnum.PENDING },
+            select: {
+              suggestion_id: true,
+              from_room_id: true,
+              to_room_id: true,
+            },
+          });
+          await tx.queue_Rebalance_Suggestion.updateMany({
+            where: { status: RebalanceSuggestionStatusEnum.PENDING },
+            data: { status: RebalanceSuggestionStatusEnum.EXPIRED },
+          });
+        }
+
+        const paramsJson = mergedParams as Prisma.InputJsonValue;
+        const ruleRow = existing
+          ? await tx.queue_Priority_Rule.update({
+              where: { rule_id: existing.rule_id },
+              data: {
+                params: paramsJson,
+                is_active: true,
+              },
+            })
+          : await tx.queue_Priority_Rule.create({
+              data: {
+                rule_code: 'REBALANCE_DEFAULT',
+                name: 'Cấu hình Load Balancing',
+                description:
+                  'Ngưỡng chênh lệch ETA 15 phút, suggestion TTL 10 phút',
+                rule_type: QueueRuleTypeEnum.REBALANCE,
+                weight: 0,
+                aging_rate: 0,
+                max_aging: 0,
+                params: paramsJson,
+                is_active: true,
+              },
+            });
+
+        return { rule: ruleRow, expiredSuggestions: expired };
+      },
+    );
+
+    this.queuePriorityService.clearRulesCache();
+
+    for (const suggestion of expiredSuggestions) {
+      this.queueGateway.emitRebalanceResolved(
+        suggestion.from_room_id,
+        suggestion.to_room_id,
+        {
+          suggestion_id: suggestion.suggestion_id,
+          status: RebalanceSuggestionStatusEnum.EXPIRED,
+        },
+      );
+    }
+
+    const config = toRebalanceConfig(rule.params);
+    return {
+      code: 200,
+      status: 'success',
+      message: disabling
+        ? 'Đã tắt tự sắp xếp hàng chờ và hết hạn các gợi ý đang chờ.'
+        : 'Cập nhật cấu hình tự sắp xếp hàng chờ thành công.',
+      data: {
+        ...config,
+        rule_id: rule.rule_id,
+      },
     };
   }
 

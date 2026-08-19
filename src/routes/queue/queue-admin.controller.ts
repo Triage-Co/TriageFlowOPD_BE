@@ -21,6 +21,7 @@ import {
   CreateRoomServiceDto,
   QueryPriorityRuleDto,
   UpdatePriorityRuleDto,
+  UpdateRebalanceConfigDto,
   UpdateRoomServiceDto,
 } from './dto/admin-rule.dto';
 import { QueueAdminService } from './queue-admin.service';
@@ -118,5 +119,19 @@ export class QueueAdminController {
   @ApiResponse({ status: 200, description: 'Dữ liệu snapshot heatmap hàng chờ.' })
   async getHeatmapData() {
     return await this.queueAdminService.getHeatmapData();
+  }
+
+  @Get('rebalance-config')
+  @ApiOperation({ summary: '[ADMIN] Lấy cấu hình tự sắp xếp hàng chờ' })
+  @ApiResponse({ status: 200, description: 'Cấu hình rebalance hiện tại.' })
+  async getRebalanceConfig() {
+    return await this.queueAdminService.getRebalanceConfig();
+  }
+
+  @Patch('rebalance-config')
+  @ApiOperation({ summary: '[ADMIN] Cập nhật cấu hình tự sắp xếp hàng chờ (merge params)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật cấu hình rebalance thành công.' })
+  async updateRebalanceConfig(@Body() dto: UpdateRebalanceConfigDto) {
+    return await this.queueAdminService.updateRebalanceConfig(dto);
   }
 }

@@ -4,12 +4,13 @@ import {
   QueueRuleTypeEnum,
   StepTypeEnum,
 } from '@prisma/client';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
@@ -193,4 +194,24 @@ export class UpdateRoomServiceDto {
   @IsNotEmpty({ message: 'is_active không được để trống' })
   @IsBoolean({ message: 'is_active phải là boolean' })
   is_active: boolean;
+}
+
+export class UpdateRebalanceConfigDto {
+  @ApiProperty({ example: false, description: 'Bật/tắt tự sắp xếp hàng chờ' })
+  @IsBoolean({ message: 'enabled phải là boolean' })
+  enabled: boolean;
+
+  @ApiPropertyOptional({ example: 15, description: 'Ngưỡng chênh lệch ETA (phút)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'eta_gap_minutes phải là số' })
+  @Min(1, { message: 'eta_gap_minutes tối thiểu là 1' })
+  eta_gap_minutes?: number;
+
+  @ApiPropertyOptional({ example: 10, description: 'TTL gợi ý điều phối (phút)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'suggestion_ttl_minutes phải là số' })
+  @Min(1, { message: 'suggestion_ttl_minutes tối thiểu là 1' })
+  suggestion_ttl_minutes?: number;
 }
