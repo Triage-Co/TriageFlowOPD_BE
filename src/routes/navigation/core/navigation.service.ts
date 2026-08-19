@@ -12,6 +12,24 @@ import { GetRouteDto, RouteLocationType } from './dto/get-route.dto';
 import * as turf from '@turf/turf';
 import { get3DMapHtml } from './navigation-3d.template';
 
+const NAV_GRAPH_CACHE_TTL_MS = 3600000;
+
+type NavGraphNode = {
+  id: string;
+  type: string;
+  coords: number[] | null;
+  metadata: unknown;
+  floorId: string;
+  floorNumber: number;
+};
+
+type NavGraphNeighbor = { toNodeId: string; distance: number };
+
+type CachedNavGraph = {
+  nodesList: NavGraphNode[];
+  adjacencyEntries: [string, NavGraphNeighbor[]][];
+};
+
 @Injectable()
 export class NavigationService {
   constructor(
@@ -229,12 +247,18 @@ export class NavigationService {
             coordsGeom: feature.geometry,
           }));
 
-        // Query active edges connecting nodes on this floor
-        const nodeIds = nodeMaps.map((n) => n.id);
+        // Query active edges connecting nodes on this floor (join filter, not `in: nodeIds`)
         const edges = await this.prisma.edge.findMany({
           where: {
-            fromNodeId: { in: nodeIds },
-            toNodeId: { in: nodeIds },
+            active: true,
+            fromNode: { active: true, floorId: floor.id },
+            toNode: { active: true, floorId: floor.id },
+          },
+          select: {
+            id: true,
+            fromNodeId: true,
+            toNodeId: true,
+            distance: true,
             active: true,
           },
         });
@@ -293,39 +317,8 @@ export class NavigationService {
 
     const buildingId = startFloor.buildingId;
 
-    // 4. Fetch all floors of this building
-    const floors = await this.prisma.floor.findMany({
-      where: { buildingId },
-      select: { id: true, floorNumber: true },
-    });
-    const floorIds = floors.map((f) => f.id);
-    const floorMap = new Map<string, number>(
-      floors.map((f) => [f.id, f.floorNumber]),
-    );
-
-    // 5. Fetch all nodes with coordinates in this building
-    const nodesList: any[] = [];
-    for (const floor of floors) {
-      const nodeFeatures = await this.geoService.readAllGeoms(
-        'node',
-        floor.id,
-        'coordsGeom',
-      );
-      for (const feature of nodeFeatures) {
-        if (feature.properties.active !== false) {
-          nodesList.push({
-            id: feature.properties.id,
-            type: feature.properties.type,
-            coords: feature.geometry ? feature.geometry.coordinates : null,
-            metadata: feature.properties.metadata,
-            floorId: floor.id,
-            floorNumber: floor.floorNumber,
-          });
-        }
-      }
-    }
-
-    const nodesMap = new Map<string, any>(nodesList.map((n) => [n.id, n]));
+    const { nodesMap, adjacencyList } =
+      await this.getCachedNavGraph(buildingId);
 
     // Check if start & target nodes are loaded in our nodesMap
     const fullStartNode = nodesMap.get(startNode.id);
@@ -334,31 +327,6 @@ export class NavigationService {
       throw new BadRequestException(
         'Điểm bắt đầu hoặc điểm đích không nằm trong cùng đồ thị tòa nhà',
       );
-    }
-
-    // 6. Fetch all edges connecting these active nodes
-    const nodeIds = nodesList.map((n) => n.id);
-    const edges = await this.prisma.edge.findMany({
-      where: {
-        fromNodeId: { in: nodeIds },
-        toNodeId: { in: nodeIds },
-        active: true,
-      },
-    });
-
-    // 7. Build adjacency list representation of the graph
-    const adjacencyList = new Map<
-      string,
-      { toNodeId: string; distance: number }[]
-    >();
-    for (const id of nodeIds) {
-      adjacencyList.set(id, []);
-    }
-    for (const edge of edges) {
-      adjacencyList.get(edge.fromNodeId)?.push({
-        toNodeId: edge.toNodeId,
-        distance: edge.distance,
-      });
     }
 
     // 8. Run A* Pathfinding
@@ -392,6 +360,92 @@ export class NavigationService {
       totalDistance,
       path: pathNodes,
     };
+  }
+
+  /**
+   * Load the building navigation graph (nodes + adjacency), cached in Redis.
+   * Maps are reconstructed from JSON-safe arrays after a cache hit.
+   */
+  private async getCachedNavGraph(buildingId: string): Promise<{
+    nodesList: NavGraphNode[];
+    nodesMap: Map<string, NavGraphNode>;
+    adjacencyList: Map<string, NavGraphNeighbor[]>;
+  }> {
+    const cacheKey = `nav_graph:${buildingId}`;
+    const cached = await this.cacheManager.get<CachedNavGraph>(cacheKey);
+
+    if (cached?.nodesList && cached.adjacencyEntries) {
+      return {
+        nodesList: cached.nodesList,
+        nodesMap: new Map(cached.nodesList.map((n) => [n.id, n])),
+        adjacencyList: new Map(cached.adjacencyEntries),
+      };
+    }
+
+    // 4. Fetch all floors of this building
+    const floors = await this.prisma.floor.findMany({
+      where: { buildingId },
+      select: { id: true, floorNumber: true },
+    });
+
+    // 5. Fetch all nodes with coordinates in this building
+    const nodesList: NavGraphNode[] = [];
+    for (const floor of floors) {
+      const nodeFeatures = await this.geoService.readAllGeoms(
+        'node',
+        floor.id,
+        'coordsGeom',
+      );
+      for (const feature of nodeFeatures) {
+        if (feature.properties.active !== false) {
+          nodesList.push({
+            id: feature.properties.id,
+            type: feature.properties.type,
+            coords: feature.geometry ? feature.geometry.coordinates : null,
+            metadata: feature.properties.metadata,
+            floorId: floor.id,
+            floorNumber: floor.floorNumber,
+          });
+        }
+      }
+    }
+
+    const nodesMap = new Map<string, NavGraphNode>(
+      nodesList.map((n) => [n.id, n]),
+    );
+
+    // 6. Fetch all edges connecting these active nodes (join filter, not `in: nodeIds`)
+    const edges = await this.prisma.edge.findMany({
+      where: {
+        active: true,
+        fromNode: { active: true, floor: { buildingId } },
+        toNode: { active: true, floor: { buildingId } },
+      },
+      select: { fromNodeId: true, toNodeId: true, distance: true },
+    });
+
+    // 7. Build adjacency list representation of the graph
+    const adjacencyList = new Map<string, NavGraphNeighbor[]>();
+    for (const node of nodesList) {
+      adjacencyList.set(node.id, []);
+    }
+    for (const edge of edges) {
+      adjacencyList.get(edge.fromNodeId)?.push({
+        toNodeId: edge.toNodeId,
+        distance: edge.distance,
+      });
+    }
+
+    await this.cacheManager.set(
+      cacheKey,
+      {
+        nodesList,
+        adjacencyEntries: Array.from(adjacencyList.entries()),
+      } satisfies CachedNavGraph,
+      NAV_GRAPH_CACHE_TTL_MS,
+    );
+
+    return { nodesList, nodesMap, adjacencyList };
   }
 
   /**

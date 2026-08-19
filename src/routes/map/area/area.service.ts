@@ -253,6 +253,7 @@ export class AreaService {
     });
     if (floor) {
       await this.cacheManager.del(`building_map:${floor.buildingId}`);
+      await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
     }
   }
 }

@@ -104,6 +104,7 @@ export class BuildingService {
         },
       });
       await this.cacheManager.del(`building_map:${id}`);
+      await this.cacheManager.del(`nav_graph:${id}`);
 
       return {
         code: 200,
@@ -136,6 +137,7 @@ export class BuildingService {
         where: { id },
       });
       await this.cacheManager.del(`building_map:${id}`);
+      await this.cacheManager.del(`nav_graph:${id}`);
 
       return {
         code: 200,

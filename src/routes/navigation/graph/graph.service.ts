@@ -102,6 +102,9 @@ export class GraphGenerationService {
       });
     }
 
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
+
     return {
       nodeId: node.id,
       connectedTo: nearestNodeId,
@@ -120,6 +123,7 @@ export class GraphGenerationService {
     await this.prisma
       .$executeRaw`DELETE FROM "node" WHERE "floorId" = ${floorId}::uuid`;
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
     return { cleared: true };
   }
 
@@ -136,6 +140,7 @@ export class GraphGenerationService {
     const { doorNodeCoordsMap } = await generateDoorNodes(this.prisma, floorId);
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
     return { doorsGenerated: doorNodeCoordsMap.size };
   }
 
@@ -165,6 +170,7 @@ export class GraphGenerationService {
     );
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
     return { corridorsGenerated: corridorData.nodeMap.size };
   }
 
@@ -254,6 +260,7 @@ export class GraphGenerationService {
     });
 
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
 
     return {
       nodesCreated: totalNodes,
@@ -442,6 +449,7 @@ export class GraphGenerationService {
     }
 
     await this.cacheManager.del(`building_map:${connector.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${connector.buildingId}`);
 
     return {
       message: 'Connector linked successfully',
