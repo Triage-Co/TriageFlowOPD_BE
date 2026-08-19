@@ -3,14 +3,17 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import {
   CreateShiftRequestDto,
   UpdateShiftRequestDto,
 } from './dto/request-shift.dto';
+import { FindShiftQueryDto } from './dto/find-shift-query.dto';
 import { BulkWeeklyShiftDto } from './dto/bulk-weekly-shift.dto';
 import { BulkImportShiftDto } from './dto/bulk-import-shift.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
+import type { IShiftRepository } from '../../shared/interfaces/i-shift.repository';
 import { Prisma, PrismaClient, RoleTypeEnum } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 
@@ -22,7 +25,10 @@ export class ShiftService {
   SLOT: PrismaClient['slot'];
   STAFF: PrismaClient['staff'];
   ROOM: PrismaClient['room'];
-  constructor(private readonly prismaService: PrismaService) {
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Inject('IShiftRepository') private readonly shiftRepository: IShiftRepository,
+  ) {
     this.SHIFT = this.prismaService.shift;
     this.SLOT = this.prismaService.slot;
     this.STAFF = this.prismaService.staff;
@@ -200,35 +206,34 @@ export class ShiftService {
     }
   }
 
-  async findAll() {
+  async findAll(query: FindShiftQueryDto) {
     try {
-      const data = await this.SHIFT.findMany({
-        include: {
-          room: {
-            include: {
-              specialty: true,
-            },
-          },
-        },
-      });
+      const { page, limit, search, staff_id, room_id, date, start_time, end_time } = query;
+      
+      const result = await this.shiftRepository.findAll(
+        page,
+        limit,
+        search,
+        staff_id,
+        room_id,
+        date,
+        start_time,
+        end_time
+      );
 
-      if (!data) {
+      if (!result.data || result.data.length === 0) {
         throw new NotFoundException({
           message: 'Danh sách rỗng',
-          datail: 'Không tìm thấy ca trực trong hệ thống',
+          detail: 'Không tìm thấy ca trực trong hệ thống',
         });
       }
-
-      const formattedData = data.map((shift) => ({
-        ...shift,
-        date: formatInTimeZone(shift.date, TIME_ZONE, 'yyyy-MM-dd'),
-      }));
 
       return {
         code: 200,
         message: 'Lấy danh sách ca trực thành công',
         status: 'success',
-        data: formattedData,
+        data: result.data,
+        meta: result.meta,
       };
     } catch (error) {
       throw error;
