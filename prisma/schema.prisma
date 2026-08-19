@@ -614,6 +614,10 @@ model Prescription {
   diagnosis_note    String?                @db.Text
   total_amount      Int                    @default(0)
   status            PrescriptionStatusEnum @default(PENDING)
+  pickup_number     String?
+  pickup_date       DateTime?              @db.Date
+  called_at         DateTime?              @db.Timestamptz()
+  missed_at         DateTime?              @db.Timestamptz()
   created_at        DateTime               @default(now()) @db.Timestamptz()
   updated_at        DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
@@ -624,7 +628,9 @@ model Prescription {
   doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
   prescriptionDetails Prescription_Detail[]
 
+  @@unique([pickup_date, pickup_number], map: "prescription_pickup_date_number_key")
   @@index([prescription_code])
+  @@index([status, called_at, missed_at])
   @@map("prescription")
 }
 

@@ -11,6 +11,9 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { QueueService } from '../../routes/queue/queue.service';
+import { PrescriptionService } from '../../routes/pharmacy/prescription/prescription.service';
+import { PrismaService } from '../config/prisma.service';
+import { ClinicalRoomType } from '@prisma/client';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -51,6 +54,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
+    @Inject(forwardRef(() => PrescriptionService))
+    private readonly prescriptionService: PrescriptionService,
+    private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -162,6 +168,18 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`${client.id} joined ${roomName}`);
 
     try {
+      const room = await this.prismaService.room.findUnique({
+        where: { room_id: roomId },
+        select: { room_type: true },
+      });
+
+      if (room?.room_type === ClinicalRoomType.PHARMACY) {
+        const pharmacyState =
+          await this.prescriptionService.getPharmacyDisplayPayload(roomId);
+        client.emit('onPharmacyDisplayUpdate', pharmacyState);
+        return;
+      }
+
       const currentState = await this.queueService.getRoomDisplayPayload(
         roomId,
         staffId,
@@ -180,6 +198,10 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitQueueUpdate(roomId: string, data: any) {
     this.server.to(`room_${roomId}`).emit('onQueueUpdate', data);
+  }
+
+  emitPharmacyDisplayUpdate(roomId: string, data: any) {
+    this.server.to(`room_${roomId}`).emit('onPharmacyDisplayUpdate', data);
   }
 
   emitRebalanceSuggestion(

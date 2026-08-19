@@ -2,15 +2,20 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/config/prisma.service';
+import { QueueGateway } from '../../../shared/gateways/queue.gateway';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import {
   ClinicalRoomType,
   PaymentStatusEnum,
+  Prisma,
   PrescriptionStatusEnum,
   ServiceOrderStatusEnum,
   StepStatusEnum,
@@ -21,7 +26,7 @@ import {
 } from '@prisma/client';
 import { randomInt } from 'crypto';
 import { format } from 'date-fns';
-import { toDate } from 'date-fns-tz';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 
 const DOCTOR_SELECT = {
   staff_id: true,
@@ -35,9 +40,21 @@ const DOCTOR_SELECT = {
   },
 } as const;
 
+const VN_TZ = 'Asia/Ho_Chi_Minh';
+const MAX_PICKUP_SEQ = 999;
+const PICKUP_NUMBER_RE = /^P(\d{1,3})$/;
+
+type DbClient = Prisma.TransactionClient | PrismaService;
+
 @Injectable()
 export class PrescriptionService {
-  constructor(private readonly prismaService: PrismaService) {}
+  private readonly logger = new Logger(PrescriptionService.name);
+
+  constructor(
+    private readonly prismaService: PrismaService,
+    @Inject(forwardRef(() => QueueGateway))
+    private readonly queueGateway: QueueGateway,
+  ) {}
 
   private generatePrescriptionCode(): string {
     const dateStr = format(new Date(), 'yyyyMMdd');
@@ -574,9 +591,20 @@ export class PrescriptionService {
         });
       }
 
+      const pickup = prescription.pickup_number
+        ? {
+            pickup_number: prescription.pickup_number,
+            pickup_date: prescription.pickup_date,
+          }
+        : await this.allocateNextPickupNumber(tx);
+
       return tx.prescription.update({
         where: { prescription_id: id },
-        data: { status: PrescriptionStatusEnum.PROCESSING },
+        data: {
+          status: PrescriptionStatusEnum.PROCESSING,
+          pickup_number: pickup.pickup_number,
+          pickup_date: pickup.pickup_date,
+        },
         include: {
           serviceOrder: true,
           prescriptionDetails: {
@@ -609,7 +637,7 @@ export class PrescriptionService {
 
     const patientAccountId = prescription.visitSession?.patient?.account_id;
 
-    return this.prismaService.$transaction(async (tx) => {
+    const result = await this.prismaService.$transaction(async (tx) => {
       const updated = await tx.prescription.update({
         where: { prescription_id: id },
         data: { status: PrescriptionStatusEnum.PREPARED },
@@ -622,16 +650,21 @@ export class PrescriptionService {
       });
 
       if (patientAccountId) {
+        const pickupLabel = updated.pickup_number
+          ? ` số ${updated.pickup_number}`
+          : '';
         await tx.notification.create({
           data: {
             account_id: patientAccountId,
-            message: `Đơn thuốc [${prescription.prescription_code}] của bạn đã được soạn xong. Vui lòng tới quầy nhà thuốc để nhận thuốc!`,
+            message: `Đơn thuốc [${prescription.prescription_code}]${pickupLabel} của bạn đã được soạn xong. Vui lòng tới quầy nhà thuốc để nhận thuốc!`,
           },
         });
       }
 
       return updated;
     });
+    void this.emitPharmacyDisplay();
+    return result;
   }
 
   async markAsDispensed(id: string) {
@@ -656,7 +689,7 @@ export class PrescriptionService {
 
     const patientAccountId = prescription.visitSession?.patient?.account_id;
 
-    return this.prismaService.$transaction(async (tx) => {
+    const result = await this.prismaService.$transaction(async (tx) => {
       if (prescription.service_order_id) {
         await tx.service_Order.update({
           where: { service_order_id: prescription.service_order_id },
@@ -712,6 +745,8 @@ export class PrescriptionService {
 
       return updated;
     });
+    void this.emitPharmacyDisplay();
+    return result;
   }
 
   async updateStatus(id: string, status: PrescriptionStatusEnum) {
@@ -858,5 +893,321 @@ export class PrescriptionService {
     return this.prismaService.prescription.delete({
       where: { prescription_id: id },
     });
+  }
+
+  async assignPickupNumbersByServiceOrder(serviceOrderId: string) {
+    const prescriptions = await this.prismaService.prescription.findMany({
+      where: {
+        service_order_id: serviceOrderId,
+        pickup_number: null,
+      },
+      select: { prescription_id: true },
+    });
+
+    for (const item of prescriptions) {
+      await this.assignPickupNumberToPrescription(item.prescription_id);
+    }
+  }
+
+  async getPharmacyDisplayPayload(roomId?: string) {
+    const room = await this.resolvePharmacyRoom(roomId);
+    const today = this.vnTodayDateOnly();
+
+    const [calling, readyUnshownCount] = await Promise.all([
+      this.prismaService.prescription.findMany({
+        where: {
+          status: PrescriptionStatusEnum.PREPARED,
+          pickup_date: today,
+          pickup_number: { not: null },
+          called_at: { not: null },
+          missed_at: null,
+        },
+        select: {
+          prescription_id: true,
+          pickup_number: true,
+          called_at: true,
+        },
+        orderBy: [{ called_at: 'asc' }],
+      }),
+      this.prismaService.prescription.count({
+        where: {
+          status: PrescriptionStatusEnum.PREPARED,
+          pickup_date: today,
+          pickup_number: { not: null },
+          called_at: null,
+          missed_at: null,
+        },
+      }),
+    ]);
+
+    const callingNumbers = [...calling].sort((a, b) => {
+      const seqDiff =
+        this.parsePickupSeq(a.pickup_number) -
+        this.parsePickupSeq(b.pickup_number);
+      if (seqDiff !== 0) return seqDiff;
+      const aTime = a.called_at?.getTime() ?? 0;
+      const bTime = b.called_at?.getTime() ?? 0;
+      return aTime - bTime;
+    });
+
+    return {
+      kind: 'pharmacy' as const,
+      room: {
+        room_id: room.room_id,
+        room_name: room.room_name,
+        room_type: room.room_type,
+      },
+      calling_numbers: callingNumbers.map((item) => ({
+        prescription_id: item.prescription_id,
+        pickup_number: item.pickup_number as string,
+      })),
+      ready_unshown_count: readyUnshownCount,
+    };
+  }
+
+  async callNextPrepared(roomId?: string) {
+    const room = await this.resolvePharmacyRoom(roomId);
+    const today = this.vnTodayDateOnly();
+    const now = new Date();
+
+    const result = await this.prismaService.prescription.updateMany({
+      where: {
+        status: PrescriptionStatusEnum.PREPARED,
+        pickup_date: today,
+        pickup_number: { not: null },
+        called_at: null,
+        missed_at: null,
+      },
+      data: { called_at: now },
+    });
+
+    const payload = await this.getPharmacyDisplayPayload(room.room_id);
+    this.queueGateway.emitPharmacyDisplayUpdate(room.room_id, payload);
+
+    return {
+      called_count: result.count,
+      ...payload,
+    };
+  }
+
+  async missPrepared(id: string) {
+    const prescription = await this.prismaService.prescription.findUnique({
+      where: { prescription_id: id },
+    });
+
+    if (!prescription) {
+      throw new NotFoundException(`Không tìm thấy đơn thuốc với ID: ${id}`);
+    }
+
+    if (prescription.status !== PrescriptionStatusEnum.PREPARED) {
+      throw new BadRequestException(
+        'Chỉ có thể đánh miss đơn thuốc đang ở trạng thái PREPARED.',
+      );
+    }
+
+    if (!prescription.called_at || prescription.missed_at) {
+      throw new BadRequestException(
+        'Đơn thuốc này không đang hiển thị trên TV nhà thuốc.',
+      );
+    }
+
+    const updated = await this.prismaService.prescription.update({
+      where: { prescription_id: id },
+      data: { missed_at: new Date() },
+      include: {
+        visitSession: {
+          select: {
+            patient: { select: { full_name: true } },
+          },
+        },
+        prescriptionDetails: { include: { medicine: true } },
+      },
+    });
+
+    void this.emitPharmacyDisplay();
+    return updated;
+  }
+
+  async recallPrepared(id: string) {
+    const prescription = await this.prismaService.prescription.findUnique({
+      where: { prescription_id: id },
+    });
+
+    if (!prescription) {
+      throw new NotFoundException(`Không tìm thấy đơn thuốc với ID: ${id}`);
+    }
+
+    if (prescription.status !== PrescriptionStatusEnum.PREPARED) {
+      throw new BadRequestException(
+        'Chỉ có thể gọi lại đơn thuốc đang ở trạng thái PREPARED.',
+      );
+    }
+
+    if (!prescription.missed_at) {
+      throw new BadRequestException(
+        'Đơn thuốc này không ở trạng thái Miss. Dùng Call next để đưa số lên TV.',
+      );
+    }
+
+    const updated = await this.prismaService.prescription.update({
+      where: { prescription_id: id },
+      data: {
+        missed_at: null,
+        called_at: new Date(),
+      },
+      include: {
+        visitSession: {
+          select: {
+            patient: { select: { full_name: true } },
+          },
+        },
+        prescriptionDetails: { include: { medicine: true } },
+      },
+    });
+
+    void this.emitPharmacyDisplay();
+    return updated;
+  }
+
+  private async assignPickupNumberToPrescription(id: string) {
+    const maxRetries = 5;
+    for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+      try {
+        return await this.prismaService.$transaction(async (tx) => {
+          const current = await tx.prescription.findUnique({
+            where: { prescription_id: id },
+          });
+          if (!current) {
+            throw new NotFoundException(
+              `Không tìm thấy đơn thuốc với ID: ${id}`,
+            );
+          }
+          if (current.pickup_number) {
+            return current;
+          }
+          const pickup = await this.allocateNextPickupNumber(tx);
+          return tx.prescription.update({
+            where: { prescription_id: id },
+            data: {
+              pickup_number: pickup.pickup_number,
+              pickup_date: pickup.pickup_date,
+            },
+          });
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002' &&
+          attempt < maxRetries - 1
+        ) {
+          continue;
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictException(
+            'Không thể cấp số lấy thuốc vì bị trùng. Vui lòng thử lại.',
+          );
+        }
+        throw error;
+      }
+    }
+    throw new ConflictException(
+      'Không thể cấp số lấy thuốc. Vui lòng thử lại.',
+    );
+  }
+
+  private async allocateNextPickupNumber(tx: DbClient): Promise<{
+    pickup_number: string;
+    pickup_date: Date;
+  }> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(741002019)`;
+    const pickupDate = this.vnTodayDateOnly();
+    const existing = await tx.prescription.findMany({
+      where: {
+        pickup_date: pickupDate,
+        pickup_number: { not: null },
+      },
+      select: { pickup_number: true },
+    });
+
+    const maxSeq = existing.reduce(
+      (acc, item) => Math.max(acc, this.parsePickupSeq(item.pickup_number)),
+      0,
+    );
+
+    if (maxSeq >= MAX_PICKUP_SEQ) {
+      throw new BadRequestException(
+        'Đã hết số lấy thuốc trong ngày (tối đa P999).',
+      );
+    }
+
+    return {
+      pickup_number: `P${maxSeq + 1}`,
+      pickup_date: pickupDate,
+    };
+  }
+
+  private parsePickupSeq(pickupNumber: string | null | undefined): number {
+    if (!pickupNumber) return 0;
+    const match = PICKUP_NUMBER_RE.exec(pickupNumber);
+    return match ? Number.parseInt(match[1], 10) : 0;
+  }
+
+  private vnTodayDateOnly(): Date {
+    const dateStr = formatInTimeZone(new Date(), VN_TZ, 'yyyy-MM-dd');
+    return new Date(`${dateStr}T00:00:00.000Z`);
+  }
+
+  private async resolvePharmacyRoom(roomId?: string) {
+    if (roomId) {
+      const room = await this.prismaService.room.findUnique({
+        where: { room_id: roomId },
+        select: {
+          room_id: true,
+          room_name: true,
+          room_type: true,
+        },
+      });
+      if (!room) {
+        throw new NotFoundException(`Không tìm thấy phòng với ID: ${roomId}`);
+      }
+      if (room.room_type !== ClinicalRoomType.PHARMACY) {
+        throw new BadRequestException(
+          'Phòng này không phải nhà thuốc. Hãy chọn phòng loại PHARMACY.',
+        );
+      }
+      return room;
+    }
+
+    const room = await this.prismaService.room.findFirst({
+      where: { room_type: ClinicalRoomType.PHARMACY },
+      orderBy: { created_at: 'asc' },
+      select: {
+        room_id: true,
+        room_name: true,
+        room_type: true,
+      },
+    });
+
+    if (!room) {
+      throw new NotFoundException(
+        'Chưa cấu hình phòng nhà thuốc (room_type = PHARMACY).',
+      );
+    }
+
+    return room;
+  }
+
+  private async emitPharmacyDisplay(roomId?: string) {
+    try {
+      const payload = await this.getPharmacyDisplayPayload(roomId);
+      this.queueGateway.emitPharmacyDisplayUpdate(
+        payload.room.room_id,
+        payload,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `Không phát được TV nhà thuốc: ${error?.message || error}`,
+      );
+    }
   }
 }

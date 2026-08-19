@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   Logger,
+  forwardRef,
 } from '@nestjs/common';
 // import { Cron, CronExpression } from '@nestjs/schedule';
 import { randomInt } from 'crypto';
@@ -19,6 +20,7 @@ import { ResponseType } from '../../shared/types/response.type';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
 import { StepService } from '../step/step.service';
 import { FlowService } from '../flow/flow.service';
+import { PrescriptionService } from '../pharmacy/prescription/prescription.service';
 
 @Injectable()
 export class TransactionService {
@@ -36,6 +38,8 @@ export class TransactionService {
     private readonly stepRepository: IStepRepository,
     private readonly stepService: StepService,
     private readonly flowService: FlowService,
+    @Inject(forwardRef(() => PrescriptionService))
+    private readonly prescriptionService: PrescriptionService,
   ) {
     this.payosClient = this.payosService.getClient();
     this.TRANSACTION = this.prismaService.transaction;
@@ -232,6 +236,10 @@ export class TransactionService {
           },
           data: { status: 'PROCESSING' },
         });
+
+        await this.prescriptionService.assignPickupNumbersByServiceOrder(
+          transaction.service_order_id,
+        );
 
         await this.prismaService.service_Order_Detail.updateMany({
           where: { service_order_id: transaction.service_order_id },
