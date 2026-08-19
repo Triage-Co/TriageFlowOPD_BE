@@ -12,6 +12,9 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueCacheService } from './queue-cache.service';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
+
+const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 export interface RuleEvaluationInput {
   patient: { dob: Date | null; gender: GenderTypeEnum } | null;
