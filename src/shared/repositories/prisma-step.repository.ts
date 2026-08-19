@@ -148,7 +148,6 @@ export class PrismaStepRepository implements IStepRepository {
         },
       },
       omit: {
-        flow_id: true,
         staff_id: true,
         room_id: true,
       },
@@ -190,7 +189,6 @@ export class PrismaStepRepository implements IStepRepository {
         step_id: id,
       },
       omit: {
-        flow_id: true,
         staff_id: true,
         room_id: true,
       },
