@@ -27,6 +27,10 @@ import {
 import { randomInt } from 'crypto';
 import { format } from 'date-fns';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
+import {
+  isStepSatisfied,
+  pickLatestReturnStep,
+} from '../../service_order/service-order.helpers';
 
 const DOCTOR_SELECT = {
   staff_id: true,
@@ -251,7 +255,7 @@ export class PrescriptionService {
             orderBy: { created_at: 'asc' },
           });
 
-          const lastStep = await tx.step.findFirst({
+          const flowSteps = await tx.step.findMany({
             where: {
               flow_id: flowId,
               parent_step_id: null,
@@ -259,6 +263,8 @@ export class PrescriptionService {
             },
             orderBy: { created_at: 'desc' },
           });
+          const returnStep = pickLatestReturnStep(flowSteps);
+          const lastStep = returnStep || flowSteps[0];
 
           const dispensingStep = await tx.step.create({
             data: {
@@ -272,12 +278,28 @@ export class PrescriptionService {
           });
 
           if (lastStep) {
-            await tx.step_Dependency.create({
-              data: {
-                step_id: dispensingStep.step_id,
-                depends_on_step_id: lastStep.step_id,
+            const existingDep = await tx.step_Dependency.findUnique({
+              where: {
+                step_id_depends_on_step_id: {
+                  step_id: dispensingStep.step_id,
+                  depends_on_step_id: lastStep.step_id,
+                },
               },
             });
+            if (!existingDep) {
+              await tx.step_Dependency.create({
+                data: {
+                  step_id: dispensingStep.step_id,
+                  depends_on_step_id: lastStep.step_id,
+                },
+              });
+            }
+            if (isStepSatisfied(lastStep.step_status)) {
+              await tx.step.update({
+                where: { step_id: dispensingStep.step_id },
+                data: { step_status: StepStatusEnum.IN_PROGRESS },
+              });
+            }
           }
         }
       }
