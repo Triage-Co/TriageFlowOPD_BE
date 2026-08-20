@@ -306,13 +306,15 @@ export class BookingService {
         tx,
       );
 
-      await this.notificationRepository.create(
-        {
-          account_id: patient.account_id,
-          message: `Bạn đã đặt lịch khám thành công. Mã vé: ${ticketCode}`,
-        },
-        tx,
-      );
+      if (patient.account_id) {
+        await this.notificationRepository.create(
+          {
+            account_id: patient.account_id,
+            message: `Bạn đã đặt lịch khám thành công. Mã vé: ${ticketCode}`,
+          },
+          tx,
+        );
+      }
 
       if (slot.shift?.staff_id) {
         await this.notificationRepository.create(
@@ -758,13 +760,15 @@ export class BookingService {
         data: { qr_code: paymentLink.data.qrCode },
       });
 
-      await this.notificationRepository.create(
-        {
-          account_id: patient.account_id,
-          message: `Bạn đã đặt lịch gói khám ${examPackage.package_name} thành công.`,
-        },
-        tx,
-      );
+      if (patient.account_id) {
+        await this.notificationRepository.create(
+          {
+            account_id: patient.account_id,
+            message: `Bạn đã đặt lịch gói khám ${examPackage.package_name} thành công.`,
+          },
+          tx,
+        );
+      }
 
       if (slot.shift?.staff_id) {
         await this.notificationRepository.create(
