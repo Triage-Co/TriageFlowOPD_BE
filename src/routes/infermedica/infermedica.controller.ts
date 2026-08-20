@@ -257,8 +257,10 @@ export class InfermedicaController {
     schema: {
       example: {
         recommended_specialist: {
-          id: 'sp_22',
+          specialty_id: '123-abc',
+          specialty_code: 'sp_22',
           name: 'Diabetologist',
+          best_slot_id: 'slot-456-def'
         },
         recommended_channel: 'personal_visit',
       },

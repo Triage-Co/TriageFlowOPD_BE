@@ -79,7 +79,7 @@ export class ServiceOrderService {
     private readonly stepRepository: IStepRepository,
     @Inject('IRoomRepository')
     private readonly roomRepository: IRoomRepository,
-  ) {}
+  ) { }
 
   async create(
     createServiceOrderReqDto: CreateServiceOrderReqDto,
@@ -328,7 +328,7 @@ export class ServiceOrderService {
               if (!paymentLink || !('data' in paymentLink)) {
                 throw new BadRequestException(
                   (paymentLink?.detail as any)?.error?.desc ||
-                    'Lỗi tạo giao dịch thanh toán',
+                  'Lỗi tạo giao dịch thanh toán',
                 );
               }
 
@@ -402,7 +402,7 @@ export class ServiceOrderService {
               if (!paymentLink || !('data' in paymentLink)) {
                 throw new BadRequestException(
                   (paymentLink?.detail as any)?.error?.desc ||
-                    'Lỗi tạo giao dịch thanh toán',
+                  'Lỗi tạo giao dịch thanh toán',
                 );
               }
 
@@ -487,6 +487,13 @@ export class ServiceOrderService {
         if (attached?.stepId) {
           await this.attachPharmacyToReturn(flow.flow_id, attached.stepId);
         }
+      }
+
+      if (flow.status === FlowStatusEnum.COMPLETED) {
+        await this.prisma.flow.update({
+          where: { flow_id: flow.flow_id },
+          data: { status: FlowStatusEnum.IN_PROGRESS },
+        });
       }
 
       return {
