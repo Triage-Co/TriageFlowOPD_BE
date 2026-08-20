@@ -526,6 +526,11 @@ export class ServiceOrderService {
             );
           }
         }
+      if (flow.status === FlowStatusEnum.COMPLETED) {
+        await this.prisma.flow.update({
+          where: { flow_id: flow.flow_id },
+          data: { status: FlowStatusEnum.IN_PROGRESS },
+        });
       }
 
       return {
