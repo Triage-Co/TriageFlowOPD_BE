@@ -525,7 +525,7 @@ export class ServiceOrderService {
               targetReturnStepId,
             );
           }
-        }
+        }}
       if (flow.status === FlowStatusEnum.COMPLETED) {
         await this.prisma.flow.update({
           where: { flow_id: flow.flow_id },
