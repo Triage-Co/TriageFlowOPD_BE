@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
 import { ITemplateRepository } from '../interfaces/i-template.repository';
 
@@ -50,6 +50,17 @@ export class PrismaTemplateRepository implements ITemplateRepository {
   }
   async delete(id: string): Promise<any> {
     await this.findById(id);
+
+    const count = await this.prismaService.exam_Package.count({
+      where: { template_id: id },
+    });
+    if (count > 0) {
+      throw new ConflictException({
+        message: 'Quy trình Khám đã được sử dụng trong gói khám, không thể xóa',
+        detail: `examPackages=${count}`,
+      });
+    }
+
     return this.prismaService.flow_Template.delete({
       where: { template_id: id },
     });
