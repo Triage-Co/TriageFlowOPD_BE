@@ -17,25 +17,16 @@ import type { IStepRepository } from '../../shared/interfaces/i-step.repository'
 import {
   QueueTypeEnum,
   StepStatusEnum,
-  StepTypeEnum,
   FlowStatusEnum,
 } from '@prisma/client';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
 import { QueueService } from '../queue/queue.service';
 import { PrismaService } from '../../shared/config/prisma.service';
-
-const CLS_TYPES = new Set([
-  StepTypeEnum.LAB_TEST,
-  StepTypeEnum.IMAGING,
-  StepTypeEnum.PROCEDURE,
-  StepTypeEnum.FUNCTIONAL_EXPLORATION,
-]);
-
-function isStepSatisfied(status: StepStatusEnum): boolean {
-  return (
-    status === StepStatusEnum.COMPLETED || status === StepStatusEnum.DECLINED
-  );
-}
+import {
+  isClsStepType,
+  isReturnServiceCode,
+  isStepSatisfied,
+} from '../service_order/service-order.helpers';
 
 @Injectable()
 export class StepService {
@@ -183,7 +174,7 @@ export class StepService {
     if (currentStep.parent_step_id) {
       await this.checkAndCompleteParentStep(currentStep.parent_step_id);
     } else {
-      await this.unlockNextSteps(stepId, StepStatusEnum.COMPLETED);
+      await this.unlockDependents(stepId, StepStatusEnum.COMPLETED);
     }
 
     if (!options?.skipCloseServingQueue) {
@@ -237,7 +228,7 @@ export class StepService {
     if (currentStep.parent_step_id) {
       await this.checkAndCompleteParentStep(currentStep.parent_step_id);
     } else {
-      await this.unlockNextSteps(stepId, StepStatusEnum.DECLINED);
+      await this.unlockDependents(stepId, StepStatusEnum.DECLINED);
     }
 
     if (!options?.skipCloseServingQueue) {
@@ -278,7 +269,7 @@ export class StepService {
           : StepStatusEnum.DECLINED,
       });
 
-      await this.unlockNextSteps(
+      await this.unlockDependents(
         parentId,
         anyCompleted ? StepStatusEnum.COMPLETED : StepStatusEnum.DECLINED,
       );
@@ -286,13 +277,13 @@ export class StepService {
   }
 
   /**
-   * @param triggerStatus status of the step that just finished (COMPLETED or DECLINED)
+   * Unlock steps that wait on `completedStepId`. Public so service-order cancel
+   * and free-payment paths can reuse the same graph rules.
    */
-  private async unlockNextSteps(
+  async unlockDependents(
     completedStepId: string,
-    triggerStatus: StepStatusEnum,
+    _triggerStatus: StepStatusEnum,
   ) {
-    const completedStep = await this.stepRepository.findById(completedStepId);
     const nextSteps =
       await this.stepRepository.findDependentSteps(completedStepId);
 
@@ -305,37 +296,45 @@ export class StepService {
         isStepSatisfied(pre.step_status),
       );
 
-      if (isReadyToStart && nextStep.step_status === StepStatusEnum.PENDING) {
+      if (!isReadyToStart || nextStep.step_status !== StepStatusEnum.PENDING) {
+        continue;
+      }
+
+      const isReturn = isReturnServiceCode(nextStep.service_code);
+      const hasCompletedCls = prerequisites.some(
+        (pre) =>
+          isClsStepType(pre.step_type) &&
+          pre.step_status === StepStatusEnum.COMPLETED,
+      );
+
+      if (isReturn && !hasCompletedCls) {
         await this.stepRepository.update(nextStep.step_id, {
-          step_status: StepStatusEnum.IN_PROGRESS,
+          step_status: StepStatusEnum.CANCELLED,
         });
+        await this.unlockDependents(
+          nextStep.step_id,
+          StepStatusEnum.CANCELLED,
+        );
+        continue;
+      }
 
-        // RETURNING only when unlocked by a real CLS completion (not decline)
-        const unlockedByCompletedCls =
-          triggerStatus === StepStatusEnum.COMPLETED &&
-          ((completedStep?.step_type &&
-            CLS_TYPES.has(completedStep.step_type)) ||
-            prerequisites.some(
-              (pre) =>
-                pre.step_type &&
-                CLS_TYPES.has(pre.step_type) &&
-                pre.step_status === StepStatusEnum.COMPLETED,
-            ));
+      await this.stepRepository.update(nextStep.step_id, {
+        step_status: StepStatusEnum.IN_PROGRESS,
+      });
 
-        if (unlockedByCompletedCls && nextStep.room_id) {
-          try {
-            await this.queueService.enqueueStep(
-              nextStep.step_id,
-              QueueTypeEnum.RETURNING,
-              undefined,
-              { forceType: true },
-            );
-          } catch (err: any) {
-            console.error(
-              `Failed to enqueue RETURNING for step ${nextStep.step_id}:`,
-              err?.message || err,
-            );
-          }
+      if (isReturn && hasCompletedCls && nextStep.room_id) {
+        try {
+          await this.queueService.enqueueStep(
+            nextStep.step_id,
+            QueueTypeEnum.RETURNING,
+            undefined,
+            { forceType: true },
+          );
+        } catch (err: any) {
+          console.error(
+            `Failed to enqueue RETURNING for step ${nextStep.step_id}:`,
+            err?.message || err,
+          );
         }
       }
     }
@@ -403,6 +402,17 @@ export class StepService {
     const updatedStep = await this.stepRepository.update(stepId, {
       step_status: updateStatusDto.step_status,
     });
+
+    if (updateStatusDto.step_status === StepStatusEnum.CANCELLED) {
+      if (currentStep.parent_step_id) {
+        await this.checkAndCompleteParentStep(currentStep.parent_step_id);
+      } else {
+        await this.unlockDependents(stepId, StepStatusEnum.CANCELLED);
+      }
+      if (currentStep.flow_id) {
+        await this.checkAndCompleteFlow(currentStep.flow_id);
+      }
+    }
 
     return {
       code: 200,

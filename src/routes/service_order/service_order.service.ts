@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import {
   CreateServiceOrderReqDto,
   QueryServiceOrderReqDto,
@@ -34,8 +39,20 @@ import { BookingErrors } from '../../shared/exceptions/booking.exceptions';
 import { FlowErrors } from '../../shared/exceptions/flow.exceptions';
 import { ServiceErrors } from '../../shared/exceptions/service.exceptions';
 import { ServiceOrderDetailErrors } from '../../shared/exceptions/service_order_detail.exceptions';
-import { roomTypeToStepType } from './service-order.helpers';
+import {
+  isClsStepType,
+  isStepSatisfied,
+  LEGACY_RETURN_SERVICE_CODE,
+  pickAnchorStep,
+  resolveReturnStepPlan,
+  RETURN_SERVICE_CODE,
+  RETURN_SERVICE_CODES,
+  roomTypeToStepType,
+  type FlowStepLike,
+  type ReturnStepPlan,
+} from './service-order.helpers';
 import { RoomErrors } from '../../shared/exceptions/room.exceptions';
+import { StepService } from '../step/step.service';
 
 @Injectable()
 export class ServiceOrderService {
@@ -43,6 +60,8 @@ export class ServiceOrderService {
     private readonly prisma: PrismaService,
     private readonly queueEtaService: QueueEtaService,
     private readonly transactionService: TransactionService,
+    @Inject(forwardRef(() => StepService))
+    private readonly stepService: StepService,
 
     @Inject('IServiceOrderRepository')
     private readonly serviceOrderRepository: IServiceOrderRepository,
@@ -107,18 +126,29 @@ export class ServiceOrderService {
         throw ServiceOrderDetailErrors.ServiceOrderDetailDuplicates();
       }
 
-      const steps = flow.steps;
-
-      const latestStep = await this.prisma.step.findFirst({
-        where: { flow_id: flow.flow_id },
-        orderBy: { created_at: 'desc' },
-      });
-
-      //lấy bước cuối tạo dependOn
-      const lastStep = latestStep || steps[steps.length - 1];
+      const steps = (flow.steps || []) as FlowStepLike[];
+      const willCreateCls = services.some((s) =>
+        isClsStepType(roomTypeToStepType(s.room_type)),
+      );
+      const returnPlan = resolveReturnStepPlan(steps, willCreateCls);
+      const paymentAnchorId =
+        returnPlan.action === 'skip'
+          ? pickAnchorStep(steps)?.step_id
+          : returnPlan.paymentAnchorId;
+      const lastStep =
+        steps.find((s) => s.step_id === paymentAnchorId) ||
+        pickAnchorStep(steps) ||
+        steps[steps.length - 1];
 
       const initialClinicalStep = await this.prisma.step.findFirst({
-        where: { flow_id: flow.flow_id, step_type: StepTypeEnum.CLINICAL },
+        where: {
+          flow_id: flow.flow_id,
+          step_type: StepTypeEnum.CLINICAL,
+          OR: [
+            { service_code: null },
+            { service_code: { notIn: [...RETURN_SERVICE_CODES] } },
+          ],
+        },
         orderBy: { created_at: 'asc' },
       });
 
@@ -277,10 +307,6 @@ export class ServiceOrderService {
 
               await this.stepRepository.update(paymentStep.step_id, {
                 step_name: `Thanh toán ${updatedName}`,
-
-                step_status: isFree
-                  ? StepStatusEnum.COMPLETED
-                  : StepStatusEnum.PENDING,
               });
             }
 
@@ -330,15 +356,15 @@ export class ServiceOrderService {
               service_code: groupServices[0].service_code,
               step_name: `Thanh toán ${newServiceNames}`,
               service_order_id: serviceOrder.service_order_id,
-              step_status: isFree
-                ? StepStatusEnum.COMPLETED
-                : StepStatusEnum.PENDING,
+              step_status: StepStatusEnum.PENDING,
             });
 
-            await this.stepRepository.createDependency(
-              paymentStep.step_id,
-              lastStep.step_id,
-            );
+            if (lastStep?.step_id) {
+              await this.stepRepository.createDependency(
+                paymentStep.step_id,
+                lastStep.step_id,
+              );
+            }
 
             const invoice = await this.invoiceRepository.create({
               service_order_id: serviceOrder.service_order_id,
@@ -405,13 +431,31 @@ export class ServiceOrderService {
         const clinicalSteps =
           await this.stepRepository.createManyParentStep(stepInputs);
 
+        const requiredForClinical = paymentStep?.step_id ?? lastStep?.step_id;
         for (const step of clinicalSteps) {
-          await this.stepRepository.createDependency(
-            step.step_id,
-            paymentStep.step_id ?? lastStep.step_id,
-          );
+          if (requiredForClinical) {
+            await this.stepRepository.createDependency(
+              step.step_id,
+              requiredForClinical,
+            );
+          }
 
-          newlyCreatedSubclinicalSteps.push(step);
+          if (isClsStepType(targetStepType)) {
+            newlyCreatedSubclinicalSteps.push(step);
+          }
+        }
+
+        if (paymentStep?.step_id) {
+          if (isFree) {
+            await this.stepService.completeStep(paymentStep.step_id, {
+              skipCloseServingQueue: true,
+            });
+          } else if (lastStep?.step_id && isStepSatisfied(lastStep.step_status)) {
+            await this.stepService.unlockDependents(
+              lastStep.step_id,
+              lastStep.step_status,
+            );
+          }
         }
 
         for (const service of groupServices) {
@@ -428,103 +472,20 @@ export class ServiceOrderService {
       }
 
       if (newlyCreatedSubclinicalSteps.length > 0 && initialClinicalStep) {
-        const returnServiceCode = 'DOC_QUA_KET_CAN_LAM_SANG';
-
-        let targetReturnStepId: string | null = null;
-
-        const existingReturnStep = await this.prisma.step.findFirst({
-          where: {
-            flow_id: flow.flow_id,
-            service_code: returnServiceCode,
-            step_status: StepStatusEnum.PENDING,
-          },
+        const attached = await this.attachReturnResultStep({
+          flowId: flow.flow_id,
+          bookingId: booking_id,
+          assignByStaffId: assign_by_staff_id,
+          initialClinicalStep,
+          newClsSteps: newlyCreatedSubclinicalSteps,
+          returnPlan,
         });
 
-        if (existingReturnStep) {
-          targetReturnStepId = existingReturnStep.step_id;
-
-          for (const subStep of newlyCreatedSubclinicalSteps) {
-            await this.stepRepository.createDependency(
-              targetReturnStepId,
-              subStep.step_id,
-            );
-          }
-        } else {
-          const returnService = await this.prisma.service.findFirst({
-            where: { service_code: returnServiceCode },
-          });
-
-          if (returnService) {
-            const returnOrder = await this.serviceOrderRepository.create({
-              booking_id,
-              name: returnService.service_name,
-              type: StepTypeEnum.CLINICAL,
-              assign_by_staff_id,
-              status: ServiceOrderStatusEnum.PENDING,
-              payment_status: PaymentStatusEnum.SUCCESSED,
-            });
-
-            await this.serviceOrderDetailRepository.create({
-              service_order_id: returnOrder.service_order_id,
-              quantity: 1,
-              price_at_order: 0,
-              service_id: returnService.service_id,
-              name: returnService.service_name,
-            });
-
-            const returnInvoice = await this.invoiceRepository.create({
-              service_order_id: returnOrder.service_order_id,
-              total_amount: 0,
-              status: InvoiceStatusEnum.PAID,
-            });
-
-            await this.invoiceDetailRepository.create({
-              invoice_id: returnInvoice.invoice_id,
-              item_name:
-                returnService.service_name || 'Đọc kết quả cận lâm sàng',
-              quantity: 1,
-              unit_price: 0,
-              sub_total: 0,
-            });
-
-            const returnStep = await this.stepRepository.createParentStep({
-              flow_id: flow.flow_id,
-              step_type: StepTypeEnum.CLINICAL,
-              step_name: returnService.service_name,
-              service_code: returnService.service_code,
-              room_id: initialClinicalStep.room_id,
-              staff_id: initialClinicalStep.staff_id,
-              service_order_id: returnOrder.service_order_id,
-              step_status: StepStatusEnum.PENDING,
-            });
-
-            targetReturnStepId = returnStep.step_id;
-
-            for (const subStep of newlyCreatedSubclinicalSteps) {
-              await this.stepRepository.createDependency(
-                targetReturnStepId,
-                subStep.step_id,
-              );
-            }
-
-            createdServiceOrders.push(returnOrder);
-          }
+        if (attached?.order) {
+          createdServiceOrders.push(attached.order);
         }
-
-        if (targetReturnStepId) {
-          const pharmacyStep = await this.prisma.step.findFirst({
-            where: {
-              flow_id: flow.flow_id,
-              step_type: StepTypeEnum.DISPENSING,
-            },
-          });
-
-          if (pharmacyStep) {
-            await this.stepRepository.createDependency(
-              pharmacyStep.step_id,
-              targetReturnStepId,
-            );
-          }
+        if (attached?.stepId) {
+          await this.attachPharmacyToReturn(flow.flow_id, attached.stepId);
         }
       }
 
@@ -539,6 +500,115 @@ export class ServiceOrderService {
         error instanceof Error ? error.message : 'Lỗi không xác định';
 
       throw ServiceOrderErrors.ActionFailed('Tạo Service Order', errorMessage);
+    }
+  }
+
+  private async findReturnCatalogService() {
+    const canonical = await this.prisma.service.findFirst({
+      where: { service_code: RETURN_SERVICE_CODE },
+    });
+    if (canonical) return canonical;
+    return this.prisma.service.findFirst({
+      where: { service_code: LEGACY_RETURN_SERVICE_CODE },
+    });
+  }
+
+  private async attachReturnResultStep(params: {
+    flowId: string;
+    bookingId: string;
+    assignByStaffId?: string;
+    initialClinicalStep: {
+      room_id: string | null;
+      staff_id: string | null;
+    };
+    newClsSteps: Array<{ step_id: string }>;
+    returnPlan: ReturnStepPlan;
+  }): Promise<{ stepId: string; order?: any } | null> {
+    const { flowId, bookingId, assignByStaffId, initialClinicalStep, newClsSteps, returnPlan } =
+      params;
+
+    if (returnPlan.action === 'skip' || newClsSteps.length === 0) {
+      return null;
+    }
+
+    if (returnPlan.action === 'extend') {
+      for (const cls of newClsSteps) {
+        await this.stepRepository.createDependency(
+          returnPlan.returnStepId,
+          cls.step_id,
+        );
+      }
+      return { stepId: returnPlan.returnStepId };
+    }
+
+    const returnService = await this.findReturnCatalogService();
+    if (!returnService) {
+      return null;
+    }
+
+    const returnOrder = await this.serviceOrderRepository.create({
+      booking_id: bookingId,
+      name: returnService.service_name,
+      type: StepTypeEnum.CLINICAL,
+      assign_by_staff_id: assignByStaffId,
+      status: ServiceOrderStatusEnum.PENDING,
+      payment_status: PaymentStatusEnum.SUCCESSED,
+    });
+
+    await this.serviceOrderDetailRepository.create({
+      service_order_id: returnOrder.service_order_id,
+      quantity: 1,
+      price_at_order: 0,
+      service_id: returnService.service_id,
+      name: returnService.service_name,
+    });
+
+    const returnInvoice = await this.invoiceRepository.create({
+      service_order_id: returnOrder.service_order_id,
+      total_amount: 0,
+      status: InvoiceStatusEnum.PAID,
+    });
+
+    await this.invoiceDetailRepository.create({
+      invoice_id: returnInvoice.invoice_id,
+      item_name: returnService.service_name || 'Đọc kết quả CLS / quay về phòng khám',
+      quantity: 1,
+      unit_price: 0,
+      sub_total: 0,
+    });
+
+    const returnStep = await this.stepRepository.createParentStep({
+      flow_id: flowId,
+      step_type: StepTypeEnum.CLINICAL,
+      step_name: returnService.service_name,
+      service_code: returnService.service_code,
+      room_id: initialClinicalStep.room_id,
+      staff_id: initialClinicalStep.staff_id,
+      service_order_id: returnOrder.service_order_id,
+      step_status: StepStatusEnum.PENDING,
+    });
+
+    for (const cls of newClsSteps) {
+      await this.stepRepository.createDependency(returnStep.step_id, cls.step_id);
+    }
+
+    return { stepId: returnStep.step_id, order: returnOrder };
+  }
+
+  private async attachPharmacyToReturn(flowId: string, returnStepId: string) {
+    const pharmacySteps = await this.prisma.step.findMany({
+      where: {
+        flow_id: flowId,
+        step_type: StepTypeEnum.DISPENSING,
+        step_status: StepStatusEnum.PENDING,
+      },
+    });
+
+    for (const pharmacyStep of pharmacySteps) {
+      await this.stepRepository.createDependency(
+        pharmacyStep.step_id,
+        returnStepId,
+      );
     }
   }
 
@@ -1399,7 +1469,7 @@ export class ServiceOrderService {
 
       const cancelledSteps = await this.prisma.step.findMany({
         where: { service_order_id: id },
-        select: { step_id: true },
+        select: { step_id: true, parent_step_id: true, flow_id: true },
       });
       const stepIds = cancelledSteps.map((s) => s.step_id);
 
@@ -1411,6 +1481,20 @@ export class ServiceOrderService {
           },
           data: { status: StepStatusEnum.CANCELLED },
         });
+      }
+
+      for (const cancelled of cancelledSteps) {
+        if (!cancelled.parent_step_id) {
+          await this.stepService.unlockDependents(
+            cancelled.step_id,
+            StepStatusEnum.CANCELLED,
+          );
+        }
+      }
+
+      const flowId = cancelledSteps.find((s) => s.flow_id)?.flow_id;
+      if (flowId) {
+        await this.stepService.checkAndCompleteFlow(flowId);
       }
 
       return {

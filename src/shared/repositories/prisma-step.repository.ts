@@ -264,12 +264,26 @@ export class PrismaStepRepository implements IStepRepository {
     waitingStepId: string,
     requiredStepId: string,
   ): Promise<any> {
-    return this.prismaService.step_Dependency.create({
-      data: {
-        step_id: waitingStepId,
-        depends_on_step_id: requiredStepId,
-      },
-    });
+    return this.prismaService.step_Dependency
+      .create({
+        data: {
+          step_id: waitingStepId,
+          depends_on_step_id: requiredStepId,
+        },
+      })
+      .catch((err: { code?: string }) => {
+        if (err?.code === 'P2002') {
+          return this.prismaService.step_Dependency.findUnique({
+            where: {
+              step_id_depends_on_step_id: {
+                step_id: waitingStepId,
+                depends_on_step_id: requiredStepId,
+              },
+            },
+          });
+        }
+        throw err;
+      });
   }
 
   updateDependency(
