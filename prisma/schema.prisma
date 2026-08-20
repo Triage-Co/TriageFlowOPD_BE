@@ -255,6 +255,7 @@ model Specialty {
   specialty_code String   @unique
   specialty_name String
   description    String?
+  is_active      Boolean  @default(true)
   createdAt      DateTime @default(now()) @db.Timestamptz()
   updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz()
 
@@ -262,10 +263,49 @@ model Specialty {
   triageInformations Triage_Information[]
   rooms              Room[]
   queuePriorityRules Queue_Priority_Rule[]
+  aiMappings         AiSpecialtyMapping[]
 
   @@index([specialty_code])
   @@index([specialty_name])
+  @@index([is_active])
   @@map("specialty")
+}
+
+model AiSpecialty {
+  ai_specialty_id String   @id @default(uuid()) @db.Uuid
+  ai_code         String   @unique
+  ai_name         String
+  ai_name_vi      String?
+  description     String?
+  is_active       Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  mappings AiSpecialtyMapping[]
+
+  @@index([ai_code])
+  @@index([is_active])
+  @@map("ai_specialty")
+}
+
+model AiSpecialtyMapping {
+  mapping_id      String   @id @default(uuid()) @db.Uuid
+  ai_specialty_id String   @db.Uuid
+  specialty_id    String   @db.Uuid
+  is_primary      Boolean  @default(false)
+  sort_order      Int      @default(0)
+  is_active       Boolean  @default(true)
+  createdAt       DateTime @default(now()) @db.Timestamptz()
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  aiSpecialty AiSpecialty @relation(fields: [ai_specialty_id], references: [ai_specialty_id], onDelete: Cascade)
+  specialty   Specialty   @relation(fields: [specialty_id], references: [specialty_id], onDelete: Restrict)
+
+  @@unique([ai_specialty_id, specialty_id])
+  @@index([ai_specialty_id])
+  @@index([specialty_id])
+  @@index([is_primary])
+  @@map("ai_specialty_mapping")
 }
 
 model Slot {
@@ -492,6 +532,7 @@ model Queue {
   rebalanceSuggestions Queue_Rebalance_Suggestion[]
 
   @@index([room_id, status])
+  @@index([status, room_id])
   @@index([room_id, enqueued_at])
   @@map("queue")
 }
@@ -573,6 +614,10 @@ model Prescription {
   diagnosis_note    String?                @db.Text
   total_amount      Int                    @default(0)
   status            PrescriptionStatusEnum @default(PENDING)
+  pickup_number     String?
+  pickup_date       DateTime?              @db.Date
+  called_at         DateTime?              @db.Timestamptz()
+  missed_at         DateTime?              @db.Timestamptz()
   created_at        DateTime               @default(now()) @db.Timestamptz()
   updated_at        DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
@@ -583,7 +628,9 @@ model Prescription {
   doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
   prescriptionDetails Prescription_Detail[]
 
+  @@unique([pickup_date, pickup_number], map: "prescription_pickup_date_number_key")
   @@index([prescription_code])
+  @@index([status, called_at, missed_at])
   @@map("prescription")
 }
 
@@ -700,6 +747,7 @@ model Service_Order {
   service_order_id   String                 @id @default(uuid()) @db.Uuid
   booking_id         String?                @db.Uuid
   name               String?
+  type               StepTypeEnum?
   assign_by_staff_id String?                @db.Uuid
   status             ServiceOrderStatusEnum @default(PENDING)
   qr_code            String?

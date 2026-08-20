@@ -6,8 +6,11 @@ import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
-import { AuthError } from '@supabase/supabase-js';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
+import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
+import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
+import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
 
 @Injectable()
 export class InfermedicaService {
@@ -16,17 +19,38 @@ export class InfermedicaService {
   PATIENT: PrismaClient['patient'];
   TRIAGE_INFO: PrismaClient['triage_Information'];
   SPECIALTY: PrismaClient['specialty'];
+  TRIAGE_CONFIG: PrismaClient['triage_Config'];
 
   constructor(
     private readonly httpService: HttpService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prismaService: PrismaService,
+    private readonly aiSpecialtyService: AiSpecialtyService,
+    @Inject('ISlotRepository')
+    private readonly slotRepository: ISlotRepository,
   ) {
     this.PATIENT_ANSWER = prismaService.patient_Answer;
     this.ACCOUNT = prismaService.account;
     this.PATIENT = prismaService.patient;
     this.TRIAGE_INFO = prismaService.triage_Information;
     this.SPECIALTY = prismaService.specialty;
+    this.TRIAGE_CONFIG = prismaService.triage_Config;
+  }
+
+  private static readonly DIAGNOSIS_CONFIG_KEY = 'DIAGNOSIS_CONFIG';
+  private static readonly DEFAULT_NUMBER_OF_DIAGNOSIS = 5;
+
+  private readNumberOfDiagnosis(ruleValue: unknown): number {
+    if (!ruleValue || typeof ruleValue !== 'object') {
+      return InfermedicaService.DEFAULT_NUMBER_OF_DIAGNOSIS;
+    }
+
+    const value = ruleValue as Record<string, unknown>;
+    const raw = value.number_of_diagnosis ?? value.number_of_diagnoise;
+
+    return typeof raw === 'number' && raw > 0
+      ? raw
+      : InfermedicaService.DEFAULT_NUMBER_OF_DIAGNOSIS;
   }
 
   async parse(parseDto: ParseDto) {
@@ -71,20 +95,14 @@ export class InfermedicaService {
     }
 
     try {
-      const configRecord = await this.prismaService.triage_Config.findFirst({
+      const configRecord = await this.TRIAGE_CONFIG.findFirst({
         where: {
-          rule_key: 'DIAGNOSIS_CONFIG',
+          rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
         },
       });
-
-      let numberOfDiagnoses = 5;
-
-      if (configRecord && configRecord.rule_value) {
-        const ruleValue = configRecord.rule_value as any;
-        if (ruleValue.number_of_diagnosis) {
-          numberOfDiagnoses = ruleValue.number_of_diagnosis;
-        }
-      }
+      const numberOfDiagnoses = this.readNumberOfDiagnosis(
+        configRecord?.rule_value,
+      );
 
       const currentToken = interview_token || `new_session_${Date.now()}`;
 
@@ -201,16 +219,12 @@ export class InfermedicaService {
         }),
       );
 
-      const specialty_code = data.recommended_specialist.id || 'SP_1';
+      const specialty_code = data.recommended_specialist.id || 'sp_1';
 
-      const exitedSpecialty = await this.SPECIALTY.findFirst({
-        where: {
-          specialty_code: {
-            equals: specialty_code,
-            mode: 'insensitive',
-          },
-        },
-      });
+      const exitedSpecialty =
+        await this.aiSpecialtyService.resolveHospitalSpecialtyByAiCode(
+          specialty_code,
+        );
 
       const exitedPatientInfo = await this.TRIAGE_INFO.findFirst({
         where: {
@@ -218,7 +232,27 @@ export class InfermedicaService {
         },
       });
 
+      let best_slot_id: string | null = null;
+
       if (exitedSpecialty) {
+        const timeZone = 'Asia/Ho_Chi_Minh';
+        const now = new Date();
+        const currentHours = formatInTimeZone(now, timeZone, 'HH:mm');
+        const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
+        const startOfToday = toDate(`${todayDateString}T00:00:00`, {
+          timeZone,
+        });
+
+        const availableSlots = await this.slotRepository.findAvailableSlots(
+          exitedSpecialty.specialty_id,
+          currentHours,
+          startOfToday,
+        );
+
+        if (availableSlots && availableSlots.length > 0) {
+          best_slot_id = availableSlots[0].slot_id;
+        }
+
         if (!exitedPatientInfo) {
           await this.TRIAGE_INFO.create({
             data: {
@@ -249,6 +283,7 @@ export class InfermedicaService {
             specialty_code: exitedSpecialty?.specialty_code,
             name: exitedSpecialty?.specialty_name,
           },
+          best_slot_id: best_slot_id,
         },
       };
     } catch (error) {
@@ -282,6 +317,78 @@ export class InfermedicaService {
     } catch (error) {
       return {
         code: 401,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+
+  async getQuestionLimit() {
+    try {
+      const configRecord = await this.TRIAGE_CONFIG.findFirst({
+        where: {
+          rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
+        },
+      });
+
+      return {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: {
+          number_of_diagnosis: this.readNumberOfDiagnosis(
+            configRecord?.rule_value,
+          ),
+        },
+      };
+    } catch (error) {
+      return {
+        code: 400,
+        status: 'error',
+        message: 'Đã xảy ra lỗi',
+        detail: error,
+      };
+    }
+  }
+
+  async updateQuestionLimit(dto: UpdateQuestionLimitDto) {
+    try {
+      const ruleValue = {
+        number_of_diagnosis: dto.number_of_diagnosis,
+      };
+
+      const existing = await this.TRIAGE_CONFIG.findFirst({
+        where: {
+          rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
+        },
+      });
+
+      if (existing) {
+        await this.TRIAGE_CONFIG.update({
+          where: { triage_config: existing.triage_config },
+          data: { rule_value: ruleValue },
+        });
+      } else {
+        await this.TRIAGE_CONFIG.create({
+          data: {
+            rule_key: InfermedicaService.DIAGNOSIS_CONFIG_KEY,
+            rule_value: ruleValue,
+          },
+        });
+      }
+
+      return {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: {
+          number_of_diagnosis: dto.number_of_diagnosis,
+        },
+      };
+    } catch (error) {
+      return {
+        code: 400,
         status: 'error',
         message: 'Đã xảy ra lỗi',
         detail: error,

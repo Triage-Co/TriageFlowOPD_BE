@@ -58,7 +58,7 @@ export class QueryRoomReqDto {
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  page?: number = 1;
+  page?: number;
 
   @ApiPropertyOptional({
     name: 'limit',
@@ -69,7 +69,7 @@ export class QueryRoomReqDto {
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  limit?: number = 10;
+  limit?: number;
 
   @ApiPropertyOptional({
     name: 'sortBy',

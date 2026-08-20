@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { BookingService } from './booking.service';
 import {
   BookingSpecialtyDto,
@@ -6,7 +15,10 @@ import {
   CreateBookingWithPackageDto,
   UpdateBookingRequestDto,
 } from './dto/request-booking.dto';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
 
 @Controller('booking')
 export class BookingController {
@@ -18,10 +30,19 @@ export class BookingController {
     return this.bookingService.create(createBookingRequestDto);
   }
 
-  /**
-   * Tạo booking với gói khám (Exam_Package).
-   * Flow sẽ được tạo tự động sau khi thanh toán gói xong.
-   */
+  @Post('/cash')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles('RECEPTIONIST')
+  @ApiOperation({
+    summary: 'Tạo booking thanh toán bằng tiền mặt (dành cho lễ tân)',
+    description:
+      'Tạo booking, hóa đơn và hoàn thành thanh toán tiền mặt ngay lập tức không tạo mã QR.',
+  })
+  createCash(@Body() createBookingRequestDto: CreateBookingRequestDto) {
+    return this.bookingService.createCashBooking(createBookingRequestDto);
+  }
+
   @Post('/with-package')
   @ApiOperation({
     summary: 'Tạo booking + chọn gói khám (Exam_Package)',

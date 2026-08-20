@@ -6,6 +6,8 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
+  UseGuards,
   Query,
 } from '@nestjs/common';
 import {
@@ -22,14 +24,21 @@ import {
   CreateServiceOrderReqDto,
   UpdateServiceOrderReqDto,
   QueryServiceOrderReqDto,
+  UpdateDetailReqDto,
 } from './dto/req-service_order.dto';
-
+import { roles } from '../../shared/decorator/role.decorator';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 @ApiTags('Service Order')
 @Controller('service-order')
 export class ServiceOrderController {
   constructor(private readonly serviceOrderService: ServiceOrderService) {}
 
   @Post()
+  @roles('ADMIN', 'DOCTOR')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Tạo mới Service Order',
   })
@@ -40,10 +49,12 @@ export class ServiceOrderController {
     description: 'Dữ liệu không hợp lệ hoặc lỗi hệ thống.',
   })
   create(
+    @Req() req: any,
     @Body()
     createServiceOrderReqDto: CreateServiceOrderReqDto,
   ) {
-    return this.serviceOrderService.create(createServiceOrderReqDto);
+    const staffId = req.user?.sub;
+    return this.serviceOrderService.create(createServiceOrderReqDto, staffId);
   }
 
   @Get()
@@ -72,6 +83,25 @@ export class ServiceOrderController {
     patientId: string,
   ) {
     return this.serviceOrderService.findPendingByPatientId(patientId);
+  }
+
+  @Get('booking/:bookingId')
+  @roles(
+    'ADMIN',
+    'DOCTOR',
+    'NURSE',
+    'LAB_TECHNICIAN',
+    'PHARMACIST',
+    'RECEPTIONIST',
+  )
+  @ApiOperation({
+    summary: 'Lấy danh sách Service Order theo booking (chỉ Admin và Staff)',
+  })
+  @ApiOkResponse({
+    description: 'Lấy danh sách thành công.',
+  })
+  findOrderServiceByBookingId(@Param('bookingId') bookingId: string) {
+    return this.serviceOrderService.findOrderServiceByBookingId(bookingId);
   }
 
   @Get(':id')
@@ -112,6 +142,28 @@ export class ServiceOrderController {
     updateServiceOrderReqDto: UpdateServiceOrderReqDto,
   ) {
     return this.serviceOrderService.update(id, updateServiceOrderReqDto);
+  }
+
+  @Patch('detail/:serviceOrderDetailId')
+  @ApiOperation({
+    summary: 'Cập nhật Service Order Detail',
+  })
+  @ApiOkResponse({
+    description: 'Cập nhật Service Order Detail thành công.',
+  })
+  @ApiNotFoundResponse({
+    description: 'Không tìm thấy Service Order Detail.',
+  })
+  @ApiBadRequestResponse({
+    description: 'Lỗi cập nhật dữ liệu.',
+  })
+  updateDetail(
+    @Param('serviceOrderDetailId')
+    id: string,
+    @Body()
+    updateDto: UpdateDetailReqDto,
+  ) {
+    return this.serviceOrderService.updateDetail(id, updateDto);
   }
 
   @Delete(':id')

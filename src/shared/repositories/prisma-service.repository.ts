@@ -8,6 +8,15 @@ import { IServiceRepository } from '../interfaces/i-service.repository';
 @Injectable()
 export class PrismaServiceRepository implements IServiceRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findManyByCode(codes: string[]): Promise<Service[]> {
+    return this.prismaService.service.findMany({
+      where: {
+        service_code: {
+          in: codes,
+        },
+      },
+    });
+  }
   findByCode(code: string): Promise<Service | null> {
     return this.prismaService.service.findFirst({
       where: {
@@ -51,6 +60,8 @@ export class PrismaServiceRepository implements IServiceRepository {
     page?: number,
     limit?: number,
     service_type?: ServiceTypeEnum,
+    search?: string,
+    is_active?: boolean | string,
   ): Promise<
     Partial<{
       data: Partial<Service>[];
@@ -59,11 +70,23 @@ export class PrismaServiceRepository implements IServiceRepository {
   > {
     const parsedPage = Number(page);
     const parsedLimit = Number(limit);
+
     const isPanigation = parsedPage > 0 && parsedLimit > 0 ? true : false;
 
     const where: Prisma.ServiceWhereInput = service_type
       ? { service_type }
       : {};
+
+    if (search) {
+      where.OR = [
+        { service_name: { contains: search, mode: 'insensitive' } },
+        { service_code: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (is_active !== undefined) {
+      where.is_active = is_active === 'true' || is_active === true;
+    }
 
     const findOptions: Prisma.ServiceFindManyArgs = {
       where,

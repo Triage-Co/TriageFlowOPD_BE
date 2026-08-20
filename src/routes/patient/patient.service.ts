@@ -28,8 +28,13 @@ export class PatientService {
     };
   }
 
-  async getAll() {
-    const getPatientData = await this.patientRepository.findAll();
+  async getAll(page?: number, limit?: number, search?: string) {
+    const getPatientData = await this.patientRepository.findAll(
+      undefined,
+      page,
+      limit,
+      search,
+    );
 
     if (getPatientData.length <= 0) {
       throw new NotFoundException({
@@ -46,8 +51,18 @@ export class PatientService {
     };
   }
 
-  async getMyPatients(account_id?: string) {
-    const getPatientData = await this.patientRepository.findAll(account_id);
+  async getMyPatients(
+    account_id?: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+  ) {
+    const getPatientData = await this.patientRepository.findAll(
+      account_id,
+      page,
+      limit,
+      search,
+    );
 
     if (getPatientData.length <= 0) {
       throw new NotFoundException({

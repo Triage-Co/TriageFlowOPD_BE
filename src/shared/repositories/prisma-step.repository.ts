@@ -9,6 +9,15 @@ import { PaymentStatusEnum, Prisma, Step } from '@prisma/client';
 @Injectable()
 export class PrismaStepRepository implements IStepRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  createManyParentStep(
+    data: Prisma.StepCreateManyInput[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step[]> {
+    const db = tx || this.prismaService;
+    return db.step.createManyAndReturn({
+      data,
+    });
+  }
   getById(id: string): Promise<StepWithBookingAndSlot | null> {
     return this.prismaService.step.findUnique({
       where: { step_id: id },
@@ -44,13 +53,33 @@ export class PrismaStepRepository implements IStepRepository {
   findClinicalStepByServiceOrderId(
     serviceOrderId: string,
   ): Promise<Step | null> {
+    return this.findPrimaryClinicalStepByServiceOrderId(serviceOrderId);
+  }
+
+  findNonPaymentStepsByServiceOrderId(serviceOrderId: string): Promise<Step[]> {
+    return this.prismaService.step.findMany({
+      where: {
+        service_order_id: serviceOrderId,
+        step_type: { not: 'PAYMENT' },
+        step_status: { not: 'CANCELLED' },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  findPrimaryClinicalStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null> {
     return this.prismaService.step.findFirst({
       where: {
         service_order_id: serviceOrderId,
-        step_type: 'CLINICAL',
+        step_type: { not: 'PAYMENT' },
+        step_status: { not: 'CANCELLED' },
       },
+      orderBy: { created_at: 'asc' },
     });
   }
+
   findPaymentStepByServiceOrderId(
     serviceOrderId: string,
   ): Promise<Step | null> {
@@ -119,7 +148,6 @@ export class PrismaStepRepository implements IStepRepository {
         },
       },
       omit: {
-        flow_id: true,
         staff_id: true,
         room_id: true,
       },
@@ -161,7 +189,6 @@ export class PrismaStepRepository implements IStepRepository {
         step_id: id,
       },
       omit: {
-        flow_id: true,
         staff_id: true,
         room_id: true,
       },
@@ -235,12 +262,26 @@ export class PrismaStepRepository implements IStepRepository {
     waitingStepId: string,
     requiredStepId: string,
   ): Promise<any> {
-    return this.prismaService.step_Dependency.create({
-      data: {
-        step_id: waitingStepId,
-        depends_on_step_id: requiredStepId,
-      },
-    });
+    return this.prismaService.step_Dependency
+      .create({
+        data: {
+          step_id: waitingStepId,
+          depends_on_step_id: requiredStepId,
+        },
+      })
+      .catch((err: { code?: string }) => {
+        if (err?.code === 'P2002') {
+          return this.prismaService.step_Dependency.findUnique({
+            where: {
+              step_id_depends_on_step_id: {
+                step_id: waitingStepId,
+                depends_on_step_id: requiredStepId,
+              },
+            },
+          });
+        }
+        throw err;
+      });
   }
 
   updateDependency(

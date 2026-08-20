@@ -1,6 +1,13 @@
-import { ApiProperty, OmitType, PartialType } from '@nestjs/swagger';
-import { GenderTypeEnum, RoleTypeEnum } from '@prisma/client';
 import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
+import { GenderTypeEnum, RoleTypeEnum } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsIn,
@@ -118,3 +125,41 @@ export class CreateStaffReqDto {
 export class UpdateStaffReqDto extends PartialType(
   OmitType(CreateStaffReqDto, ['email', 'password']),
 ) {}
+
+export class FindAllStaffQueryDto {
+  @ApiPropertyOptional({ description: 'Trang hiện tại' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  page?: number;
+
+  @ApiPropertyOptional({
+    description: 'Số lượng item trên 1 trang',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  limit?: number;
+
+  @ApiPropertyOptional({ description: 'Trạng thái hoạt động (true/false)' })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  is_active?: boolean;
+
+  @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm (email, tên)' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ enum: STAFF_ROLES, description: 'Vai trò' })
+  @IsOptional()
+  @IsIn(STAFF_ROLES)
+  role?: RoleTypeEnum;
+}

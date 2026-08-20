@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  PartialType,
+  OmitType,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
@@ -41,7 +46,10 @@ export class CreateServiceOrderDetailReqDto {
 }
 
 export class UpdateServiceOrderDetailReqDto extends PartialType(
-  CreateServiceOrderDetailReqDto,
+  OmitType(CreateServiceOrderDetailReqDto, [
+    'quantity',
+    'price_at_order',
+  ] as const),
 ) {}
 
 export class QueryServiceOrderDetailReqDto {

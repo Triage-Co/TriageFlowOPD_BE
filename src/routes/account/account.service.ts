@@ -1,5 +1,5 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { BanReqDto, CreateAccountDto } from './dto/req-account.dto';
+import { Inject, Injectable } from '@nestjs/common';
+import { BanReqDto, FindAllUsersQueryDto } from './dto/req-account.dto';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { SupabaseService } from '../../shared/config/supabase.service';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
@@ -16,8 +16,14 @@ export class AccountService {
     @Inject('IAuthProvider') private readonly authProvider: IAuthProvider,
   ) {}
 
-  async findAll() {
-    const data = await this.accountRepository.findAll();
+  async findAllUsers(query: FindAllUsersQueryDto) {
+    const { page, limit, is_active, search } = query;
+    const data = await this.accountRepository.findAllUsers(
+      page,
+      limit,
+      is_active,
+      search,
+    );
 
     return {
       code: 200,

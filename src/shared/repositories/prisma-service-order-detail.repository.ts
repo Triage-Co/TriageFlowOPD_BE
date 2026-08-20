@@ -1,12 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../config/prisma.service';
-import { IStaffRepository } from '../interfaces/i-staff.repository';
-import { Prisma, RoleTypeEnum, Service_Order_Detail } from '@prisma/client';
+import {
+  Prisma,
+  Service_Order_Detail,
+  ServiceOrderDetailStatusEnum,
+  ServiceOrderStatusEnum,
+} from '@prisma/client';
 import { IServiceOrderDetailRepository } from '../interfaces/i-service-order-detail.repository';
 
 @Injectable()
 export class PrismaServiceOrderDetailRepository implements IServiceOrderDetailRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  existingDuplicates(
+    bookingId: string,
+    services: string[],
+  ): Promise<Service_Order_Detail[]> {
+    return this.prismaService.service_Order_Detail.findMany({
+      where: {
+        order: {
+          booking_id: bookingId,
+          status: {
+            not: ServiceOrderStatusEnum.CANCELLED,
+          },
+        },
+        service_id: {
+          in: services,
+        },
+        status: { not: ServiceOrderDetailStatusEnum.CANCELLED },
+      },
+    });
+  }
   delete(
     id: string,
     tx?: Prisma.TransactionClient,

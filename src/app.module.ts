@@ -22,6 +22,7 @@ import { StaffModule } from './routes/staff/staff.module';
 import { AccountModule } from './routes/account/account.module';
 import { FlowModule } from './routes/flow/flow.module';
 import { SpecialtyModule } from './routes/specialty/specialty.module';
+import { AiSpecialtyModule } from './routes/ai-specialty/ai-specialty.module';
 import { VisitSessionModule } from './routes/visit-session/visit-session.module';
 import { ClinicalDocumentModule } from './routes/clinical-document/clinical-document.module';
 
@@ -40,6 +41,7 @@ import { InvoiceDetailModule } from './routes/invoice_detail/invoice_detail.modu
 import { PharmacyModule } from './routes/pharmacy/pharmacy.module';
 import { TicketModule } from './routes/ticket/ticket.module';
 import { ExamPackageModule } from './routes/exam-package/exam-package.module';
+import { AdminDashboardModule } from './routes/admin-dashboard/admin-dashboard.module';
 
 @Module({
   imports: [
@@ -97,6 +99,7 @@ import { ExamPackageModule } from './routes/exam-package/exam-package.module';
     AccountModule,
     FlowModule,
     SpecialtyModule,
+    AiSpecialtyModule,
     TemplateModule,
     QueueModule,
     VisitSessionModule,
@@ -110,6 +113,7 @@ import { ExamPackageModule } from './routes/exam-package/exam-package.module';
     PharmacyModule,
     TicketModule,
     ExamPackageModule,
+    AdminDashboardModule,
   ],
 })
 export class AppModule {}

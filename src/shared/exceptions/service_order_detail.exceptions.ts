@@ -16,28 +16,22 @@ export const ServiceOrderDetailErrors = {
   ServiceOrderDetailNotFoundById: (id: string) =>
     new ServiceOrderDetailException(
       HttpStatus.NOT_FOUND,
-      'Không tìm thấy chi tiết Service Order',
-      `Không tìm thấy Service Order Detail với id: ${id}.`,
+      'Không tìm thấy thông tin chi tiết dịch vụ',
+      `Hệ thống chưa ghi nhận thông tin chi tiết dịch vụ có mã số ${id}. Quý khách vui lòng kiểm tra lại thông tin.`,
     ),
 
-  ServiceOrderNotFound: (id: string) =>
+  ServiceOrderDetailDuplicates: () =>
     new ServiceOrderDetailException(
-      HttpStatus.NOT_FOUND,
-      'Không tìm thấy Service Order',
-      `Không tìm thấy Service Order với id: ${id}.`,
-    ),
-
-  ServiceNotFound: (id: string) =>
-    new ServiceOrderDetailException(
-      HttpStatus.NOT_FOUND,
-      'Không tìm thấy dịch vụ',
-      `Không tìm thấy Service với id: ${id}.`,
+      HttpStatus.CONFLICT,
+      'Mã dịch vụ đã tồn tại',
+      `Một số mã dịch vụ y tế đã được ghi nhận trên hệ thống. Quý khách vui lòng sử dụng mã khác hoặc kiểm tra lại.`,
     ),
 
   ActionFailed: (action: string, errorDetail?: string) =>
     new ServiceOrderDetailException(
       HttpStatus.BAD_REQUEST,
-      `${action} không thành công`,
-      errorDetail ?? `Đã xảy ra lỗi khi ${action.toLowerCase()}.`,
+      `Không thể hoàn tất yêu cầu: ${action}`,
+      errorDetail ??
+        `Quá trình xử lý tác vụ "${action.toLowerCase()}" đang bị gián đoạn. Quý khách vui lòng thử lại sau ít phút.`,
     ),
 };

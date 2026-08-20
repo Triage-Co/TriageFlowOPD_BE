@@ -57,6 +57,8 @@ export class MedicineService {
   async findAll(query: {
     search?: string;
     is_active?: boolean;
+    usage_route?: string;
+    manufacturer?: string;
     page?: number;
     limit?: number;
   }) {
@@ -77,6 +79,20 @@ export class MedicineService {
         { medicine_code: { contains: query.search, mode: 'insensitive' } },
         { active_ingredient: { contains: query.search, mode: 'insensitive' } },
       ];
+    }
+
+    if (query.usage_route) {
+      where.usage_route = {
+        equals: query.usage_route,
+        mode: 'insensitive',
+      };
+    }
+
+    if (query.manufacturer) {
+      where.manufacturer = {
+        contains: query.manufacturer,
+        mode: 'insensitive',
+      };
     }
 
     const [data, total] = await Promise.all([
@@ -136,6 +152,17 @@ export class MedicineService {
     return { data: ingredients };
   }
 
+  async getManufacturers() {
+    const medicines = await this.prismaService.medicine.findMany({
+      where: { manufacturer: { not: null }, is_active: true },
+      select: { manufacturer: true },
+      distinct: ['manufacturer'],
+    });
+
+    const manufacturers = medicines.map((m) => m.manufacturer).filter(Boolean);
+    return { data: manufacturers };
+  }
+
   async update(id: string, updateMedicineDto: UpdateMedicineDto) {
     await this.findOne(id);
 
@@ -154,6 +181,10 @@ export class MedicineService {
       }
     }
 
+    if (updateMedicineDto.is_active === false) {
+      await this.assertNoPrescriptionDetailRefs(id);
+    }
+
     return this.prismaService.medicine.update({
       where: { medicine_id: id },
       data: updateMedicineDto,
@@ -170,9 +201,32 @@ export class MedicineService {
 
   async remove(id: string) {
     await this.findOne(id);
+    await this.assertNoPrescriptionDetailRefs(id);
     return this.prismaService.medicine.update({
       where: { medicine_id: id },
       data: { is_active: false },
     });
+  }
+
+  private async assertNoPrescriptionDetailRefs(id: string) {
+    const activePrescriptionsCount =
+      await this.prismaService.prescription_Detail.count({
+        where: {
+          medicine_id: id,
+          prescription: {
+            status: {
+              in: ['PENDING', 'PROCESSING', 'PREPARED'],
+            },
+          },
+        },
+      });
+
+    if (activePrescriptionsCount > 0) {
+      throw new ConflictException({
+        message:
+          'Không thể vô hiệu hóa thuốc vì vẫn còn nằm trong đơn thuốc chưa được giao',
+        detail: `activePrescriptions=${activePrescriptionsCount}`,
+      });
+    }
   }
 }

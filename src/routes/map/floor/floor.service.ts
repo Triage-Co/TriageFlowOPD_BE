@@ -41,6 +41,7 @@ export class FloorService {
         : null;
 
       await this.cacheManager.del(`building_map:${data.buildingId}`);
+      await this.cacheManager.del(`nav_graph:${data.buildingId}`);
 
       return {
         code: 201,
@@ -164,6 +165,7 @@ export class FloorService {
       );
 
       await this.cacheManager.del(`building_map:${data.buildingId}`);
+      await this.cacheManager.del(`nav_graph:${data.buildingId}`);
 
       return {
         code: 200,
@@ -196,6 +198,7 @@ export class FloorService {
         where: { id },
       });
       await this.cacheManager.del(`building_map:${floor.buildingId}`);
+      await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
       return {
         code: 200,
         message: 'Xóa tầng thành công',

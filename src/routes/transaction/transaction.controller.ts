@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Get, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiOkResponse,
@@ -9,6 +17,10 @@ import {
   PayCashDto,
 } from './dto/request-transaction.dto';
 import { TransactionService } from './transaction.service';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
+import { roles } from '../../shared/decorator/role.decorator';
 
 @Controller('transaction')
 export class TransactionController {
@@ -70,6 +82,9 @@ export class TransactionController {
   }
 
   @Post('/cash')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles('RECEPTIONIST')
   @ApiOperation({
     summary: 'Thanh toán bằng tiền mặt (lễ tân xác nhận thu tiền)',
     description:

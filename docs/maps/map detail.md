@@ -1,5 +1,7 @@
 # Chi tiết Bản đồ Tòa nhà & Danh sách Phòng theo Khu vực (OPD4.svg)
 
+> **Cập nhật 13/08/2026:** file này không còn khớp database (tên phòng, `room_type`, khoa). Đối chiếu hiện tại: [`map-rooms-specialty.md`](./map-rooms-specialty.md).
+
 Tài liệu này tổng hợp toàn bộ các khu vực (`Area`), phòng vật lý (`PhysicalRoom`), phòng nghiệp vụ (`Room`) và chuyên khoa (`Specialty`) trên sơ đồ Tầng 1 Tòa nhà G2 (Khối Khám Bệnh).
 
 ---

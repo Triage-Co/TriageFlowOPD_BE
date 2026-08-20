@@ -11,13 +11,30 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { QueueService } from '../../routes/queue/queue.service';
+import { PrescriptionService } from '../../routes/pharmacy/prescription/prescription.service';
+import { PrismaService } from '../config/prisma.service';
+import { ClinicalRoomType } from '@prisma/client';
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const getCorsOrigins = (): string[] | string => {
   const allowed = process.env.WS_ALLOWED_ORIGINS;
   if (!allowed) {
-    return ['http://localhost:3000', 'http://localhost:8000'];
+    // FE often runs on 3001 when BE takes 3000
+    return [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:8000',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+      'https://triageflow.me',
+    ];
   }
-  const origins = allowed.split(',').map((o) => o.trim()).filter(Boolean);
+  const origins = allowed
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   return origins.length > 0 ? origins : '*';
 };
 
@@ -37,6 +54,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
+    @Inject(forwardRef(() => PrescriptionService))
+    private readonly prescriptionService: PrescriptionService,
+    private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -52,7 +72,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
         try {
           const payload = await this.jwtService.verifyAsync(token);
           client.data = { ...client.data, user: payload };
-          this.logger.log(`Client authenticated: ${client.id} (user: ${payload.sub || payload.id || 'valid'})`);
+          this.logger.log(
+            `Client authenticated: ${client.id} (user: ${payload.sub || payload.id || 'valid'})`,
+          );
         } catch (err: any) {
           // Staff Supabase JWTs are not signed with KIOSK_KEY — fall back to anonymous TV mode
           // instead of disconnecting (TV only listens; mutations stay on authenticated HTTP APIs).
@@ -67,7 +89,9 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.logger.log(`Client connected anonymously (TV mode): ${client.id}`);
       }
     } catch (error: any) {
-      this.logger.error(`Error handling connection for ${client.id}: ${error.message}`);
+      this.logger.error(
+        `Error handling connection for ${client.id}: ${error.message}`,
+      );
       client.disconnect(true);
     }
   }
@@ -93,13 +117,43 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: { roomId: string; staffId?: string },
   ) {
-    if (!payload || !payload.roomId || typeof payload.roomId !== 'string' || payload.roomId.trim() === '') {
-      this.logger.warn(`Client ${client.id} passed invalid roomId in joinRoomDisplay`);
-      client.emit('onError', { message: 'roomId is required and must be a non-empty string' });
+    if (
+      !payload ||
+      !payload.roomId ||
+      typeof payload.roomId !== 'string' ||
+      payload.roomId.trim() === ''
+    ) {
+      this.logger.warn(
+        `Client ${client.id} passed invalid roomId in joinRoomDisplay`,
+      );
+      client.emit('onError', {
+        message: 'roomId is required and must be a non-empty string',
+      });
       return;
     }
 
     const roomId = payload.roomId.trim();
+
+    if (!UUID_RE.test(roomId)) {
+      this.logger.warn(`Client ${client.id} passed non-UUID roomId: ${roomId}`);
+      client.emit('onError', {
+        message:
+          'roomId phải là UUID phòng hợp lệ (không dùng mã phòng kiểu 101)',
+        roomId,
+      });
+      return;
+    }
+
+    // Ignore non-UUID staffId (e.g. auth email) — TV does not need it for queue numbers
+    const staffId =
+      payload.staffId && UUID_RE.test(payload.staffId.trim())
+        ? payload.staffId.trim()
+        : undefined;
+    if (payload.staffId && !staffId) {
+      this.logger.warn(
+        `Client ${client.id} sent non-UUID staffId "${payload.staffId}" — ignored for TV payload`,
+      );
+    }
 
     // Auto-leave any previous room starting with "room_"
     for (const room of client.rooms) {
@@ -114,13 +168,27 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`${client.id} joined ${roomName}`);
 
     try {
+      const room = await this.prismaService.room.findUnique({
+        where: { room_id: roomId },
+        select: { room_type: true },
+      });
+
+      if (room?.room_type === ClinicalRoomType.PHARMACY) {
+        const pharmacyState =
+          await this.prescriptionService.getPharmacyDisplayPayload(roomId);
+        client.emit('onPharmacyDisplayUpdate', pharmacyState);
+        return;
+      }
+
       const currentState = await this.queueService.getRoomDisplayPayload(
         roomId,
-        payload.staffId,
+        staffId,
       );
       client.emit('onQueueUpdate', currentState);
     } catch (error: any) {
-      this.logger.error(`Error fetching initial TV state for room ${roomId}: ${error?.message || error}`);
+      this.logger.error(
+        `Error fetching initial TV state for room ${roomId}: ${error?.message || error}`,
+      );
       client.emit('onError', {
         message: 'Không thể lấy dữ liệu phòng',
         roomId,
@@ -132,9 +200,21 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`room_${roomId}`).emit('onQueueUpdate', data);
   }
 
-  emitRebalanceSuggestion(fromRoomId: string, toRoomId: string, suggestionData: any) {
-    this.server.to(`room_${fromRoomId}`).emit('onRebalanceSuggestion', suggestionData);
-    this.server.to(`room_${toRoomId}`).emit('onRebalanceSuggestion', suggestionData);
+  emitPharmacyDisplayUpdate(roomId: string, data: any) {
+    this.server.to(`room_${roomId}`).emit('onPharmacyDisplayUpdate', data);
+  }
+
+  emitRebalanceSuggestion(
+    fromRoomId: string,
+    toRoomId: string,
+    suggestionData: any,
+  ) {
+    this.server
+      .to(`room_${fromRoomId}`)
+      .emit('onRebalanceSuggestion', suggestionData);
+    this.server
+      .to(`room_${toRoomId}`)
+      .emit('onRebalanceSuggestion', suggestionData);
   }
 
   emitRebalanceResolved(
@@ -146,4 +226,3 @@ export class QueueGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`room_${toRoomId}`).emit('onRebalanceResolved', data);
   }
 }
-

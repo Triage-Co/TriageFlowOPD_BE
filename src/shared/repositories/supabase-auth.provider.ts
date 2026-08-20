@@ -93,6 +93,13 @@ export class SupabaseAuthProvider implements IAuthProvider {
           Object.keys(metadata).length > 0 && { user_metadata: metadata }),
       });
   }
+  updatePasswordUserById(account_id: string, password: string): Promise<any> {
+    return this.supabaseService
+      .getClient()
+      .auth.admin.updateUserById(account_id, {
+        password: password,
+      });
+  }
   refreshSession(refresh_token: string): Promise<any> {
     return this.supabaseService.getClient().auth.refreshSession({
       refresh_token: refresh_token,

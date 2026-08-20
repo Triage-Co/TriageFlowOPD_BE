@@ -12,7 +12,12 @@ export interface IPatientRepository {
     account_id?: string,
     tx?: Prisma.TransactionClient,
   ): Promise<any>;
-  findAll(account_id?: string): Promise<any>;
+  findAll(
+    account_id?: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+  ): Promise<any>;
   findOne(patient_id: string, account_id?: string): Promise<any>;
   findOneWithPatientId(patient_id: string): Promise<any>;
   delete(

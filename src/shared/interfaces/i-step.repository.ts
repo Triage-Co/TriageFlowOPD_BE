@@ -21,6 +21,12 @@ export interface IStepRepository {
     data: Prisma.StepUncheckedCreateWithoutParent_stepInput,
     tx?: Prisma.TransactionClient,
   ): Promise<Step>;
+
+  createManyParentStep(
+    data: Prisma.StepCreateManyInput[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<Step[]>;
+
   createSubStep(
     data: Prisma.StepUncheckedCreateWithoutFlowInput,
     tx?: Prisma.TransactionClient,
@@ -45,6 +51,12 @@ export interface IStepRepository {
   ): Promise<Step | null>;
   findPendingPaymentStepsByPatientId(patientId: string): Promise<Step[]>;
   findClinicalStepByServiceOrderId(
+    serviceOrderId: string,
+  ): Promise<Step | null>;
+  /** All non-PAYMENT, non-CANCELLED steps for a service order (oldest first). */
+  findNonPaymentStepsByServiceOrderId(serviceOrderId: string): Promise<Step[]>;
+  /** Primary clinical step used to hang the single queue ticket for an SO. */
+  findPrimaryClinicalStepByServiceOrderId(
     serviceOrderId: string,
   ): Promise<Step | null>;
   findPaymentStepByServiceOrderId(serviceOrderId: string): Promise<Step | null>;

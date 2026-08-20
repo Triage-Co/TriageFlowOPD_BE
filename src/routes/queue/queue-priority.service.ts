@@ -8,8 +8,14 @@ import {
   QueueRuleTypeEnum,
   QueueStatusEnum,
   QueueTypeEnum,
+  StepTypeEnum,
 } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueCacheService } from './queue-cache.service';
+import { formatInTimeZone, toDate } from 'date-fns-tz';
+import { buildQueueDateFilter } from './queue.constants';
+
+const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 export interface RuleEvaluationInput {
   patient: { dob: Date | null; gender: GenderTypeEnum } | null;
@@ -32,12 +38,72 @@ export interface RuleEvaluationResult {
   appliedRules: { rule_code: string; weight: number }[];
 }
 
+export type QueueOrderStep = {
+  step_type: StepTypeEnum | null;
+  service_code: string | null;
+  room_id?: string | null;
+  flow?: {
+    booking?: {
+      patient?: { full_name: string } | null;
+    } | null;
+  } | null;
+};
+
+export type OrderedQueueRecord = Queue & {
+  step?: QueueOrderStep | null;
+};
+
 export interface OrderedQueueEntry {
-  queue: Queue;
+  queue: OrderedQueueRecord;
   effectiveScore: number;
   position: number;
   reasons: string[];
 }
+
+export type RoomQueueContext = {
+  room_type?: ClinicalRoomType | null;
+  specialty_id?: string | null;
+};
+
+const QUEUE_ORDER_SELECT = {
+  queue_id: true,
+  step_id: true,
+  queue_number: true,
+  status: true,
+  room_id: true,
+  queue_type: true,
+  base_priority: true,
+  applied_rules: true,
+  is_pinned: true,
+  pinned_at: true,
+  hold_positions: true,
+  enqueued_at: true,
+  called_at: true,
+  serving_started_at: true,
+  finished_at: true,
+  missed_at: true,
+  missed_count: true,
+  created_at: true,
+  updated_at: true,
+  step: {
+    select: {
+      step_type: true,
+      service_code: true,
+      room_id: true,
+      flow: {
+        select: {
+          booking: {
+            select: {
+              patient: {
+                select: { full_name: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.QueueSelect;
 
 /**
  * Pure function to evaluate rule conditions against fact object.
@@ -104,13 +170,10 @@ export function matchConditions(
  * Pure function to calculate effective scores and order queue entries.
  */
 export function orderEntries(
-  entries: Queue[],
+  entries: OrderedQueueRecord[],
   rules: Queue_Priority_Rule[],
   now: Date,
-  roomContext?: {
-    room_type?: ClinicalRoomType | null;
-    specialty_id?: string | null;
-  },
+  roomContext?: RoomQueueContext,
 ): OrderedQueueEntry[] {
   if (!entries || entries.length === 0) {
     return [];
@@ -198,7 +261,8 @@ export function orderEntries(
     ) || interleaveRules.find((r) => !r.room_type && !r.specialty_id);
 
   const rawRatio = Number((scopedInterleave?.params as any)?.interleave_ratio);
-  const ratio = Number.isFinite(rawRatio) && rawRatio >= 1 ? Math.floor(rawRatio) : 1;
+  const ratio =
+    Number.isFinite(rawRatio) && rawRatio >= 1 ? Math.floor(rawRatio) : 1;
 
   const merged: (typeof evaluated)[0][] = [];
   let regIdx = 0;
@@ -277,10 +341,14 @@ export class QueuePriorityService {
     null;
   private readonly CACHE_TTL_MS = 60000;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly queueCacheService: QueueCacheService,
+  ) {}
 
   clearRulesCache(): void {
     this.rulesCache = null;
+    void this.queueCacheService.bumpRulesVersion();
   }
 
   async getActiveRules(): Promise<Queue_Priority_Rule[]> {
@@ -383,36 +451,56 @@ export class QueuePriorityService {
   async computeQueueOrder(
     roomId: string,
     tx?: Prisma.TransactionClient,
+    roomContext?: RoomQueueContext,
   ): Promise<OrderedQueueEntry[]> {
     const db = tx || this.prisma;
     const rules = await this.getActiveRules();
 
-    const room = await db.room.findUnique({
-      where: { room_id: roomId },
-      select: { room_type: true, specialty_id: true },
+    const room =
+      roomContext !== undefined
+        ? roomContext
+        : await db.room.findUnique({
+            where: { room_id: roomId },
+            select: { room_type: true, specialty_id: true },
+          });
+
+    const now = new Date();
+    const dateFormatted = formatInTimeZone(now, TIME_ZONE, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+      timeZone: TIME_ZONE,
+    });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+      timeZone: TIME_ZONE,
     });
 
     const entries = await db.queue.findMany({
       where: {
-        room_id: roomId,
         status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
-      },
-      include: {
-        step: {
-          include: {
-            flow: {
-              include: {
-                booking: {
-                  include: {
-                    patient: true,
-                  },
-                },
-              },
-            },
+        AND: [
+          buildQueueDateFilter(startOfDay, endOfDay),
+          {
+            // Prefer denormalized queue.room_id; also pick up orphans where only step.room_id is set
+            OR: [
+              { room_id: roomId },
+              { room_id: null, step: { room_id: roomId } },
+            ],
           },
-        },
+        ],
       },
+      select: QUEUE_ORDER_SELECT,
     });
+
+    // Repair denormalized room_id so TV/socket queries stay consistent
+    const orphanIds = entries.filter((e) => !e.room_id).map((e) => e.queue_id);
+    if (orphanIds.length > 0) {
+      await db.queue.updateMany({
+        where: { queue_id: { in: orphanIds } },
+        data: { room_id: roomId },
+      });
+      for (const e of entries) {
+        if (!e.room_id) e.room_id = roomId;
+      }
+    }
 
     return orderEntries(entries, rules, new Date(), {
       room_type: room?.room_type,

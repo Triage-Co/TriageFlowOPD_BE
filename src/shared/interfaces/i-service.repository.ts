@@ -2,6 +2,7 @@ import { Prisma, Service, ServiceTypeEnum, Staff } from '@prisma/client';
 
 export interface IServiceRepository {
   findByCode(code: string): Promise<Service | null>;
+  findManyByCode(codes: string[]): Promise<Service[]>;
   create(
     data: Prisma.ServiceUncheckedCreateInput,
     tx?: Prisma.TransactionClient,
@@ -15,6 +16,8 @@ export interface IServiceRepository {
     page?: number,
     limit?: number,
     service_type?: ServiceTypeEnum,
+    search?: string,
+    is_active?: boolean | string,
   ): Promise<
     Partial<{
       data: Partial<Service>[];

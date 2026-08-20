@@ -9,11 +9,14 @@ import {
   Query,
   UseGuards,
   Req,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { PrescriptionService } from './prescription.service';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { UpdatePrescriptionStatusDto } from './dto/update-prescription-status.dto';
+import { PharmacyCallNextDto } from './dto/pharmacy-call-next.dto';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -131,6 +134,12 @@ export class PrescriptionController {
     type: Number,
     description: 'Số bản ghi trên trang (mặc định 20)',
   })
+  @ApiQuery({
+    name: 'date',
+    required: false,
+    type: String,
+    description: 'Lọc theo ngày (YYYY-MM-DD)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Lấy danh sách đơn thuốc thành công.',
@@ -141,6 +150,7 @@ export class PrescriptionController {
     @Query('status') status?: PrescriptionStatusEnum,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('date') date?: string,
   ) {
     return this.prescriptionService.findAll({
       patient_id,
@@ -148,7 +158,68 @@ export class PrescriptionController {
       status,
       page,
       limit,
+      date,
     });
+  }
+
+  @Get('pharmacy-display')
+  @ApiOperation({
+    summary: '[TV] Payload lưới số lấy thuốc nhà thuốc (không gồm tên bệnh nhân)',
+    description:
+      'Endpoint công khai cho màn hình TV nhà thuốc. Trả danh sách số đang gọi và số đơn PREPARED chưa lên TV.',
+  })
+  @ApiQuery({
+    name: 'room_id',
+    required: false,
+    description: 'ID phòng nhà thuốc. Bỏ trống thì dùng phòng PHARMACY mặc định.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy trạng thái TV nhà thuốc thành công.',
+  })
+  getPharmacyDisplay(@Query('room_id') room_id?: string) {
+    return this.prescriptionService.getPharmacyDisplayPayload(room_id);
+  }
+
+  @Post('call-next')
+  @roles('PHARMACIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      '[PHARMACIST - ADMIN] Call next: đưa tất cả đơn PREPARED chưa lên TV vào lưới đang gọi',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Đã đưa các số PREPARED chưa hiển thị lên TV nhà thuốc.',
+  })
+  callNextPrepared(@Body() body: PharmacyCallNextDto = {}) {
+    return this.prescriptionService.callNextPrepared(body?.room_id);
+  }
+
+  @Post(':id/miss')
+  @roles('PHARMACIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '[PHARMACIST - ADMIN] Gỡ số đang gọi khỏi TV nhà thuốc (Miss)',
+  })
+  missPrepared(@Param('id') id: string) {
+    return this.prescriptionService.missPrepared(id);
+  }
+
+  @Post(':id/recall')
+  @roles('PHARMACIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '[PHARMACIST - ADMIN] Gọi lại số đã Miss lên TV nhà thuốc',
+  })
+  recallPrepared(@Param('id') id: string) {
+    return this.prescriptionService.recallPrepared(id);
   }
 
   @Get('scan/:code')

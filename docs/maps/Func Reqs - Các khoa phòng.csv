@@ -1,0 +1,52 @@
+Khoa (Specialty),Phòng số,Phòng khám,Mã số phân loại
+Nhiễm,G2.2.24,Bệnh truyền nhiễm,sp_19 – Infectologist
+Tai mũi họng,G2.4.24,Tai mũi họng 1,sp_14 – ENT doctor
+Tai mũi họng,G2.4.25,Tai mũi họng 2,
+Mắt,G2.4.8,Mắt 1,sp_7 – Ophthalmologist
+Mắt,G2.4.11,Mắt 2,
+Ngoại TK,G2.4.16,Ngoại thần kinh 1,sp_4 – Surgeon
+Ngoại TK,G2.4.17,Ngoại thần kinh 2,
+Ngoại lồng ngực,G2.4.15,Ngoại lồng ngực,sp_4 – Surgeon
+Ngoại tiết niệu,G2.4.14,Ngoại tiết niệu,sp_11 – Urologist
+Ngoại tổng quát,G2.4.12,Ngoại tổng quát 1,sp_4 – Surgeon
+Ngoại ung bướu,G2.4.18,Ngoại ung bướu,sp_13 – Oncologist
+Răng hàm mặt,G2.4.28,Răng hàm mặt 1,"sp_18 – Dentist
+sp_29 – Maxillofacial surgeon"
+Răng hàm mặt,G2.4.29,Răng hàm mặt 2,
+,G2.4.34,Đơn vị tiêm chủng,
+Sản phụ khoa,G2.4.23,Khám thai 1,sp_15 – Gynecologist
+Sản phụ khoa,G2.4.21,Phụ khoa,sp_15 – Gynecologist
+Vật lý trị liệu - PHCN,G2.6.1,Vật lý trị liệu - PHCN,sp_20 – Rheumatologist
+Y học cổ truyền,G2.7.1,Y học cổ truyền,
+Chấn thương chỉnh hình,G2.4.1,Chấn thương chỉnh hình 1,sp_6 – Orthopedist
+Chấn thương chỉnh hình,G2.4.2,Chấn thương chỉnh hình 2,
+Nội thận,G2.2.25,Nội thận,sp_24 – Nephrologist
+Ngoại tim mạch,G2.2.12,Tim mạch can thiệp 1,sp_21 – Angiologist
+Ngoại tim mạch,G2.2.13,Tim mạch can thiệp 2,
+Tâm thần,G2.2.33,Sức khỏe tâm thần,sp_16 – Psychiatrist
+Huyết học,G2.2.40,Huyết học,sp_25 – Hematologist
+Nội tim mạch,G2.2.6,Nội tim mạch 1,sp_12 – Cardiologist
+Nội tim mạch,G2.2.7,Nội tim mạch 2,
+Nội tim mạch,G2.2.8,Nội tim mạch 3,
+Nội tim mạch,G2.2.9,Nội tim mạch 4,
+Nội tim mạch,G2.2.10,Nội tim mạch 5,
+Nội cơ xương khớp,G2.2.11,Nội cơ xương khớp,sp_20 – Rheumatologist
+Nội tiết,G2.2.14,Nội tiết 1,"sp_10 – Endocrinologist
+sp_22 – Diabetologist"
+Nội tiết,G2.2.15,Nội tiết 2,
+Nội tiết,G2.2.16,Nội tiết 3,
+Nội tiêu hóa,G2.2.26,Nội tiêu hóa 1,sp_5 – Gastroenterologist
+Nội tiêu hóa,G2.2.27,Nội tiêu hóa 2,
+Nội TK,G2.2.22,Nội thần kinh 1,sp_17 – Neurologist
+Nội TK,G2.2.23,Nội thần kinh 2,
+Nội hô hấp,G2.2.28,Nội hô hấp 1,sp_27 – Pulmonologist
+Nội tổng quát,G2.2.18,Nội tổng quát 1,"sp_1 – General Practitioner
+sp_2 – Internal Medicine Specialist"
+Nội tổng quát,G2.2.19,Nội tổng quát 2,
+Nội tổng quát,G2.2.20,Nội tổng quát 3,
+Nhi,G2.2.34,Nhi 1,"sp_3 – Pediatrician
+sp_26 – Neonatologist"
+Nhi,G2.2.35,Nhi 2,
+Da liễu,G2.4.4,Da liễu 1,sp_9 – Dermatologist
+Da liễu,G2.4.5,Da liễu 2,
+Da liễu,G2.4.6,Da liễu 3,

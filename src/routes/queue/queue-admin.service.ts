@@ -1,26 +1,35 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
-  ClinicalRoomType,
   Prisma,
   QueueRuleTypeEnum,
   QueueStatusEnum,
+  RebalanceSuggestionStatusEnum,
 } from '@prisma/client';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import { PrismaService } from '../../shared/config/prisma.service';
+import { QueueGateway } from '../../shared/gateways/queue.gateway';
 import {
   CreatePriorityRuleDto,
   CreateRoomServiceDto,
   QueryPriorityRuleDto,
   UpdatePriorityRuleDto,
+  UpdateRebalanceConfigDto,
   UpdateRoomServiceDto,
 } from './dto/admin-rule.dto';
 import { QueueEtaService } from './queue-eta.service';
 import { QueuePriorityService } from './queue-priority.service';
+import {
+  buildQueueDateFilter,
+  DEFAULT_REBALANCE_PARAMS,
+  mergeRebalanceParams,
+  toRebalanceConfig,
+} from './queue.constants';
 
 export const ALLOWED_CONDITION_KEYS = [
   'age',
@@ -37,7 +46,9 @@ export const ALLOWED_CONDITION_KEYS = [
 
 export const ALLOWED_OPERATORS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in'];
 
-export function validateConditions(conditions: Record<string, any> | null | undefined): void {
+export function validateConditions(
+  conditions: Record<string, any> | null | undefined,
+): void {
   if (!conditions || typeof conditions !== 'object') return;
 
   for (const [key, val] of Object.entries(conditions)) {
@@ -77,7 +88,8 @@ export function validateParams(
     const gap = params?.eta_gap_minutes;
     if (typeof gap !== 'number' || gap <= 0) {
       throw new BadRequestException({
-        message: 'Rule REBALANCE bắt buộc có tham số params.eta_gap_minutes là số lớn hơn 0',
+        message:
+          'Rule REBALANCE bắt buộc có tham số params.eta_gap_minutes là số lớn hơn 0',
       });
     }
   }
@@ -91,6 +103,7 @@ export class QueueAdminService {
     private readonly prisma: PrismaService,
     private readonly queuePriorityService: QueuePriorityService,
     private readonly queueEtaService: QueueEtaService,
+    private readonly queueGateway: QueueGateway,
   ) {}
 
   // ─── 1. Priority Rules CRUD ──────────────────────────────────────────────────
@@ -165,7 +178,7 @@ export class QueueAdminService {
           data: updated,
         };
       } else {
-        throw new BadRequestException({
+        throw new ConflictException({
           message: 'Mã quy tắc đã tồn tại',
           detail: `rule_code '${dto.rule_code}' đã tồn tại và đang hoạt động.`,
         });
@@ -236,10 +249,16 @@ export class QueueAdminService {
         ...(dto.weight !== undefined && { weight: dto.weight }),
         ...(dto.aging_rate !== undefined && { aging_rate: dto.aging_rate }),
         ...(dto.max_aging !== undefined && { max_aging: dto.max_aging }),
-        ...(dto.conditions !== undefined && { conditions: dto.conditions ?? Prisma.DbNull }),
-        ...(dto.params !== undefined && { params: dto.params ?? Prisma.DbNull }),
+        ...(dto.conditions !== undefined && {
+          conditions: dto.conditions ?? Prisma.DbNull,
+        }),
+        ...(dto.params !== undefined && {
+          params: dto.params ?? Prisma.DbNull,
+        }),
         ...(dto.room_type !== undefined && { room_type: dto.room_type }),
-        ...(dto.specialty_id !== undefined && { specialty_id: dto.specialty_id }),
+        ...(dto.specialty_id !== undefined && {
+          specialty_id: dto.specialty_id,
+        }),
         ...(dto.is_active !== undefined && { is_active: dto.is_active }),
       },
     });
@@ -278,6 +297,113 @@ export class QueueAdminService {
       status: 'success',
       message: 'Đã tắt (soft-delete) quy tắc ưu tiên thành công.',
       data: updated,
+    };
+  }
+
+  async getRebalanceConfig() {
+    const rule = await this.prisma.queue_Priority_Rule.findFirst({
+      where: { rule_type: QueueRuleTypeEnum.REBALANCE },
+      orderBy: { created_at: 'asc' },
+    });
+    const config = toRebalanceConfig(rule?.params);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy cấu hình tự sắp xếp hàng chờ thành công.',
+      data: {
+        ...config,
+        rule_id: rule?.rule_id ?? null,
+      },
+    };
+  }
+
+  async updateRebalanceConfig(dto: UpdateRebalanceConfigDto) {
+    const existing = await this.prisma.queue_Priority_Rule.findFirst({
+      where: { rule_type: QueueRuleTypeEnum.REBALANCE },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const wasEnabled = existing
+      ? toRebalanceConfig(existing.params).enabled
+      : DEFAULT_REBALANCE_PARAMS.enabled;
+    const mergedParams = mergeRebalanceParams(existing?.params, dto);
+    const disabling = wasEnabled && mergedParams.enabled === false;
+
+    const { rule, expiredSuggestions } = await this.prisma.$transaction(
+      async (tx) => {
+        let expired: Array<{
+          suggestion_id: string;
+          from_room_id: string;
+          to_room_id: string;
+        }> = [];
+
+        if (disabling) {
+          expired = await tx.queue_Rebalance_Suggestion.findMany({
+            where: { status: RebalanceSuggestionStatusEnum.PENDING },
+            select: {
+              suggestion_id: true,
+              from_room_id: true,
+              to_room_id: true,
+            },
+          });
+          await tx.queue_Rebalance_Suggestion.updateMany({
+            where: { status: RebalanceSuggestionStatusEnum.PENDING },
+            data: { status: RebalanceSuggestionStatusEnum.EXPIRED },
+          });
+        }
+
+        const paramsJson = mergedParams as Prisma.InputJsonValue;
+        const ruleRow = existing
+          ? await tx.queue_Priority_Rule.update({
+              where: { rule_id: existing.rule_id },
+              data: {
+                params: paramsJson,
+                is_active: true,
+              },
+            })
+          : await tx.queue_Priority_Rule.create({
+              data: {
+                rule_code: 'REBALANCE_DEFAULT',
+                name: 'Cấu hình Load Balancing',
+                description:
+                  'Ngưỡng chênh lệch ETA 15 phút, suggestion TTL 10 phút',
+                rule_type: QueueRuleTypeEnum.REBALANCE,
+                weight: 0,
+                aging_rate: 0,
+                max_aging: 0,
+                params: paramsJson,
+                is_active: true,
+              },
+            });
+
+        return { rule: ruleRow, expiredSuggestions: expired };
+      },
+    );
+
+    this.queuePriorityService.clearRulesCache();
+
+    for (const suggestion of expiredSuggestions) {
+      this.queueGateway.emitRebalanceResolved(
+        suggestion.from_room_id,
+        suggestion.to_room_id,
+        {
+          suggestion_id: suggestion.suggestion_id,
+          status: RebalanceSuggestionStatusEnum.EXPIRED,
+        },
+      );
+    }
+
+    const config = toRebalanceConfig(rule.params);
+    return {
+      code: 200,
+      status: 'success',
+      message: disabling
+        ? 'Đã tắt tự sắp xếp hàng chờ và hết hạn các gợi ý đang chờ.'
+        : 'Cập nhật cấu hình tự sắp xếp hàng chờ thành công.',
+      data: {
+        ...config,
+        rule_id: rule.rule_id,
+      },
     };
   }
 
@@ -323,6 +449,13 @@ export class QueueAdminService {
       });
     }
 
+    if (!service.is_active) {
+      throw new ConflictException({
+        message: 'Không thể gán dịch vụ đã bị vô hiệu hóa cho phòng',
+        detail: `Dịch vụ '${service.service_name ?? service.service_id}' hiện đang bị tắt (is_active=false).`,
+      });
+    }
+
     const existing = await this.prisma.room_Service.findUnique({
       where: {
         room_id_service_id: {
@@ -332,32 +465,40 @@ export class QueueAdminService {
       },
     });
 
+    let mapping;
+    let isReactivated = false;
     if (existing) {
-      throw new BadRequestException({
-        message: 'Phân công dịch vụ cho phòng này đã tồn tại.',
+      // Upsert/reactivate thay vì báo lỗi trùng lặp
+      mapping = await this.prisma.room_Service.update({
+        where: { id: existing.id },
+        data: { is_active: true },
+        include: { room: true, service: true },
+      });
+      isReactivated = true;
+    } else {
+      mapping = await this.prisma.room_Service.create({
+        data: {
+          room_id: dto.room_id,
+          service_id: dto.service_id,
+          is_active: true,
+        },
+        include: { room: true, service: true },
       });
     }
 
-    const created = await this.prisma.room_Service.create({
-      data: {
-        room_id: dto.room_id,
-        service_id: dto.service_id,
-        is_active: true,
-      },
-      include: { room: true, service: true },
-    });
-
-    const isClinical = room.room_type === ClinicalRoomType.CLINICAL_ROOM;
-    const warning = isClinical
-      ? 'Cảnh báo: Phòng thuộc loại CLINICAL_ROOM, tính năng load balancing tự động sẽ không áp dụng cho phòng khám lâm sàng.'
-      : undefined;
+    const warning =
+      service.room_type && service.room_type !== room.room_type
+        ? `Cảnh báo: Loại dịch vụ (${service.room_type}) không khớp với loại phòng (${room.room_type}).`
+        : undefined;
 
     return {
-      code: 201,
+      code: isReactivated ? 200 : 201,
       status: 'success',
-      message: 'Tạo phân công dịch vụ phòng thành công.',
+      message: isReactivated
+        ? 'Kích hoạt lại phân công dịch vụ phòng thành công.'
+        : 'Tạo phân công dịch vụ phòng thành công.',
       warning,
-      data: created,
+      data: mapping,
     };
   }
 
@@ -439,11 +580,13 @@ export class QueueAdminService {
     const todayDateString = formatInTimeZone(now, timeZone, 'yyyy-MM-dd');
     const startOfDay = toDate(`${todayDateString}T00:00:00`, { timeZone });
 
+    const endOfDay = toDate(`${todayDateString}T23:59:59.999`, { timeZone });
+
     // 1. Fetch today's queues first, then only rooms with activity
     const todayQueues = await this.prisma.queue.findMany({
       where: {
-        created_at: { gte: startOfDay },
         room_id: { not: null },
+        ...buildQueueDateFilter(startOfDay, endOfDay),
       },
     });
 
@@ -490,15 +633,25 @@ export class QueueAdminService {
       let maxCurrentWaitMinutes = 0;
 
       for (const q of roomQueues) {
-        if (q.status === QueueStatusEnum.QUEUED || q.status === QueueStatusEnum.PENDING) {
+        if (
+          q.status === QueueStatusEnum.QUEUED ||
+          q.status === QueueStatusEnum.PENDING
+        ) {
           waitingCount++;
 
-          const enqueuedAt = q.enqueued_at ? new Date(q.enqueued_at) : new Date(q.created_at);
-          const waitedMins = Math.floor(Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000);
+          const enqueuedAt = q.enqueued_at
+            ? new Date(q.enqueued_at)
+            : new Date(q.created_at);
+          const waitedMins = Math.floor(
+            Math.max(0, now.getTime() - enqueuedAt.getTime()) / 60000,
+          );
           if (waitedMins > maxCurrentWaitMinutes) {
             maxCurrentWaitMinutes = waitedMins;
           }
-        } else if (q.status === QueueStatusEnum.SERVING || q.status === QueueStatusEnum.CALLED) {
+        } else if (
+          q.status === QueueStatusEnum.SERVING ||
+          q.status === QueueStatusEnum.CALLED
+        ) {
           servingCount++;
         } else if (q.status === QueueStatusEnum.MISSING) {
           missingCount++;
@@ -507,10 +660,13 @@ export class QueueAdminService {
         }
 
         if (q.serving_started_at) {
-          const enqueuedAt = q.enqueued_at ? new Date(q.enqueued_at) : new Date(q.created_at);
+          const enqueuedAt = q.enqueued_at
+            ? new Date(q.enqueued_at)
+            : new Date(q.created_at);
           const waitMins = Math.max(
             0,
-            (new Date(q.serving_started_at).getTime() - enqueuedAt.getTime()) / 60000,
+            (new Date(q.serving_started_at).getTime() - enqueuedAt.getTime()) /
+              60000,
           );
           servedWaitMinutesSum += waitMins;
           servedCount++;
@@ -538,14 +694,22 @@ export class QueueAdminService {
       }
 
       let congestionLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-      if (etaFullQueueMinutes > 30) {
+      if (
+        (waitingCount == 5 && etaFullQueueMinutes > 50) ||
+        waitingCount >= 10
+      ) {
         congestionLevel = 'HIGH';
-      } else if (etaFullQueueMinutes >= 15) {
+      } else if (
+        (waitingCount == 3 && etaFullQueueMinutes > 30) ||
+        waitingCount >= 6
+      ) {
         congestionLevel = 'MEDIUM';
       }
 
       const avgWaitMinutesToday =
-        servedCount > 0 ? Number((servedWaitMinutesSum / servedCount).toFixed(1)) : 0;
+        servedCount > 0
+          ? Number((servedWaitMinutesSum / servedCount).toFixed(1))
+          : 0;
 
       roomResults.push({
         room_id: room.room_id,
@@ -558,7 +722,9 @@ export class QueueAdminService {
         missing_count: missingCount,
         avg_wait_minutes_today: avgWaitMinutesToday,
         max_current_wait_minutes: maxCurrentWaitMinutes,
-        expected_service_minutes: Math.round(etaResult.expectedDurationSec / 60),
+        expected_service_minutes: Math.round(
+          etaResult.expectedDurationSec / 60,
+        ),
         eta_full_queue_minutes: etaFullQueueMinutes,
         completed_today: completedCount,
         congestion_level: congestionLevel,
@@ -566,7 +732,9 @@ export class QueueAdminService {
     }
 
     const avgWaitMinutesAll =
-      totalServedCount > 0 ? Number((totalServedWaitMinutesSum / totalServedCount).toFixed(1)) : 0;
+      totalServedCount > 0
+        ? Number((totalServedWaitMinutesSum / totalServedCount).toFixed(1))
+        : 0;
 
     return {
       code: 200,

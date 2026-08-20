@@ -68,3 +68,7 @@ init/data.ts
 *.seed.ts
 
 .cursor/rules/codegraph.mdc
+
+scratch
+scratch/*
+/scratch/

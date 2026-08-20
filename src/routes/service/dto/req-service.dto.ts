@@ -1,30 +1,37 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { ClinicalRoomType, ServiceTypeEnum } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
+  Matches,
+  MaxLength,
   Min,
-  IsEnum,
 } from 'class-validator';
-import { ClinicalRoomType, ServiceTypeEnum } from '@prisma/client';
 
 export class CreateServiceDto {}
 
 export class CreateServiceReqDto {
   @IsString()
+  @IsNotEmpty()
+  @Matches(/^[A-Z0-9_]+$/, {
+    message: 'service_code chỉ chứa chữ in hoa, số và dấu gạch dưới',
+  })
+  @MaxLength(64)
   @ApiProperty({
     name: 'service_code',
     example: 'KHAM_BAN_DAU',
-    required: false,
     description: 'Mã dịch vụ',
   })
   service_code: string;
 
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
   @ApiProperty({
     name: 'service_name',
     example: 'Khám chuyên khoa',
@@ -33,6 +40,7 @@ export class CreateServiceReqDto {
   service_name: string;
 
   @IsInt()
+  @Min(0)
   @ApiProperty({
     name: 'price',
     example: 2000,
@@ -77,31 +85,57 @@ export class QueryServiceReqDto {
   @ApiPropertyOptional({
     name: 'page',
     example: 1,
-    description: 'Số trang hiện tại',
+    description: 'Số trang hiện tại (nếu bỏ trống sẽ lấy tất cả)',
   })
   @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  page?: number = 1;
+  page?: number;
 
   @ApiPropertyOptional({
     name: 'limit',
     example: 10,
-    description: 'Số lượng bản ghi trên một trang',
+    description: 'Số lượng bản ghi trên một trang (nếu bỏ trống sẽ lấy tất cả)',
   })
   @IsOptional()
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  limit?: number = 10;
+  limit?: number;
 
   @ApiPropertyOptional({
     name: 'service_type',
     enum: ServiceTypeEnum,
-    description: 'Lọc dịch vụ theo loại',
   })
   @IsOptional()
   @IsEnum(ServiceTypeEnum)
   service_type?: ServiceTypeEnum;
+
+  @ApiPropertyOptional({
+    name: 'room_type',
+    enum: ClinicalRoomType,
+  })
+  @IsOptional()
+  @IsEnum(ClinicalRoomType)
+  room_type?: ClinicalRoomType;
+
+  @ApiPropertyOptional({
+    description:
+      'Trạng thái hoạt động (nếu bỏ trống sẽ không lọc theo trạng thái)',
+  })
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    if (value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  is_active?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

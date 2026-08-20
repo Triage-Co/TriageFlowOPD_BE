@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  IsBoolean,
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
@@ -19,50 +19,12 @@ export class CreateServiceOrderReqDto {
   })
   booking_id: string;
 
-  @IsUUID()
+  @IsArray()
   @ApiProperty({
-    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Bác sĩ/Nhân viên chỉ định',
-  })
-  assign_by_staff_id: string;
-
-  @IsString()
-  @ApiProperty({
-    example: 'Xét nghiệm máu',
-    description: 'Tên của Service Order',
-  })
-  name: string;
-
-  @IsString()
-  @ApiProperty({
-    example: 'XET_NGHIEM_MAU',
+    example: '["XET_NGHIEM_MAU", "X_QUANG"]',
     description: 'Mã của Service Order',
   })
-  service_code: string;
-
-  @IsOptional()
-  @IsUUID()
-  @ApiPropertyOptional({
-    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Mã chuyên khoa [có thể null]',
-  })
-  specialty_id: string;
-
-  @IsOptional()
-  @IsUUID()
-  @ApiPropertyOptional({
-    example: 'e7f88300-c39a-4821-b6c7-28c6daae313c',
-    description: 'Phòng chỉ định (nếu có)',
-  })
-  room_id?: string;
-
-  @IsBoolean()
-  @ApiProperty({
-    description: 'Dịch vụ có cần thanh toán hay không',
-    default: true,
-    example: true,
-  })
-  is_payment: boolean;
+  service_code: string[];
 }
 
 export class UpdateServiceOrderReqDto extends PartialType(
@@ -75,6 +37,23 @@ export class UpdateServiceOrderReqDto extends PartialType(
     description: 'Trạng thái Service Order',
   })
   status?: ServiceOrderStatusEnum;
+
+  @IsOptional()
+  @IsString()
+  @ApiPropertyOptional({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    description:
+      'ID của chi tiết Service Order cần cập nhật (nếu có nhiều dịch vụ)',
+  })
+  detail_id?: string;
+
+  @ApiPropertyOptional({
+    name: 'room_id',
+    description: 'ID phòng thực hiện (nếu muốn chỉ định rõ)',
+  })
+  @IsOptional()
+  @IsUUID()
+  room_id?: string;
 }
 
 export class QueryServiceOrderReqDto {
@@ -87,7 +66,7 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  page?: number = 1;
+  page?: number;
 
   @ApiPropertyOptional({
     name: 'limit',
@@ -98,5 +77,23 @@ export class QueryServiceOrderReqDto {
   @IsInt()
   @Type(() => Number)
   @Min(1)
-  limit?: number = 10;
+  limit?: number;
+}
+
+export class UpdateDetailReqDto {
+  @ApiProperty({
+    name: 'service_code',
+    example: 'XQ_001',
+    description: 'Mã Service mới',
+  })
+  @IsString()
+  service_code: string;
+
+  @ApiPropertyOptional({
+    name: 'room_id',
+    description: 'ID phòng thực hiện (nếu muốn chỉ định rõ)',
+  })
+  @IsOptional()
+  @IsUUID()
+  room_id?: string;
 }

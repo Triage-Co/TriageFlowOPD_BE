@@ -1,7 +1,25 @@
-import { Body, Controller, Get, Ip, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+} from '@nestjs/swagger';
+import { RoleTypeEnum } from '@prisma/client';
+import { roles } from '../../shared/decorator/role.decorator';
+import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
+import { IsRoleGuard } from '../../shared/guards/is-role.guard';
 import { InfermedicaService } from './infermedica.service';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
-import { ApiOkResponse, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
 
 @Controller('infermedica')
 export class InfermedicaController {
@@ -239,8 +257,10 @@ export class InfermedicaController {
     schema: {
       example: {
         recommended_specialist: {
-          id: 'sp_22',
+          specialty_id: '123-abc',
+          specialty_code: 'sp_22',
           name: 'Diabetologist',
+          best_slot_id: 'slot-456-def'
         },
         recommended_channel: 'personal_visit',
       },
@@ -301,5 +321,25 @@ export class InfermedicaController {
   })
   search(@Query() searchDto: SearchDto) {
     return this.infermedicaService.search(searchDto);
+  }
+
+  @Get('/question-limit')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[ADMIN] Lấy số câu hỏi tối đa của phiên triage' })
+  getQuestionLimit() {
+    return this.infermedicaService.getQuestionLimit();
+  }
+
+  @Patch('/question-limit')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(RoleTypeEnum.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[ADMIN] Cập nhật số câu hỏi tối đa của phiên triage',
+  })
+  updateQuestionLimit(@Body() dto: UpdateQuestionLimitDto) {
+    return this.infermedicaService.updateQuestionLimit(dto);
   }
 }

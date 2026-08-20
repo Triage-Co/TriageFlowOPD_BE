@@ -40,7 +40,6 @@ export class AuthService {
 
   async signUp(signUpRequestDto: SignUpReqDto) {
     const { user_name, gender, email, password, phone } = signUpRequestDto;
-    console.time('1');
     const { data, error } = await this.authProvider.signUp(email, password, {
       user_name,
       gender,
@@ -64,7 +63,6 @@ export class AuthService {
         }
       }
     }
-    console.timeEnd('1');
 
     if (!data?.user?.id) {
       throw AuthErrors.ProviderError(
@@ -77,8 +75,6 @@ export class AuthService {
     let isLocalAccountCreated = false;
 
     try {
-      console.time('2');
-
       const newAccount = await this.accountRepository.create({
         account_id: account_id,
         email: email,
@@ -89,7 +85,6 @@ export class AuthService {
       });
 
       isLocalAccountCreated = true;
-      console.timeEnd('2');
 
       return {
         code: 200,
@@ -291,9 +286,7 @@ export class AuthService {
     const account_id = data.user.id;
 
     const { data: updateUserData, error: updateUserError } =
-      await this.authProvider.updateUserById(account_id, {
-        password: new_password,
-      });
+      await this.authProvider.updatePasswordUserById(account_id, new_password);
 
     if (updateUserError) {
       throw AuthErrors.ResetPasswordFailed(updateUserError.message);
@@ -352,7 +345,6 @@ export class AuthService {
   }
 
   async getProfile(id: string) {
-    console.log(id);
     const existedAccount = await this.accountRepository.findById(id);
 
     if (!existedAccount) {

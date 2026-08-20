@@ -246,10 +246,22 @@ export class FlowService {
                   `Không tìm thấy dịch vụ với mã: ${step.service_code}`,
                 );
 
+              const orderTargetStepType =
+                svc.room_type === 'LABORATORY'
+                  ? 'LAB_TEST'
+                  : svc.room_type === 'IMAGING_ROOM'
+                    ? 'IMAGING'
+                    : svc.room_type === 'PROCEDURE_ROOM'
+                      ? 'PROCEDURE'
+                      : svc.room_type === 'FUNCTIONAL_EXPLORATION'
+                        ? 'FUNCTIONAL_EXPLORATION'
+                        : 'CLINICAL';
+
               const createdServiceOrder = await tx.service_Order.create({
                 data: {
                   booking_id: existingFlow.booking_id,
-                  name: 'Thanh toán: ' + (step.step_name || svc.service_name),
+                  name: svc.service_name || step.step_name || 'Dịch vụ y tế',
+                  type: orderTargetStepType as any,
                   status: 'PENDING',
                 },
               });
@@ -446,6 +458,9 @@ export class FlowService {
 
         await saveDependenciesRecursively(templateSteps);
 
+        let rootStepStarted = false;
+        const rootStepIds: string[] = [];
+
         for (const stepId of Array.from(idMapping.values())) {
           const currentStep = await tx.step.findUnique({
             where: { step_id: stepId },
@@ -460,7 +475,11 @@ export class FlowService {
 
           if (dependencyCount == 0) {
             if (!currentStep?.parent_step_id) {
-              isReadyToProgress = true;
+              rootStepIds.push(stepId);
+              if (!rootStepStarted) {
+                isReadyToProgress = true;
+                rootStepStarted = true;
+              }
             } else {
               const parentStep = await tx.step.findUnique({
                 where: { step_id: currentStep.parent_step_id },
@@ -481,6 +500,16 @@ export class FlowService {
               data: { step_status: 'IN_PROGRESS' },
             });
           }
+        }
+
+        // Chain the other root steps sequentially
+        for (let i = 1; i < rootStepIds.length; i++) {
+          await tx.step_Dependency.create({
+            data: {
+              step_id: rootStepIds[i],
+              depends_on_step_id: rootStepIds[i - 1],
+            },
+          });
         }
 
         await tx.flow.update({

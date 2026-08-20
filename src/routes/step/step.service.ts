@@ -14,22 +14,19 @@ import {
   UpdateStepStatusReqDto,
 } from './dto/req-step.dto';
 import type { IStepRepository } from '../../shared/interfaces/i-step.repository';
-import { QueueTypeEnum, StepStatusEnum, StepTypeEnum } from '@prisma/client';
+import {
+  QueueTypeEnum,
+  StepStatusEnum,
+  FlowStatusEnum,
+} from '@prisma/client';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
 import { QueueService } from '../queue/queue.service';
-
-const CLS_TYPES = new Set([
-  StepTypeEnum.LAB_TEST,
-  StepTypeEnum.IMAGING,
-  StepTypeEnum.PROCEDURE,
-  StepTypeEnum.FUNCTIONAL_EXPLORATION,
-]);
-
-function isStepSatisfied(status: StepStatusEnum): boolean {
-  return (
-    status === StepStatusEnum.COMPLETED || status === StepStatusEnum.DECLINED
-  );
-}
+import { PrismaService } from '../../shared/config/prisma.service';
+import {
+  isClsStepType,
+  isReturnServiceCode,
+  isStepSatisfied,
+} from '../service_order/service-order.helpers';
 
 @Injectable()
 export class StepService {
@@ -38,6 +35,7 @@ export class StepService {
 
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async createParentStep(createParentStepReqDto: CreateParentStepReqDto) {
@@ -176,11 +174,15 @@ export class StepService {
     if (currentStep.parent_step_id) {
       await this.checkAndCompleteParentStep(currentStep.parent_step_id);
     } else {
-      await this.unlockNextSteps(stepId, StepStatusEnum.COMPLETED);
+      await this.unlockDependents(stepId, StepStatusEnum.COMPLETED);
     }
 
     if (!options?.skipCloseServingQueue) {
       await this.queueService.closeServingQueueByStepId(stepId, 'complete');
+    }
+
+    if (currentStep.flow_id) {
+      await this.checkAndCompleteFlow(currentStep.flow_id);
     }
 
     const updated = await this.stepRepository.findById(stepId);
@@ -226,7 +228,7 @@ export class StepService {
     if (currentStep.parent_step_id) {
       await this.checkAndCompleteParentStep(currentStep.parent_step_id);
     } else {
-      await this.unlockNextSteps(stepId, StepStatusEnum.DECLINED);
+      await this.unlockDependents(stepId, StepStatusEnum.DECLINED);
     }
 
     if (!options?.skipCloseServingQueue) {
@@ -235,6 +237,10 @@ export class StepService {
         'refuse',
         options?.reason,
       );
+    }
+
+    if (currentStep.flow_id) {
+      await this.checkAndCompleteFlow(currentStep.flow_id);
     }
 
     const updated = await this.stepRepository.findById(stepId);
@@ -263,7 +269,7 @@ export class StepService {
           : StepStatusEnum.DECLINED,
       });
 
-      await this.unlockNextSteps(
+      await this.unlockDependents(
         parentId,
         anyCompleted ? StepStatusEnum.COMPLETED : StepStatusEnum.DECLINED,
       );
@@ -271,13 +277,13 @@ export class StepService {
   }
 
   /**
-   * @param triggerStatus status of the step that just finished (COMPLETED or DECLINED)
+   * Unlock steps that wait on `completedStepId`. Public so service-order cancel
+   * and free-payment paths can reuse the same graph rules.
    */
-  private async unlockNextSteps(
+  async unlockDependents(
     completedStepId: string,
-    triggerStatus: StepStatusEnum,
+    _triggerStatus: StepStatusEnum,
   ) {
-    const completedStep = await this.stepRepository.findById(completedStepId);
     const nextSteps =
       await this.stepRepository.findDependentSteps(completedStepId);
 
@@ -290,46 +296,67 @@ export class StepService {
         isStepSatisfied(pre.step_status),
       );
 
-      if (isReadyToStart && nextStep.step_status === StepStatusEnum.PENDING) {
+      if (!isReadyToStart || nextStep.step_status !== StepStatusEnum.PENDING) {
+        continue;
+      }
+
+      const isReturn = isReturnServiceCode(nextStep.service_code);
+      const hasCompletedCls = prerequisites.some(
+        (pre) =>
+          isClsStepType(pre.step_type) &&
+          pre.step_status === StepStatusEnum.COMPLETED,
+      );
+
+      if (isReturn && !hasCompletedCls) {
         await this.stepRepository.update(nextStep.step_id, {
-          step_status: StepStatusEnum.IN_PROGRESS,
+          step_status: StepStatusEnum.CANCELLED,
         });
+        await this.unlockDependents(
+          nextStep.step_id,
+          StepStatusEnum.CANCELLED,
+        );
+        continue;
+      }
 
-        // RETURNING only when unlocked by a real CLS completion (not decline)
-        const unlockedByCompletedCls =
-          triggerStatus === StepStatusEnum.COMPLETED &&
-          ((completedStep?.step_type &&
-            CLS_TYPES.has(completedStep.step_type)) ||
-            prerequisites.some(
-              (pre) =>
-                pre.step_type &&
-                CLS_TYPES.has(pre.step_type) &&
-                pre.step_status === StepStatusEnum.COMPLETED,
-            ));
+      await this.stepRepository.update(nextStep.step_id, {
+        step_status: StepStatusEnum.IN_PROGRESS,
+      });
 
-        if (unlockedByCompletedCls && nextStep.room_id) {
-          try {
-            await this.queueService.enqueueStep(
-              nextStep.step_id,
-              QueueTypeEnum.RETURNING,
-              undefined,
-              { forceType: true },
-            );
-          } catch (err: any) {
-            console.error(
-              `Failed to enqueue RETURNING for step ${nextStep.step_id}:`,
-              err?.message || err,
-            );
-          }
+      if (isReturn && hasCompletedCls && nextStep.room_id) {
+        try {
+          await this.queueService.enqueueStep(
+            nextStep.step_id,
+            QueueTypeEnum.RETURNING,
+            undefined,
+            { forceType: true },
+          );
+        } catch (err: any) {
+          console.error(
+            `Failed to enqueue RETURNING for step ${nextStep.step_id}:`,
+            err?.message || err,
+          );
         }
       }
     }
   }
 
   async updateStep(stepId: string, updateData: UpdateStepReqDto) {
-    const currentStep = await this.stepRepository.findById(stepId);
+    const currentStep = await this.prisma.step.findUnique({
+      where: { step_id: stepId },
+      include: { flow: true },
+    });
     if (!currentStep) {
       throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+    const flowStatus = currentStep.flow?.status;
+    if (
+      flowStatus &&
+      flowStatus !== FlowStatusEnum.IN_PROGRESS &&
+      flowStatus !== FlowStatusEnum.PENDING
+    ) {
+      throw new BadRequestException(
+        'Không thể cập nhật Step vì flow hiện tại không ở trạng thái IN_PROGRESS hoặc PENDING',
+      );
     }
 
     const updatedStep = await this.stepRepository.update(stepId, updateData);
@@ -346,9 +373,22 @@ export class StepService {
     stepId: string,
     updateStatusDto: UpdateStepStatusReqDto,
   ) {
-    const currentStep = await this.stepRepository.findById(stepId);
+    const currentStep = await this.prisma.step.findUnique({
+      where: { step_id: stepId },
+      include: { flow: true },
+    });
     if (!currentStep) {
       throw new NotFoundException('Bước này không tồn tại trên hệ thống.');
+    }
+    const flowStatus = currentStep.flow?.status;
+    if (
+      flowStatus &&
+      flowStatus !== FlowStatusEnum.IN_PROGRESS &&
+      flowStatus !== FlowStatusEnum.PENDING
+    ) {
+      throw new BadRequestException(
+        'Không thể cập nhật trạng thái Step vì flow hiện tại không ở trạng thái IN_PROGRESS hoặc PENDING',
+      );
     }
 
     if (updateStatusDto.step_status === StepStatusEnum.COMPLETED) {
@@ -362,6 +402,17 @@ export class StepService {
     const updatedStep = await this.stepRepository.update(stepId, {
       step_status: updateStatusDto.step_status,
     });
+
+    if (updateStatusDto.step_status === StepStatusEnum.CANCELLED) {
+      if (currentStep.parent_step_id) {
+        await this.checkAndCompleteParentStep(currentStep.parent_step_id);
+      } else {
+        await this.unlockDependents(stepId, StepStatusEnum.CANCELLED);
+      }
+      if (currentStep.flow_id) {
+        await this.checkAndCompleteFlow(currentStep.flow_id);
+      }
+    }
 
     return {
       code: 200,
@@ -380,5 +431,28 @@ export class StepService {
       message: 'Lấy danh sách các bước thành công',
       data: steps,
     };
+  }
+
+  async checkAndCompleteFlow(flowId: string) {
+    if (!flowId) return;
+    const unfinishedSteps = await this.prisma.step.count({
+      where: {
+        flow_id: flowId,
+        step_status: {
+          notIn: [
+            StepStatusEnum.COMPLETED,
+            StepStatusEnum.DECLINED,
+            StepStatusEnum.CANCELLED,
+          ],
+        },
+      },
+    });
+
+    if (unfinishedSteps === 0) {
+      await this.prisma.flow.update({
+        where: { flow_id: flowId },
+        data: { status: FlowStatusEnum.COMPLETED },
+      });
+    }
   }
 }

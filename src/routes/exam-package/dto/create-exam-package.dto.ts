@@ -6,6 +6,8 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
+  Min,
 } from 'class-validator';
 
 export class CreateExamPackageDto {
@@ -15,6 +17,7 @@ export class CreateExamPackageDto {
   })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200, { message: 'package_name tối đa 200 ký tự' })
   package_name: string;
 
   @ApiPropertyOptional({
@@ -23,10 +26,12 @@ export class CreateExamPackageDto {
   })
   @IsString()
   @IsOptional()
+  @MaxLength(2000, { message: 'description tối đa 2000 ký tự' })
   description?: string;
 
   @ApiProperty({ description: 'Giá của gói', example: 500000 })
   @IsInt()
+  @Min(0, { message: 'price phải lớn hơn hoặc bằng 0' })
   price: number;
 
   @ApiPropertyOptional({ description: 'Trạng thái hoạt động', example: true })
@@ -38,7 +43,7 @@ export class CreateExamPackageDto {
     description: 'ID của Template Luồng Khám',
     example: 'e3f1...',
   })
-  @IsUUID()
+  @IsUUID('4', { message: 'template_id phải là định dạng UUID' })
   @IsNotEmpty()
   template_id: string;
 }
