@@ -10,6 +10,7 @@ import {
   UpdateUserRequestDto,
   VerifyAndResetPasswordRequestDto,
   VerifyOtpSignInRequestDto,
+  VerifySignInWithCitizenIdRequestDto,
 } from './dto/request-auth.dto';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
 import {
@@ -31,8 +32,6 @@ export class AuthService {
     @Inject('IAuthProvider') private readonly authProvider: IAuthProvider,
     @Inject('IPatientRepository')
     private readonly patientRepository: IPatientRepository,
-    @Inject('IStaffRepository')
-    private readonly staffRepository: IStaffRepository,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -165,6 +164,104 @@ export class AuthService {
         refresh_token: data.session.refresh_token,
         id: data.user.id,
         ...data.user.user_metadata,
+      },
+    };
+  }
+
+  async signInWithCitizentIdAndOtp(
+    signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
+  ) {
+    const account = await this.accountRepository.findEmailByCitizentId(
+      signInWithCitizenIdRequestDto.citizen_id,
+    );
+
+    if (!account) {
+      throw AuthErrors.PatientNotFoundByCitizenId(
+        signInWithCitizenIdRequestDto.citizen_id,
+      );
+    }
+
+    this.authProvider.signInWithOtp(account.email).catch((error) => {
+      this.logger.error(
+        `Gửi OTP thất bại cho email: ${account.email}`,
+        error.message,
+      );
+    });
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'gửi OTP thành công',
+    };
+  }
+
+  async verifyOtpWithCitizentIdAndOtp(
+    verifyOtpSignInRequestDto: VerifySignInWithCitizenIdRequestDto,
+  ) {
+    const { citizen_id, otp } = verifyOtpSignInRequestDto;
+
+    const account = await this.accountRepository.findEmailByCitizentId(
+      citizen_id,
+    );
+
+    if (!account) {
+      throw AuthErrors.PatientNotFoundByCitizenId(
+        citizen_id,
+      );
+    }
+    const { data, error } = await this.authProvider.verifyOtp(
+      account.email,
+      otp,
+      OtpType.MAGIC_LINK,
+    );
+
+    if (error) {
+      throw AuthErrors.VerifyOtpFailed(error.message);
+    }
+
+    if (!data?.session || !data?.user) {
+      throw AuthErrors.ProviderError(
+        'Lỗi hệ thống',
+        'Không lấy được phiên đăng nhập sau khi xác thực OTP',
+      );
+    }
+
+    const existedPatient: Patient =
+      await this.patientRepository.findByCitizenId(
+        citizen_id,
+      );
+    if (!existedPatient) {
+      throw AuthErrors.PatientNotFoundByCitizenId(
+        citizen_id,
+      );
+    }
+
+    const payload = {
+      sub: existedPatient.patient_id,
+      id: existedPatient.patient_id,
+      patient: existedPatient,
+    };
+    const token = await this.jwtService.signAsync(payload);
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đăng nhập thành công',
+      data: {
+        token: token,
+        patient_id: existedPatient.patient_id,
+        citizen_id: existedPatient.citizen_id,
+      },
+    };
+
+    return {
+      code: 200,
+      status: 'success',
+      message: 'xác thực thành công',
+      data: {
+        access_token: data?.session?.access_token,
+        refresh_token: data?.session?.refresh_token,
+        ...data.user?.user_metadata,
       },
     };
   }

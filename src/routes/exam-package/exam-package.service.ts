@@ -59,7 +59,7 @@ export class ExamPackageService {
   async findOne(id: string) {
     const examPackage = await this.prisma.exam_Package.findUnique({
       where: { package_id: id },
-      include: { template: { select: TEMPLATE_SELECT } },
+      include: { template: true },
     });
     if (!examPackage)
       throw new NotFoundException(`Không tìm thấy gói khám với ID ${id}`);

@@ -103,6 +103,21 @@ export class VerifyOtpSignInRequestDto {
   })
   otp: string;
 }
+export class VerifySignInWithCitizenIdRequestDto {
+  @IsString({ message: 'Số CMND/CCCD phải là một chuỗi ký tự hợp lệ' })
+  @ApiProperty({
+    name: 'citizen_id',
+    example: '08420300798',
+  })
+  citizen_id: string;
+
+  @IsString({ message: 'Mã OTP phải là một chuỗi ký tự hợp lệ' })
+  @ApiProperty({
+    name: 'otp',
+    example: '12345678',
+  })
+  otp: string;
+}
 
 export class ForgotPasswordRequestDto {
   @IsEmail({}, { message: 'Địa chỉ email không hợp lệ' })
