@@ -19,6 +19,7 @@ import {
   UpdateUserRequestDto,
   VerifyAndResetPasswordRequestDto,
   VerifyOtpSignInRequestDto,
+  VerifySignInWithCitizenIdRequestDto,
 } from './dto/request-auth.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
@@ -45,6 +46,21 @@ export class AuthController {
     @Body() signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
   ) {
     return this.authService.SignInWithCitizenId(signInWithCitizenIdRequestDto);
+  }
+
+  @Post('/login/citizen-id/otp')
+  signInWithCitizentIdAndOtp(
+    @Body() signInWithCitizenIdRequestDto: SignInWithCitizenIdRequestDto,
+  ) {
+    return this.authService.signInWithCitizentIdAndOtp(signInWithCitizenIdRequestDto);
+  }
+  @Post('/login/citizen-id/otp/verify')
+  verifyOtpWithCitizentIdAndOtp(
+    @Body() verifyOtpSignInRequestDto: VerifySignInWithCitizenIdRequestDto,
+  ) {
+    return this.authService.verifyOtpWithCitizentIdAndOtp(
+      verifyOtpSignInRequestDto,
+    );
   }
 
   @Post('/otp/send')

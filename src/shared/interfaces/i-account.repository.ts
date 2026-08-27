@@ -28,4 +28,5 @@ export interface IAccountRepository {
       totalPages: number;
     };
   }>;
+  findEmailByCitizentId(citizen_id: string): Promise<{ email: string } | null>;
 }
