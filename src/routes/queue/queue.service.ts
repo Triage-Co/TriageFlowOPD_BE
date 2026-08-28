@@ -1403,7 +1403,7 @@ export class QueueService {
     const servingQueue = await this.prisma.queue.findFirst({
       where: {
         room_id: roomId,
-        status: QueueStatusEnum.SERVING,
+        status: { in: [QueueStatusEnum.SERVING, QueueStatusEnum.CALLED] },
         ...buildQueueDateFilter(startOfDay, endOfDay),
       },
       include: {
