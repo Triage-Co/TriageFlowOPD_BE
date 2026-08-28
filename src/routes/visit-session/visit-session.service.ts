@@ -11,6 +11,7 @@ import {
 import type { IVisitSessionRepository } from '../../shared/interfaces/i-visit-session.repository';
 import type { IPatientRepository } from '../../shared/interfaces/i-patient.repository';
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
+import { PrismaService } from '../../shared/config/prisma.service';
 
 @Injectable()
 export class VisitSessionService {
@@ -21,6 +22,7 @@ export class VisitSessionService {
     private readonly patientRepository: IPatientRepository,
     @Inject('IAccountRepository')
     private readonly accountRepository: IAccountRepository,
+    private readonly prismaService: PrismaService,
   ) {}
 
   async create(createDto: CreateVisitSessionReqDto) {
@@ -155,6 +157,30 @@ export class VisitSessionService {
     await this.visitSessionRepository.delete(id);
     return {
       message: `Visit session with ID ${id} deleted successfully`,
+    };
+  }
+
+  async getLatestPatientAnswer(patientId: string, reqUser: any) {
+    const answer = await this.prismaService.patient_Answer.findFirst({
+      where: {
+        patient_id: patientId,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    if (!answer) {
+      throw new NotFoundException(
+        `Không tìm thấy câu trả lời Triage nào cho patient_id ${patientId}`,
+      );
+    }
+
+    return {
+      code: 200,
+      message: 'Thành công',
+      status: 'success',
+      data: answer,
     };
   }
 }

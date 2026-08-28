@@ -147,6 +147,34 @@ export class VisitSessionController {
     );
   }
 
+  @Get('patient/:patient_id/latest-answer')
+  @roles('DOCTOR', 'NURSE', 'RECEPTIONIST', 'ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '[STAFF - ADMIN] Lấy câu trả lời Triage mới nhất của bệnh nhân',
+    description:
+      'Endpoint dành cho Nhân viên y tế lấy thông tin câu hỏi Triage (Patient Answer) gần nhất của bệnh nhân.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lấy câu trả lời Triage mới nhất thành công.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Không có quyền truy cập.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Không tìm thấy câu trả lời Triage nào.',
+  })
+  findLatestPatientAnswer(
+    @Param('patient_id') patient_id: string,
+    @Req() req: any,
+  ) {
+    return this.visitSessionService.getLatestPatientAnswer(patient_id, req.user);
+  }
+
   @Get('patient/:patient_id')
   @UseGuards(IsAuthGuard)
   @ApiBearerAuth()

@@ -114,13 +114,18 @@ export class InfermedicaService {
         currentTurn = interview_token ? 1 : 0;
       }
 
+      const evidenceForApi = triageDto.evidence?.map((item) => ({
+        id: item.id,
+        choice_id: item.choice_id,
+      }));
+
       const { data } = await firstValueFrom(
         this.httpService.post('/diagnosis', {
           sex: triageDto.sex,
           age: {
             value: triageDto.age,
           },
-          evidence: triageDto.evidence,
+          evidence: evidenceForApi,
         }),
       );
 
@@ -168,13 +173,18 @@ export class InfermedicaService {
 
   async triage(triageDto: TriageDto) {
     try {
+      const evidenceForApi = triageDto.evidence?.map((item) => ({
+        id: item.id,
+        choice_id: item.choice_id,
+      }));
+
       const { data } = await firstValueFrom(
         this.httpService.post('/triage', {
           sex: triageDto.sex,
           age: {
             value: triageDto.age,
           },
-          evidence: triageDto.evidence,
+          evidence: evidenceForApi,
         }),
       );
 
@@ -209,13 +219,18 @@ export class InfermedicaService {
         });
       }
 
+      const evidenceForApi = triageDto.evidence?.map((item) => ({
+        id: item.id,
+        choice_id: item.choice_id,
+      }));
+
       const { data } = await firstValueFrom(
         this.httpService.post('/recommend_specialist', {
           sex: triageDto.sex,
           age: {
             value: triageDto.age,
           },
-          evidence: triageDto.evidence,
+          evidence: evidenceForApi,
         }),
       );
 
