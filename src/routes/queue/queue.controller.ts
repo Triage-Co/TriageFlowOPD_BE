@@ -25,6 +25,7 @@ import {
   CallPatientDto,
   OverrideQueueDto,
   RefuseQueueDto,
+  ScanQueueDto,
   TransferQueueDto,
   UpdateRoomStatDto,
 } from './dto/create-queue.dto';
@@ -68,6 +69,23 @@ export class QueueController {
       staff_id,
       user,
     );
+  }
+
+  @Post('scan')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Quét mã QR trên vé khám hoặc bấm bắt đầu phục vụ bệnh nhân (chuyển CALLED -> SERVING, hoặc đưa MISSING -> QUEUED)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bắt đầu khám thành công và cập nhật màn hình TV.',
+  })
+  async scanQueueTicket(@Body() body: ScanQueueDto, @Req() req: any) {
+    const user = this.getUser(req);
+    return await this.queueService.scanQueueTicket(body, user);
   }
 
   @Post('transfer')
