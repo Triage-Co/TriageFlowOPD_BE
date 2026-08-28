@@ -98,8 +98,8 @@ export class PatientController {
     summary: '[USER] xóa bệnh nhân theo patient id',
   })
   removeMyPatient(@Req() req: any, @Param('patient_id') patient_id: string) {
-    const id = req.user.id || req.user.sub;
-    return this.patientService.remove(id, patient_id);
+    const id = req.user.sub || req.user.id;
+    return this.patientService.remove(patient_id, id);
   }
 
   @Get('me/:patient_id')
