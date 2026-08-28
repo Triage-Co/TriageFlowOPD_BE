@@ -206,7 +206,7 @@ model Account {
 
 model Patient {
   patient_id          String         @id @default(uuid()) @db.Uuid
-  account_id          String         @db.Uuid
+  account_id          String?         @db.Uuid
   medical_coverage_id String?        @unique
   full_name           String
   dob                 DateTime?      @db.Timestamptz()
@@ -218,7 +218,7 @@ model Patient {
   blood_type    String?
   allergy_notes String?
 
-  account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  account        Account?          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
   bookings       Booking[]
   patientAnswers Patient_Answer[]
   visitSessions  Visit_Session[]
