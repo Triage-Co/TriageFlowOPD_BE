@@ -49,8 +49,26 @@ export type DisplayScreenPublic = {
     room_id: string;
     room_name: string;
     room_type: ClinicalRoomType;
+    specialty?: {
+      specialty_id: string;
+      specialty_code: string;
+      specialty_name: string;
+    } | null;
   } | null;
 };
+
+const ROOM_PUBLIC_SELECT = {
+  room_id: true,
+  room_name: true,
+  room_type: true,
+  specialty: {
+    select: {
+      specialty_id: true,
+      specialty_code: true,
+      specialty_name: true,
+    },
+  },
+} as const;
 
 function asSettings(value: Prisma.JsonValue | null | undefined): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -110,6 +128,11 @@ export class DisplayScreenService implements OnModuleInit {
       room_id: string;
       room_name: string;
       room_type: ClinicalRoomType;
+      specialty?: {
+        specialty_id: string;
+        specialty_code: string;
+        specialty_name: string;
+      } | null;
     } | null;
   }): DisplayScreenPublic {
     return {
@@ -134,7 +157,7 @@ export class DisplayScreenService implements OnModuleInit {
       },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
       orderBy: [{ kind: 'asc' }, { name: 'asc' }],
@@ -147,7 +170,7 @@ export class DisplayScreenService implements OnModuleInit {
       where: { display_screen_id: id },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
     });
@@ -175,7 +198,7 @@ export class DisplayScreenService implements OnModuleInit {
         },
         include: {
           room: {
-            select: { room_id: true, room_name: true, room_type: true },
+            select: ROOM_PUBLIC_SELECT,
           },
         },
       });
@@ -214,7 +237,7 @@ export class DisplayScreenService implements OnModuleInit {
         },
         include: {
           room: {
-            select: { room_id: true, room_name: true, room_type: true },
+            select: ROOM_PUBLIC_SELECT,
           },
         },
       });
@@ -234,7 +257,7 @@ export class DisplayScreenService implements OnModuleInit {
   ): Promise<DisplayScreenPublic> {
     const room = await this.prisma.room.findUnique({
       where: { room_id: dto.room_id },
-      select: { room_id: true, room_name: true, room_type: true },
+      select: ROOM_PUBLIC_SELECT,
     });
     if (!room) {
       throw new NotFoundException(`Không tìm thấy phòng với ID: ${dto.room_id}`);
@@ -247,7 +270,7 @@ export class DisplayScreenService implements OnModuleInit {
       },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
       orderBy: { created_at: 'asc' },
@@ -266,7 +289,7 @@ export class DisplayScreenService implements OnModuleInit {
       },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
     });
@@ -280,7 +303,7 @@ export class DisplayScreenService implements OnModuleInit {
       where: { kind: DisplayScreenKind.TV_PAYMENT },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
       orderBy: { created_at: 'asc' },
@@ -310,7 +333,7 @@ export class DisplayScreenService implements OnModuleInit {
       },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
     });
@@ -370,7 +393,7 @@ export class DisplayScreenService implements OnModuleInit {
       where: { display_screen_id: displayScreenId },
       include: {
         room: {
-          select: { room_id: true, room_name: true, room_type: true },
+          select: ROOM_PUBLIC_SELECT,
         },
       },
     });
