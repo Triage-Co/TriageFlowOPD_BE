@@ -248,6 +248,8 @@ export class InfermedicaService {
       });
 
       let best_slot_id: string | null = null;
+      let doctor: string | null = null;
+      let room: string | null = null;
 
       if (exitedSpecialty) {
         const timeZone = 'Asia/Ho_Chi_Minh';
@@ -266,6 +268,8 @@ export class InfermedicaService {
 
         if (availableSlots && availableSlots.length > 0) {
           best_slot_id = availableSlots[0].slot_id;
+          doctor = availableSlots[0].shift.staff.full_name;
+          room = availableSlots[0].shift.room.room_name;
         }
 
         if (!exitedPatientInfo) {
@@ -299,6 +303,8 @@ export class InfermedicaService {
             name: exitedSpecialty?.specialty_name,
           },
           best_slot_id: best_slot_id,
+          room: room,
+          doctor: doctor,
         },
       };
     } catch (error) {
