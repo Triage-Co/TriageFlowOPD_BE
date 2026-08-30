@@ -105,16 +105,32 @@ export class InfermedicaService {
       );
 
       const currentToken = interview_token || `new_session_${Date.now()}`;
+      const finalToken = interview_token || currentToken;
 
       const cacheKey = `interview_${currentToken}`;
+      const lastQuestionKey = `last_question_${finalToken}`;
 
       let currentTurn = await this.cacheManager.get<number>(cacheKey);
-
       if (!currentTurn) {
-        currentTurn = interview_token ? 1 : 0;
+        currentTurn = 1;
       }
 
-      const evidenceForApi = triageDto.evidence?.map((item) => ({
+      const lastQuestion: any = await this.cacheManager.get(lastQuestionKey);
+
+      let cleanedEvidence = [...(triageDto.evidence || [])];
+      if (lastQuestion && lastQuestion.type === 'group_single') {
+        const groupItemIds = new Set(
+          lastQuestion.items?.map((item: any) => item.id) || [],
+        );
+        cleanedEvidence = cleanedEvidence.filter((e) => {
+          if (groupItemIds.has(e.id)) {
+            return e.choice_id === 'present';
+          }
+          return true;
+        });
+      }
+
+      const evidenceForApi = cleanedEvidence.map((item) => ({
         id: item.id,
         choice_id: item.choice_id,
       }));
@@ -129,24 +145,146 @@ export class InfermedicaService {
         }),
       );
 
-      currentTurn += 1;
-      await this.cacheManager.set(cacheKey, currentTurn, 3600000);
-
       const isOverLimit = currentTurn >= numberOfDiagnoses;
+      await this.cacheManager.set(cacheKey, currentTurn + 1, 3600000);
 
-      const finalToken = interview_token || currentToken;
+      const existingAnswer = await this.PATIENT_ANSWER.findUnique({
+        where: {
+          interview_token: finalToken,
+        },
+      });
+
+      let questionnaireData: any = existingAnswer?.questionnaire_data;
+      if (
+        !questionnaireData ||
+        typeof questionnaireData !== 'object' ||
+        Array.isArray(questionnaireData)
+      ) {
+        questionnaireData = {
+          sex: triageDto.sex,
+          age: triageDto.age,
+          history: [],
+          evidence: [],
+        };
+      }
+      if (!Array.isArray(questionnaireData.history)) {
+        questionnaireData.history = [];
+      }
+
+      if (lastQuestion) {
+        const qType = lastQuestion.type;
+
+        if (qType === 'single') {
+          const item = lastQuestion.items?.[0];
+          const matchedEv = cleanedEvidence.find((e) => e.id === item?.id);
+          const choiceId = matchedEv?.choice_id || 'unknown';
+          const choiceMeta = item?.choices?.find((c: any) => c.id === choiceId);
+
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: 'single',
+            question_text: lastQuestion.text,
+            answer: {
+              id: item?.id,
+              name: item?.name || matchedEv?.name,
+              choice_id: choiceId,
+              choice_label: choiceMeta?.label || choiceId,
+            },
+          });
+        } else if (qType === 'group_single') {
+          const selectedEvidence = cleanedEvidence.find(
+            (e) =>
+              lastQuestion.items?.some((item: any) => item.id === e.id) &&
+              e.choice_id === 'present',
+          );
+          const selectedItem = lastQuestion.items?.find(
+            (item: any) => item.id === selectedEvidence?.id,
+          );
+
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: 'group_single',
+            question_text: lastQuestion.text,
+            answer: selectedItem
+              ? {
+                  id: selectedItem.id,
+                  name: selectedItem.name,
+                  choice_id: 'present',
+                }
+              : {
+                  id: null,
+                  name: 'Không rõ / Không chọn',
+                  choice_id: 'unknown',
+                },
+          });
+        } else if (qType === 'group_multiple') {
+          const selectedItems = lastQuestion.items
+            ?.map((item: any) => {
+              const ev = cleanedEvidence.find((e) => e.id === item.id);
+              if (!ev) return null;
+              const choiceMeta = item.choices?.find(
+                (c: any) => c.id === ev.choice_id,
+              );
+              return {
+                id: item.id,
+                name: item.name,
+                choice_id: ev.choice_id,
+                choice_label: choiceMeta?.label || ev.choice_id,
+              };
+            })
+            .filter(Boolean);
+
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: 'group_multiple',
+            question_text: lastQuestion.text,
+            answers: selectedItems || [],
+          });
+        } else {
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: qType,
+            question_text: lastQuestion.text,
+            evidence: cleanedEvidence,
+          });
+        }
+      } else {
+        const hasTurn1 = questionnaireData.history.some(
+          (h: any) => h.turn === 1,
+        );
+        if (!hasTurn1) {
+          questionnaireData.history.push({
+            turn: 1,
+            question_type: 'initial',
+            question_text: 'Khai báo triệu chứng ban đầu',
+            answers: cleanedEvidence,
+          });
+        }
+      }
+
+      questionnaireData.sex = triageDto.sex;
+      questionnaireData.age = triageDto.age;
+      questionnaireData.evidence = cleanedEvidence;
+
+      if (data.question) {
+        await this.cacheManager.set(lastQuestionKey, data.question, 3600000);
+      } else {
+        await this.cacheManager.del(lastQuestionKey);
+      }
 
       await this.PATIENT_ANSWER.upsert({
         where: {
           interview_token: finalToken,
         },
         update: {
-          questionnaire_data: triageDto as unknown as Prisma.InputJsonObject,
+          questionnaire_data:
+            questionnaireData as unknown as Prisma.InputJsonObject,
         },
         create: {
           citizen_id: citizen_id,
           patient_id: existedPatient.patient_id,
-          questionnaire_data: triageDto as unknown as Prisma.InputJsonObject,
+          questionnaire_data:
+            questionnaireData as unknown as Prisma.InputJsonObject,
           interview_token: finalToken,
         },
       });
