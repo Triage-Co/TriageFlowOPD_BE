@@ -1669,13 +1669,58 @@ export class QueueService {
     if (!queue || !queue.room_id) {
       throw new NotFoundException('Không tìm thấy lượt chờ.');
     }
-    if (queue.status !== QueueStatusEnum.SERVING) {
+
+    const allowedStatuses: QueueStatusEnum[] = [
+      QueueStatusEnum.SERVING,
+      QueueStatusEnum.CALLED,
+    ];
+
+    if (!allowedStatuses.includes(queue.status)) {
       throw new BadRequestException(
-        'Chỉ thao tác được trên lượt đang phục vụ (SERVING).',
+        'Chỉ thao tác được trên lượt đang phục vụ (SERVING) hoặc đang gọi (CALLED).',
       );
     }
 
     await this.assertCanManageRoom(user, queue.room_id, queue.step_id);
+
+    if (queue.status === QueueStatusEnum.CALLED) {
+      const now = new Date();
+      const servingStartedAt = queue.called_at || now;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.queue.update({
+          where: { queue_id: queueId },
+          data: {
+            status: QueueStatusEnum.SERVING,
+            serving_started_at: servingStartedAt,
+          },
+        });
+
+        if (queue.step_id) {
+          await tx.step.update({
+            where: { step_id: queue.step_id },
+            data: { step_status: StepStatusEnum.IN_PROGRESS },
+          });
+        }
+
+        await tx.move_Log.create({
+          data: {
+            queue_id: queueId,
+            action_type: 'SERVING',
+            actor_account_id: user.id,
+            reason:
+              'Tự động chuyển sang SERVING khi thực hiện thao tác dịch vụ/hoàn thành',
+          },
+        });
+      });
+
+      queue.status = QueueStatusEnum.SERVING;
+      queue.serving_started_at = servingStartedAt;
+      if (queue.step) {
+        (queue.step as any).step_status = StepStatusEnum.IN_PROGRESS;
+      }
+    }
+
     return queue;
   }
 
