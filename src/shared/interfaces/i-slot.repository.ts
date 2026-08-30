@@ -14,7 +14,7 @@ export interface ISlotRepository {
     specialtyId: string,
     currentHours: string,
     starOfDate: Date,
-  ): Promise<{ slot_id: string }[]>;
+  ): Promise<SlotWithShiftAndRoom[]>;
 
   update(
     slotId: string,
