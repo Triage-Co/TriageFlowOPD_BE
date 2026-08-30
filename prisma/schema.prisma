@@ -141,6 +141,18 @@ enum ClinicalRoomType {
   OTHER
 }
 
+enum DisplayScreenKind {
+  KIOSK
+  TV_CLINIC
+  TV_PHARMACY
+  TV_PAYMENT
+}
+
+enum DisplayScreenStatus {
+  ENABLED
+  DISABLED
+}
+
 enum StepTypeEnum {
   REGISTRATION
   TRIAGE
@@ -412,6 +424,7 @@ model Room {
   roomServiceStats         Room_Service_Stat[]
   rebalanceSuggestionsFrom Queue_Rebalance_Suggestion[] @relation("RebalanceFromRoom")
   rebalanceSuggestionsTo   Queue_Rebalance_Suggestion[] @relation("RebalanceToRoom")
+  displayScreens           Display_Screen[]
 
   @@index([room_name, room_type])
   @@index([physical_room_id])
@@ -618,6 +631,7 @@ model Prescription {
   pickup_date       DateTime?              @db.Date
   called_at         DateTime?              @db.Timestamptz()
   missed_at         DateTime?              @db.Timestamptz()
+  display_screen_id String?                @db.Uuid
   created_at        DateTime               @default(now()) @db.Timestamptz()
   updated_at        DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
@@ -626,11 +640,13 @@ model Prescription {
   booking             Booking?              @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   flow                Flow?                 @relation(fields: [flow_id], references: [flow_id], onDelete: Cascade)
   doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
+  displayScreen       Display_Screen?       @relation(fields: [display_screen_id], references: [display_screen_id], onDelete: SetNull)
   prescriptionDetails Prescription_Detail[]
 
   @@unique([pickup_date, pickup_number], map: "prescription_pickup_date_number_key")
   @@index([prescription_code])
   @@index([status, called_at, missed_at])
+  @@index([display_screen_id])
   @@map("prescription")
 }
 
@@ -1253,4 +1269,30 @@ model ScheduledBlockage {
   @@index([nodeId, edgeId, status])
   @@index([startAt, endAt])
   @@map("scheduled_blockage")
+}
+
+model Display_Screen {
+  display_screen_id String              @id @default(uuid()) @db.Uuid
+  code              String              @unique
+  name              String
+  kind              DisplayScreenKind
+  status            DisplayScreenStatus @default(ENABLED)
+  room_id           String?             @db.Uuid
+  settings          Json                @default("{}")
+  created_at        DateTime            @default(now()) @db.Timestamptz()
+  updated_at        DateTime            @default(now()) @updatedAt @db.Timestamptz()
+
+  room          Room?          @relation(fields: [room_id], references: [room_id], onDelete: SetNull)
+  prescriptions Prescription[]
+
+  @@index([kind, status])
+  @@map("display_screen")
+}
+
+model Display_Pin {
+  id         String   @id @default("default")
+  pin_hash   String
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  @@map("display_pin")
 }
