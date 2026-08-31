@@ -55,6 +55,17 @@ export class CorridorEditsDto {
   remove?: string[];
 }
 
+export class EdgeEditsDto {
+  @ApiProperty({
+    description:
+      'Edge IDs to remove. Reverse-direction siblings on the same floor are also deleted.',
+    type: [String],
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  remove: string[];
+}
+
 export class LinkConnectorDto {
   @ApiProperty({
     description:
@@ -80,7 +91,7 @@ export class GraphController {
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @ApiOperation({
     summary:
-      'Apply batched corridor/junction node add/remove then rebuild edges from existing nodes (Admin)',
+      'Apply batched corridor/junction node add/remove without rebuilding edges (Admin)',
   })
   async applyCorridorEdits(
     @Param('floorId') floorId: string,
@@ -90,6 +101,28 @@ export class GraphController {
     return {
       code: 200,
       message: 'Applied corridor edits successfully',
+      status: 'success',
+      data,
+    };
+  }
+
+  @Post(':floorId/edge-edits')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Delete navigation edges on a floor (both directions). Does not rebuild the graph (Admin)',
+  })
+  async applyEdgeEdits(
+    @Param('floorId') floorId: string,
+    @Body() body: EdgeEditsDto,
+  ) {
+    const data = await this.graphService.applyEdgeEdits(floorId, body);
+    return {
+      code: 200,
+      message: 'Applied edge edits successfully',
       status: 'success',
       data,
     };

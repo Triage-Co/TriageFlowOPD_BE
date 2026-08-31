@@ -164,16 +164,68 @@ export class GraphGenerationService {
       await this.createNode(floorId, NodeType.CORRIDOR, coords);
     }
 
-    const rebuilt = await rebuildEdgesFromExistingNodes(this.prisma, floorId);
-
     await this.cacheManager.del(`building_map:${floor.buildingId}`);
     await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
 
     return {
       added: add.length,
       removed: removedCount,
-      edgesCreated: rebuilt.totalEdges,
-      nodesUsed: rebuilt.nodesUsed,
+      edgesCreated: 0,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  async applyEdgeEdits(floorId: string, payload: { remove?: string[] }) {
+    const startTime = Date.now();
+    const requested = [...new Set(payload.remove ?? [])];
+
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor) {
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    }
+
+    if (requested.length === 0) {
+      return { removed: 0, durationMs: Date.now() - startTime };
+    }
+
+    const matches = await this.prisma.edge.findMany({
+      where: {
+        id: { in: requested },
+        fromNode: { floorId },
+      },
+      select: { id: true, fromNodeId: true, toNodeId: true },
+    });
+
+    const idsToDelete = new Set(matches.map((edge) => edge.id));
+    if (matches.length > 0) {
+      const reverse = await this.prisma.edge.findMany({
+        where: {
+          fromNode: { floorId },
+          OR: matches.map((edge) => ({
+            fromNodeId: edge.toNodeId,
+            toNodeId: edge.fromNodeId,
+          })),
+        },
+        select: { id: true },
+      });
+      for (const edge of reverse) idsToDelete.add(edge.id);
+    }
+
+    let removed = 0;
+    if (idsToDelete.size > 0) {
+      const result = await this.prisma.edge.deleteMany({
+        where: { id: { in: [...idsToDelete] } },
+      });
+      removed = result.count;
+    }
+
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
+
+    return {
+      removed,
       durationMs: Date.now() - startTime,
     };
   }
