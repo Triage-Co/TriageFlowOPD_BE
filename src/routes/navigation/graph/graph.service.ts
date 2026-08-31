@@ -178,6 +178,28 @@ export class GraphGenerationService {
     };
   }
 
+  async rebuildEdgesForFloor(floorId: string) {
+    const startTime = Date.now();
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor) {
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    }
+
+    const rebuilt = await rebuildEdgesFromExistingNodes(this.prisma, floorId);
+
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
+
+    return {
+      nodesCreated: 0,
+      edgesCreated: rebuilt.totalEdges,
+      nodesUsed: rebuilt.nodesUsed,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
   async clearAllNodes(floorId: string) {
     const floor = await this.prisma.floor.findUnique({
       where: { id: floorId },
@@ -279,7 +301,7 @@ export class GraphGenerationService {
   }
 
   async generateEdgesPhase(floorId: string) {
-    return await this.generateGraph(floorId);
+    return await this.rebuildEdgesForFloor(floorId);
   }
 
   /**
