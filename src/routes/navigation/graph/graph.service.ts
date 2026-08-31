@@ -13,7 +13,10 @@ import { NodeType, ConnectorType } from '@prisma/client';
 import { Polygon, MultiPolygon } from 'geojson';
 import { generateDoorNodes } from '../core/graph-generation/doors';
 import { generateCorridorNodes } from '../core/graph-generation/corridors';
-import { generateGraphEdges } from '../core/graph-generation/edges';
+import {
+  generateGraphEdges,
+  rebuildEdgesFromExistingNodes,
+} from '../core/graph-generation/edges';
 import { readGeom } from '../core/graph-generation/utils';
 @Injectable()
 export class GraphGenerationService {
@@ -112,6 +115,69 @@ export class GraphGenerationService {
     };
   }
 
+  async applyCorridorEdits(
+    floorId: string,
+    payload: { add?: number[][]; remove?: string[] },
+  ) {
+    const startTime = Date.now();
+    const add = (payload.add ?? []).filter(
+      (coords): coords is [number, number] =>
+        Array.isArray(coords) &&
+        coords.length >= 2 &&
+        Number.isFinite(coords[0]) &&
+        Number.isFinite(coords[1]),
+    );
+    const remove = [...new Set(payload.remove ?? [])];
+    let removedCount = 0;
+
+    const floor = await this.prisma.floor.findUnique({
+      where: { id: floorId },
+    });
+    if (!floor) {
+      throw new NotFoundException(`Floor with ID ${floorId} not found`);
+    }
+
+    if (remove.length > 0) {
+      const existing = await this.prisma.node.findMany({
+        where: { id: { in: remove }, floorId },
+      });
+      const forbidden = existing.filter(
+        (node) =>
+          node.type !== NodeType.CORRIDOR && node.type !== NodeType.JUNCTION,
+      );
+      if (forbidden.length > 0) {
+        throw new BadRequestException(
+          'Chỉ được xóa node CORRIDOR hoặc JUNCTION trên tầng này.',
+        );
+      }
+
+      const removableIds = existing.map((node) => node.id);
+      if (removableIds.length > 0) {
+        await this.prisma.node.deleteMany({
+          where: { id: { in: removableIds } },
+        });
+      }
+      removedCount = removableIds.length;
+    }
+
+    for (const coords of add) {
+      await this.createNode(floorId, NodeType.CORRIDOR, coords);
+    }
+
+    const rebuilt = await rebuildEdgesFromExistingNodes(this.prisma, floorId);
+
+    await this.cacheManager.del(`building_map:${floor.buildingId}`);
+    await this.cacheManager.del(`nav_graph:${floor.buildingId}`);
+
+    return {
+      added: add.length,
+      removed: removedCount,
+      edgesCreated: rebuilt.totalEdges,
+      nodesUsed: rebuilt.nodesUsed,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
   async clearAllNodes(floorId: string) {
     const floor = await this.prisma.floor.findUnique({
       where: { id: floorId },
@@ -194,6 +260,7 @@ export class GraphGenerationService {
       this.prisma,
       floorId,
       floorOutlineGeoJSON,
+      { persist: false },
     );
 
     const pbPoints = (corridorData.uniquePoints || []).map(
