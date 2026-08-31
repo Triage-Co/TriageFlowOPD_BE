@@ -173,6 +173,25 @@ export class GraphController {
     };
   }
 
+  @Post(':floorId/rebuild-edges')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Rebuild navigation edges from existing nodes without regenerating nodes (Admin)',
+  })
+  async rebuildEdges(@Param('floorId') floorId: string) {
+    const data = await this.graphService.rebuildEdgesForFloor(floorId);
+    return {
+      code: 200,
+      message: 'Rebuilt graph edges from existing nodes',
+      status: 'success',
+      data,
+    };
+  }
+
   @Post(':floorId/generate')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
