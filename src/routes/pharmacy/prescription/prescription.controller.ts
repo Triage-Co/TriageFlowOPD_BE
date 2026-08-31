@@ -17,6 +17,7 @@ import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { UpdatePrescriptionDto } from './dto/update-prescription.dto';
 import { UpdatePrescriptionStatusDto } from './dto/update-prescription-status.dto';
 import { PharmacyCallNextDto } from './dto/pharmacy-call-next.dto';
+import { PharmacyPrepareDto } from './dto/pharmacy-prepare.dto';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -166,7 +167,7 @@ export class PrescriptionController {
   @ApiOperation({
     summary: '[TV] Payload lưới số lấy thuốc nhà thuốc (không gồm tên bệnh nhân)',
     description:
-      'Endpoint công khai cho màn hình TV nhà thuốc. Trả danh sách số đang gọi và số đơn PREPARED chưa lên TV.',
+      'Endpoint công khai cho màn hình TV nhà thuốc. Trả danh sách số đang gọi (kèm display_screen_id), số miss trong ngày, và số PREPARED chưa lên TV.',
   })
   @ApiQuery({
     name: 'room_id',
@@ -188,14 +189,18 @@ export class PrescriptionController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      '[PHARMACIST - ADMIN] Call next: đưa tất cả đơn PREPARED chưa lên TV vào lưới đang gọi',
+      '[PHARMACIST - ADMIN] Call next: đưa 1 đơn PREPARED lên TV quầy (display_screen_id)',
   })
   @ApiResponse({
     status: 200,
-    description: 'Đã đưa các số PREPARED chưa hiển thị lên TV nhà thuốc.',
+    description: 'Đã đưa 1 số PREPARED lên TV nhà thuốc của quầy đã chọn.',
   })
   callNextPrepared(@Body() body: PharmacyCallNextDto = {}) {
-    return this.prescriptionService.callNextPrepared(body?.room_id);
+    return this.prescriptionService.callNextPrepared({
+      room_id: body?.room_id,
+      display_screen_id: body?.display_screen_id,
+      prescription_id: body?.prescription_id,
+    });
   }
 
   @Post(':id/miss')
@@ -332,8 +337,11 @@ export class PrescriptionController {
     description: 'Đơn thuốc chưa ở trạng thái PROCESSING (chưa thanh toán).',
   })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn thuốc.' })
-  markAsPrepared(@Param('id') id: string) {
-    return this.prescriptionService.markAsPrepared(id);
+  markAsPrepared(
+    @Param('id') id: string,
+    @Body() body: PharmacyPrepareDto = {},
+  ) {
+    return this.prescriptionService.markAsPrepared(id, body?.display_screen_id);
   }
 
   @Patch(':id/dispense')
