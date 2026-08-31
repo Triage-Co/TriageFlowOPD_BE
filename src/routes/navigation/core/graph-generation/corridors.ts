@@ -38,7 +38,9 @@ export async function generateCorridorNodes(
   prisma: PrismaClient,
   floorId: string,
   floorOutlineGeoJSON: any,
+  options: { persist?: boolean } = {},
 ) {
+  const persist = options.persist !== false;
   console.log(
     `🛣️  Calculating walkable space and generating MPRSS corridor nodes...`,
   );
@@ -722,12 +724,16 @@ export async function generateCorridorNodes(
     }
   }
 
-  // Batch insert all corridor nodes at once
-  await createNodesBatch(prisma, nodesToCreate);
-
-  console.log(
-    `🛣️  Created ${nodeMap.size} MPRSSEM corridor/junction nodes {P_Mid}`,
-  );
+  if (persist) {
+    await createNodesBatch(prisma, nodesToCreate);
+    console.log(
+      `🛣️  Created ${nodeMap.size} MPRSSEM corridor/junction nodes {P_Mid}`,
+    );
+  } else {
+    console.log(
+      `🛣️  Computed ${nodeMap.size} MPRSSEM corridor/junction nodes {P_Mid} (not persisted)`,
+    );
+  }
 
   // Build centerline edge list for edges.ts
   const centerlineEdgesTyped: [[number, number], [number, number]][] = [];

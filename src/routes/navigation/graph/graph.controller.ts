@@ -20,7 +20,7 @@ import { IsAuthGuard } from '../../../shared/guards/is-auth.guard';
 import { IsRoleGuard } from '../../../shared/guards/is-role.guard';
 import { roles } from '../../../shared/decorator/role.decorator';
 import { RoleTypeEnum } from '@prisma/client';
-import { IsArray, IsNumber, IsOptional } from 'class-validator';
+import { IsArray, IsNumber, IsOptional, IsUUID } from 'class-validator';
 
 export class CreateCorridorNodeDto {
   @ApiProperty({
@@ -31,6 +31,28 @@ export class CreateCorridorNodeDto {
   @IsArray()
   @IsNumber({}, { each: true })
   coords: number[];
+}
+
+export class CorridorEditsDto {
+  @ApiProperty({
+    description: 'Corridor node coordinates to add as [lng, lat] pairs',
+    type: 'array',
+    required: false,
+    example: [[0.00012, 0.00034]],
+  })
+  @IsOptional()
+  @IsArray()
+  add?: number[][];
+
+  @ApiProperty({
+    description: 'Corridor or junction node IDs to remove',
+    type: [String],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  remove?: string[];
 }
 
 export class LinkConnectorDto {
@@ -50,6 +72,28 @@ export class LinkConnectorDto {
 @Controller('graph')
 export class GraphController {
   constructor(private readonly graphService: GraphGenerationService) {}
+
+  @Post(':floorId/corridor-edits')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @roles(RoleTypeEnum.ADMIN)
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @ApiOperation({
+    summary:
+      'Apply batched corridor/junction node add/remove then rebuild edges from existing nodes (Admin)',
+  })
+  async applyCorridorEdits(
+    @Param('floorId') floorId: string,
+    @Body() body: CorridorEditsDto,
+  ) {
+    const data = await this.graphService.applyCorridorEdits(floorId, body);
+    return {
+      code: 200,
+      message: 'Applied corridor edits successfully',
+      status: 'success',
+      data,
+    };
+  }
 
   @Post(':floorId/corridor')
   @HttpCode(HttpStatus.CREATED)
