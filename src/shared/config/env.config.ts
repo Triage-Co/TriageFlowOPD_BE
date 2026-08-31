@@ -38,6 +38,8 @@ class EnvClass {
   CRON_SECRET: string;
   @IsString({ message: 'Thiếu SUPABASE_JWKS_URL TRONG FILE .ENV' })
   SUPABASE_JWKS_URL: string;
+  @IsString({ message: 'Thiếu GROQ_API_KEY TRONG FILE .ENV' })
+  GROQ_API_KEY: string;
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

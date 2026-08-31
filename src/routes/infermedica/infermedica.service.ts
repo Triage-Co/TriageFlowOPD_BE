@@ -11,6 +11,7 @@ import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
 import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
+import { GroqService } from '../../shared/config/groq.service';
 
 @Injectable()
 export class InfermedicaService {
@@ -28,6 +29,7 @@ export class InfermedicaService {
     private readonly aiSpecialtyService: AiSpecialtyService,
     @Inject('ISlotRepository')
     private readonly slotRepository: ISlotRepository,
+    private readonly groqService: GroqService,
   ) {
     this.PATIENT_ANSWER = prismaService.patient_Answer;
     this.ACCOUNT = prismaService.account;
@@ -288,13 +290,49 @@ export class InfermedicaService {
           interview_token: finalToken,
         },
       });
+      const promptSystem = `Bạn là một chuyên gia y tế kiêm dịch giả chuyên nghiệp. Nhiệm vụ của bạn là dịch đối tượng JSON chứa bộ câu hỏi chẩn đoán bệnh từ tiếng Anh sang tiếng Việt.
+                            Yêu cầu bắt buộc:
+                            1. Sử dụng thuật ngữ y khoa chuẩn xác, ngắn gọn, dễ hiểu.
+                            2. Giữ nguyên 100% cấu trúc JSON gốc (không thay đổi 'id', 'type', 'extras', 'text', 'name', 'label').
+                            6. Chỉ trả về DUY NHẤT chuỗi JSON hợp lệ, tuyệt đối không bọc trong block code hay thêm bất kỳ văn bản nào khác.`;
+
+      const groq = await this.groqService
+        .groqInstance()
+        .chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: promptSystem,
+            },
+            {
+              role: 'user',
+              content: JSON.stringify(data.question),
+            },
+          ],
+          model: 'openai/gpt-oss-20b',
+          temperature: 0.1,
+          response_format: { type: 'json_object' },
+        });
+
+      const aiResponseString = groq.choices[0]?.message?.content || '{}';
+
+      let translatedQuestionObject;
+      try {
+        translatedQuestionObject = JSON.parse(aiResponseString);
+
+        if (Object.keys(translatedQuestionObject).length === 0) {
+          translatedQuestionObject = data.question;
+        }
+      } catch (e) {
+        translatedQuestionObject = data.question;
+      }
       return {
         code: 200,
         message: 'Thành công',
         status: 'success',
         data: {
           ...data,
-          question: data.question,
+          question: translatedQuestionObject,
           ...(interview_token && { interview_token: interview_token }),
           should_stop: isOverLimit || !data.question,
         },
