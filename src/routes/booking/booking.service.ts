@@ -803,6 +803,8 @@ export class BookingService {
         booking_id: rs.booking.booking_id,
         service_order_id: rs.serviceOrder.service_order_id,
         package_name: examPackage.package_name,
+        doctor: slot.shift.staff.full_name,
+        room: slot.shift.room.room_name,
         amount: packagePrice,
         payment: rs.paymentLink,
       },
