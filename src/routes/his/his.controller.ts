@@ -78,6 +78,7 @@ export class HisController {
   async receiveHisWebhook(@Body() dto: HisWebhookDto) {
     const result = await this.hisService.syncByCitizenIdFromWebhook(
       dto.citizen_id,
+      dto.data,
     );
 
     return {

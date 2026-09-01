@@ -102,6 +102,7 @@ export class HisService {
   async syncPatientExamFromHis(
     patientId: string,
     targetVisitSessionId?: string,
+    examDataOverride?: ExamHisData,
   ) {
     const patient = await this.prismaService.patient.findUnique({
       where: { patient_id: patientId },
@@ -120,9 +121,9 @@ export class HisService {
       return null;
     }
 
-    const hisExam = await this.fetchLatestExamFromHisByCitizenId(
-      patient.citizen_id,
-    );
+    const hisExam =
+      examDataOverride ||
+      (await this.fetchLatestExamFromHisByCitizenId(patient.citizen_id));
 
     if (!hisExam) {
       return null;
@@ -164,51 +165,50 @@ export class HisService {
     }
 
     const updatePayload: any = {};
-    if (hisExam.chief_complaint)
+    if (
+      hisExam.chief_complaint !== undefined &&
+      hisExam.chief_complaint !== null
+    )
       updatePayload.chief_complaint = hisExam.chief_complaint.trim();
     if (hisExam.heart_rate !== undefined && hisExam.heart_rate !== null)
-      updatePayload.heart_rate = hisExam.heart_rate;
+      updatePayload.heart_rate = Number(hisExam.heart_rate);
     if (
       hisExam.blood_pressure_sys !== undefined &&
       hisExam.blood_pressure_sys !== null
     )
-      updatePayload.blood_pressure_sys = hisExam.blood_pressure_sys;
+      updatePayload.blood_pressure_sys = Number(hisExam.blood_pressure_sys);
     if (
       hisExam.blood_pressure_dia !== undefined &&
       hisExam.blood_pressure_dia !== null
     )
-      updatePayload.blood_pressure_dia = hisExam.blood_pressure_dia;
+      updatePayload.blood_pressure_dia = Number(hisExam.blood_pressure_dia);
     if (hisExam.temperature !== undefined && hisExam.temperature !== null)
-      updatePayload.temperature = hisExam.temperature;
+      updatePayload.temperature = Number(hisExam.temperature);
     if (hisExam.spo2 !== undefined && hisExam.spo2 !== null)
-      updatePayload.spo2 = hisExam.spo2;
-    if (hisExam.diagnosis) updatePayload.diagnosis = hisExam.diagnosis.trim();
-    if (hisExam.final_diagnosis)
+      updatePayload.spo2 = Number(hisExam.spo2);
+    if (hisExam.diagnosis !== undefined && hisExam.diagnosis !== null)
+      updatePayload.diagnosis = hisExam.diagnosis.trim();
+    if (
+      hisExam.final_diagnosis !== undefined &&
+      hisExam.final_diagnosis !== null
+    )
       updatePayload.final_diagnosis = hisExam.final_diagnosis.trim();
-    if (hisExam.hpi) updatePayload.hpi = hisExam.hpi.trim();
-    if (hisExam.pmh) updatePayload.pmh = hisExam.pmh.trim();
-    if (hisExam.pe) updatePayload.pe = hisExam.pe;
+    if (hisExam.hpi !== undefined && hisExam.hpi !== null)
+      updatePayload.hpi = hisExam.hpi.trim();
+    if (hisExam.pmh !== undefined && hisExam.pmh !== null)
+      updatePayload.pmh = hisExam.pmh.trim();
+    if (hisExam.pe !== undefined && hisExam.pe !== null)
+      updatePayload.pe = hisExam.pe;
 
     if (visitSession) {
-      // Nếu là auto-sync và session hiện tại đã có dữ liệu khám riêng, chỉ bổ sung PMH nếu session chưa có
-      const isAutoSync = !targetVisitSessionId;
-      let finalUpdateData = updatePayload;
-
-      if (isAutoSync && (visitSession.chief_complaint || visitSession.hpi)) {
-        finalUpdateData = {};
-        if (hisExam.pmh && !visitSession.pmh) {
-          finalUpdateData.pmh = hisExam.pmh.trim();
-        }
-      }
-
-      if (Object.keys(finalUpdateData).length > 0) {
+      if (Object.keys(updatePayload).length > 0) {
         const updated = await this.prismaService.visit_Session.update({
           where: { visit_session_id: visitSession.visit_session_id },
-          data: finalUpdateData,
+          data: updatePayload,
         });
 
         this.logger.log(
-          `Đã đồng bộ bệnh án HIS thành công vào Visit_Session ${updated.visit_session_id} cho bệnh nhân ${patient.full_name} (${patient.citizen_id})`,
+          `Đã đồng bộ cập nhật bệnh án HIS thành công vào Visit_Session ${updated.visit_session_id} cho bệnh nhân ${patient.full_name} (${patient.citizen_id})`,
         );
         return updated;
       }
@@ -231,7 +231,10 @@ export class HisService {
     }
   }
 
-  async syncByCitizenIdFromWebhook(citizenId: string) {
+  async syncByCitizenIdFromWebhook(
+    citizenId: string,
+    hisData?: any,
+  ) {
     const patient = await this.prismaService.patient.findUnique({
       where: { citizen_id: citizenId },
     });
@@ -243,7 +246,11 @@ export class HisService {
       return null;
     }
 
-    return this.syncPatientExamFromHis(patient.patient_id);
+    return this.syncPatientExamFromHis(
+      patient.patient_id,
+      undefined,
+      hisData,
+    );
   }
 
   /**
