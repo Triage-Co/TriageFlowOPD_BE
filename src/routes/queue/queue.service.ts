@@ -41,6 +41,13 @@ const ACTIVE_SOD_STATUSES: ServiceOrderDetailStatusEnum[] = [
   ServiceOrderDetailStatusEnum.IN_PROGRESS,
 ];
 
+function toValidUuidOrNull(val?: string | null): string | null {
+  if (!val) return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val)
+    ? val
+    : null;
+}
+
 const SERVING_STEP_INCLUDE = {
   flow: {
     include: {
@@ -1314,7 +1321,7 @@ export class QueueService {
         data: {
           queue_id: queueId,
           action_type: 'MISSED',
-          actor_account_id: user.id,
+          actor_account_id: toValidUuidOrNull(user?.id),
         },
       });
 

@@ -130,6 +130,8 @@ export class QueueController {
   }
 
   @Post(':queueId/miss')
+  @UseGuards(IsAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đánh dấu bệnh nhân vắng mặt khi gọi (MISSING)' })
   @ApiResponse({ status: 200, description: 'Đã đánh dấu vắng mặt.' })
