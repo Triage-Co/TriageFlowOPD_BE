@@ -73,9 +73,9 @@ scratch
 scratch/*
 /scratch/
 
-/script
-script
-script/*
-/script/*
-*/script
-*/script/*
+/scripts
+scripts
+scripts/*
+/scripts/*
+*/scripts
+*/scripts/*
