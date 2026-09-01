@@ -3,11 +3,66 @@ import { PrismaService } from '../config/prisma.service';
 import {
   PaymentStatusEnum,
   Prisma,
-  RoleTypeEnum,
   Service_Order,
   ServiceOrderStatusEnum,
 } from '@prisma/client';
-import { IServiceOrderRepository } from '../interfaces/i-service-order.repository';
+import {
+  BookingBillingContext,
+  IServiceOrderRepository,
+  PatientBillingFilters,
+} from '../interfaces/i-service-order.repository';
+
+const BILLING_ORDER_INCLUDE = {
+  invoices: {
+    include: {
+      invoice_details: true,
+    },
+    orderBy: {
+      created_at: 'desc' as const,
+    },
+  },
+  transactions: {
+    orderBy: {
+      transDate: 'desc' as const,
+    },
+  },
+  serviceOrderDetails: {
+    include: {
+      service: {
+        select: {
+          service_code: true,
+          service_name: true,
+        },
+      },
+    },
+  },
+  prescription: {
+    select: {
+      prescription_id: true,
+      total_amount: true,
+      status: true,
+    },
+  },
+  booking: {
+    select: {
+      booking_id: true,
+      patient_id: true,
+      created_at: true,
+      visitSession: {
+        select: {
+          visit_session_id: true,
+          visit_date: true,
+        },
+      },
+      flow: {
+        select: {
+          flow_id: true,
+          ticket_code: true,
+        },
+      },
+    },
+  },
+} satisfies Prisma.Service_OrderInclude;
 
 @Injectable()
 export class PrismaServiceOrderRepository implements IServiceOrderRepository {
@@ -144,7 +199,7 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
     };
   }
 
-  async findById(id: string): Promise<any | null> {
+  async findById(id: string): Promise<any> {
     const rawData = await this.prismaService.service_Order.findUnique({
       where: {
         service_order_id: id,
@@ -239,5 +294,103 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
         created_at: 'desc',
       },
     });
+  }
+
+  async findBillingByPatientId(
+    patientId: string,
+    filters?: PatientBillingFilters,
+  ): Promise<any[]> {
+    const dateRange = this.toDateRange(filters?.from, filters?.to);
+
+    const bookingFilter: Prisma.BookingWhereInput = {
+      patient_id: patientId,
+      ...(dateRange
+        ? {
+            OR: [
+              { visitSession: { visit_date: dateRange } },
+              {
+                AND: [
+                  { visitSession: { is: null } },
+                  { created_at: dateRange },
+                ],
+              },
+            ],
+          }
+        : {}),
+    };
+
+    return this.prismaService.service_Order.findMany({
+      where: {
+        status: {
+          not: ServiceOrderStatusEnum.CANCELLED,
+        },
+        ...(filters?.paymentStatus
+          ? { payment_status: filters.paymentStatus }
+          : {}),
+        booking: bookingFilter,
+      },
+      include: BILLING_ORDER_INCLUDE,
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+  }
+
+  async findBillingByBookingId(
+    bookingId: string,
+  ): Promise<BookingBillingContext> {
+    const booking = await this.prismaService.booking.findUnique({
+      where: { booking_id: bookingId },
+      select: {
+        booking_id: true,
+        patient_id: true,
+        created_at: true,
+        visitSession: {
+          select: {
+            visit_session_id: true,
+            visit_date: true,
+          },
+        },
+        flow: {
+          select: {
+            flow_id: true,
+            ticket_code: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      return { booking: null, orders: [] };
+    }
+
+    const orders = await this.prismaService.service_Order.findMany({
+      where: {
+        booking_id: bookingId,
+        status: {
+          not: ServiceOrderStatusEnum.CANCELLED,
+        },
+      },
+      include: BILLING_ORDER_INCLUDE,
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    return { booking, orders };
+  }
+
+  private toDateRange(
+    from?: Date,
+    to?: Date,
+  ): Prisma.DateTimeFilter | undefined {
+    if (!from && !to) {
+      return undefined;
+    }
+
+    return {
+      ...(from ? { gte: from } : {}),
+      ...(to ? { lte: to } : {}),
+    };
   }
 }

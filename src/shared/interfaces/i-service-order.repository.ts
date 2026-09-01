@@ -1,4 +1,27 @@
-import { Prisma, Service_Order, Staff } from '@prisma/client';
+import { PaymentStatusEnum, Prisma, Service_Order } from '@prisma/client';
+
+export type PatientBillingFilters = {
+  from?: Date;
+  to?: Date;
+  paymentStatus?: PaymentStatusEnum;
+};
+
+export type BookingBillingContext = {
+  booking: {
+    booking_id: string;
+    patient_id: string;
+    created_at: Date;
+    visitSession: {
+      visit_session_id: string;
+      visit_date: Date;
+    } | null;
+    flow: {
+      flow_id: string;
+      ticket_code: string | null;
+    } | null;
+  } | null;
+  orders: any[];
+};
 
 export interface IServiceOrderRepository {
   create(
@@ -22,8 +45,13 @@ export interface IServiceOrderRepository {
       totalPages: number;
     };
   }>;
-  findById(id: string): Promise<any | null>;
+  findById(id: string): Promise<any>;
   delete(id: string, tx?: Prisma.TransactionClient): Promise<Service_Order>;
   findPendingByPatientId(patientId: string): Promise<any[]>;
   findOrderServiceByBookingId(booking_id: string): Promise<any[]>;
+  findBillingByPatientId(
+    patientId: string,
+    filters?: PatientBillingFilters,
+  ): Promise<any[]>;
+  findBillingByBookingId(bookingId: string): Promise<BookingBillingContext>;
 }
