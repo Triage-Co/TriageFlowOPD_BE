@@ -29,6 +29,7 @@ import { PrismaQueueRepository } from './repositories/prisma-queue.repository';
 import { PrismaInvoiceRepository } from './repositories/prisma-invoice.repository';
 import { PrismaInvoiceDetailRepository } from './repositories/prisma-invoice-detail.repository';
 import { PrismaRoomServiceRepository } from './repositories/prisma.room-service.repository';
+import { GroqService } from './config/groq.service';
 
 @Global()
 @Module({
@@ -39,6 +40,7 @@ import { PrismaRoomServiceRepository } from './repositories/prisma.room-service.
     SupabaseService,
     PrismaService,
     PayosService,
+    GroqService,
     GeoService,
     {
       provide: 'IAuthProvider',
@@ -138,6 +140,7 @@ import { PrismaRoomServiceRepository } from './repositories/prisma.room-service.
     PrismaService,
     PayosService,
     GeoService,
+    GroqService,
     'IAuthProvider',
     'IAccountRepository',
     'IPatientRepository',

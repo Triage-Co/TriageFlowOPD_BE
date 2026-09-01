@@ -44,6 +44,8 @@ import { ExamPackageModule } from './routes/exam-package/exam-package.module';
 import { AdminDashboardModule } from './routes/admin-dashboard/admin-dashboard.module';
 import { DisplayScreenModule } from './routes/display-screen/display-screen.module';
 
+import { HisModule } from './routes/his/his.module';
+
 @Module({
   imports: [
     CacheModule.registerAsync({
@@ -116,6 +118,7 @@ import { DisplayScreenModule } from './routes/display-screen/display-screen.modu
     ExamPackageModule,
     AdminDashboardModule,
     DisplayScreenModule,
+    HisModule,
   ],
 })
 export class AppModule {}

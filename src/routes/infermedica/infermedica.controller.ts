@@ -216,11 +216,11 @@ export class InfermedicaController {
           {
             id: 's_3055',
             choice_id: 'present',
-            name: 'Diagnosed diabetes'
-          }
-        ]
-      }
-    }
+            name: 'Diagnosed diabetes',
+          },
+        ],
+      },
+    },
   })
   diagnoise(
     @Body() triageDto: TriageDto,
@@ -273,11 +273,11 @@ export class InfermedicaController {
           {
             id: 's_3055',
             choice_id: 'present',
-            name: 'Diagnosed diabetes'
-          }
-        ]
-      }
-    }
+            name: 'Diagnosed diabetes',
+          },
+        ],
+      },
+    },
   })
   @Post('/triage')
   triage(@Body() triageDto: TriageDto) {
@@ -294,7 +294,7 @@ export class InfermedicaController {
           specialty_id: '123-abc',
           specialty_code: 'sp_22',
           name: 'Diabetologist',
-          best_slot_id: 'slot-456-def'
+          best_slot_id: 'slot-456-def',
         },
         recommended_channel: 'personal_visit',
       },
@@ -310,11 +310,11 @@ export class InfermedicaController {
           {
             id: 's_3055',
             choice_id: 'present',
-            name: 'Diagnosed diabetes'
-          }
-        ]
-      }
-    }
+            name: 'Diagnosed diabetes',
+          },
+        ],
+      },
+    },
   })
   @Post('/recommend_specialist')
   recommendSpecialist(
@@ -385,10 +385,10 @@ export class InfermedicaController {
         message: 'Thành công',
         status: 'success',
         data: {
-          number_of_diagnosis: 5
-        }
-      }
-    }
+          number_of_diagnosis: 5,
+        },
+      },
+    },
   })
   getQuestionLimit() {
     return this.infermedicaService.getQuestionLimit();
@@ -404,9 +404,9 @@ export class InfermedicaController {
   @ApiBody({
     schema: {
       example: {
-        number_of_diagnosis: 5
-      }
-    }
+        number_of_diagnosis: 5,
+      },
+    },
   })
   @ApiOkResponse({
     schema: {
@@ -415,10 +415,10 @@ export class InfermedicaController {
         message: 'Thành công',
         status: 'success',
         data: {
-          number_of_diagnosis: 5
-        }
-      }
-    }
+          number_of_diagnosis: 5,
+        },
+      },
+    },
   })
   updateQuestionLimit(@Body() dto: UpdateQuestionLimitDto) {
     return this.infermedicaService.updateQuestionLimit(dto);
