@@ -1,4 +1,4 @@
-import { IsString, validateSync } from 'class-validator';
+import { IsOptional, IsString, validateSync } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { config } from 'dotenv';
 config();
@@ -38,6 +38,11 @@ class EnvClass {
   CRON_SECRET: string;
   @IsString({ message: 'Thiếu SUPABASE_JWKS_URL TRONG FILE .ENV' })
   SUPABASE_JWKS_URL: string;
+  @IsString({ message: 'Thiếu GROQ_API_KEY TRONG FILE .ENV' })
+  GROQ_API_KEY: string;
+  @IsOptional()
+  @IsString()
+  HIS_BASE_URL: string = 'http://localhost:3002';
 }
 
 const envInstance = plainToInstance(EnvClass, process.env);

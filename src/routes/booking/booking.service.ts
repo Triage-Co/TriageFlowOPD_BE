@@ -233,6 +233,8 @@ export class BookingService {
         step_id: rs.step.step_id,
         booking_id: rs.booking.booking_id,
         ticket_code: rs.flow.ticket_code,
+        doctor: slot.shift.staff.full_name,
+        room: slot.shift.room.room_name,
         payment: rs.paymentLink,
       },
     };
@@ -537,10 +539,19 @@ export class BookingService {
             where: { booking_id: bookingId },
           });
         if (!existingSession) {
+          const prevWithPmh = await this.prismaService.visit_Session.findFirst({
+            where: {
+              patient_id: patientId,
+              pmh: { not: null },
+            },
+            orderBy: { visit_date: 'desc' },
+          });
+
           await this.prismaService.visit_Session.create({
             data: {
               patient_id: patientId,
               booking_id: bookingId,
+              pmh: prevWithPmh?.pmh ? prevWithPmh.pmh.trim() : null,
             },
           });
         }
