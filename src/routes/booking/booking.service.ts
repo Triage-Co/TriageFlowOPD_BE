@@ -537,10 +537,20 @@ export class BookingService {
             where: { booking_id: bookingId },
           });
         if (!existingSession) {
+          const prevWithPmh =
+            await this.prismaService.visit_Session.findFirst({
+              where: {
+                patient_id: patientId,
+                pmh: { not: null },
+              },
+              orderBy: { visit_date: 'desc' },
+            });
+
           await this.prismaService.visit_Session.create({
             data: {
               patient_id: patientId,
               booking_id: bookingId,
+              pmh: prevWithPmh?.pmh ? prevWithPmh.pmh.trim() : null,
             },
           });
         }

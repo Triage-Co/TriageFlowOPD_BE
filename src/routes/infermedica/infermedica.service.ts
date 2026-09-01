@@ -147,6 +147,8 @@ export class InfermedicaService {
         }),
       );
 
+      console.log(currentTurn);
+      console.log(numberOfDiagnoses);
       const isOverLimit = currentTurn >= numberOfDiagnoses;
       await this.cacheManager.set(cacheKey, currentTurn + 1, 3600000);
 
@@ -290,41 +292,52 @@ export class InfermedicaService {
           interview_token: finalToken,
         },
       });
-      const promptSystem = `Bạn là một chuyên gia y tế kiêm dịch giả chuyên nghiệp. Nhiệm vụ của bạn là dịch đối tượng JSON chứa bộ câu hỏi chẩn đoán bệnh từ tiếng Anh sang tiếng Việt.
-                            Yêu cầu bắt buộc:
-                            1. Sử dụng thuật ngữ y khoa chuẩn xác, ngắn gọn, dễ hiểu.
-                            2. Giữ nguyên 100% cấu trúc JSON gốc (không thay đổi 'id', 'type', 'extras', 'text', 'name', 'label').
-                            6. Chỉ trả về DUY NHẤT chuỗi JSON hợp lệ, tuyệt đối không bọc trong block code hay thêm bất kỳ văn bản nào khác.`;
+      let translatedQuestionObject = data.question;
 
-      const groq = await this.groqService
-        .groqInstance()
-        .chat.completions.create({
-          messages: [
-            {
-              role: 'system',
-              content: promptSystem,
-            },
-            {
-              role: 'user',
-              content: JSON.stringify(data.question),
-            },
-          ],
-          model: 'openai/gpt-oss-20b',
-          temperature: 0.1,
-          response_format: { type: 'json_object' },
-        });
+      if (data.question) {
+        const promptSystem = `Bạn là một bác sĩ chuyên khoa và dịch giả y khoa chuyên nghiệp. Nhiệm vụ của bạn là dịch đối tượng JSON chứa bộ câu hỏi chẩn đoán bệnh từ tiếng Anh sang tiếng Việt.
 
-      const aiResponseString = groq.choices[0]?.message?.content || '{}';
+Yêu cầu bắt buộc về chuyên môn dịch thuật:
+1. Văn phong y khoa tự nhiên: Dịch thoát ý, tự nhiên và phù hợp với cách bác sĩ Việt Nam hỏi bệnh nhân. TUYỆT ĐỐI KHÔNG dịch rập khuôn từng từ.
+2. Xử lý mức độ (Severity): Các câu hỏi về "How severe..." phải dịch là "Mức độ... như thế nào?". Các mức độ "Mild / Moderate / Severe" dịch tương ứng là "Nhẹ / Vừa / Nặng".
+3. Xử lý câu hỏi tiền sử bệnh: Các câu hỏi về việc đã từng mắc bệnh (như "Have you been diagnosed with...") phải ưu tiên dùng cụm từ "có tiền sử". Ví dụ: "Bạn có tiền sử tăng huyết áp không?". Ưu tiên dùng thuật ngữ y khoa chuẩn (Ví dụ: dùng "tăng huyết áp" thay cho "cao huyết áp", "đái tháo đường" thay cho "tiểu đường").
 
-      let translatedQuestionObject;
-      try {
-        translatedQuestionObject = JSON.parse(aiResponseString);
+Yêu cầu bắt buộc về cấu trúc JSON:
+4. Giữ nguyên 100% cấu trúc JSON gốc (không thay đổi 'id', 'type', 'extras', 'text', 'name', 'label').
+8. Chỉ trả về DUY NHẤT một chuỗi JSON hợp lệ, không bọc trong markdown và không giải thích thêm.`;
 
-        if (Object.keys(translatedQuestionObject).length === 0) {
+        try {
+          const groq = await this.groqService
+            .groqInstance()
+            .chat.completions.create({
+              messages: [
+                {
+                  role: 'system',
+                  content: promptSystem,
+                },
+                {
+                  role: 'user',
+                  content: JSON.stringify(data.question),
+                },
+              ],
+              model: 'openai/gpt-oss-20b',
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            });
+
+          const aiResponseString = groq.choices[0]?.message?.content || '{}';
+          const parsed = JSON.parse(aiResponseString);
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            Object.keys(parsed).length > 0
+          ) {
+            translatedQuestionObject = parsed;
+          }
+        } catch (aiError) {
+          console.error('Lỗi khi dịch câu hỏi qua Groq AI:', aiError);
           translatedQuestionObject = data.question;
         }
-      } catch (e) {
-        translatedQuestionObject = data.question;
       }
       return {
         code: 200,
@@ -500,6 +513,8 @@ export class InfermedicaService {
           params: {
             'age.value': Number(searchDto.age),
             phrase: searchDto.phrase,
+            include_pro: false,
+            types: 'symptom',
             max_results: 999,
           },
         }),
