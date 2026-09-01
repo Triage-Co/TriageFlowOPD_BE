@@ -225,6 +225,14 @@ export class BookingService {
       return { serviceOrder, step, booking, paymentLink, flow };
     });
 
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+          new Date(slot.shift.date),
+          'Asia/Ho_Chi_Minh',
+          'yyyy-MM-dd',
+        )
+      : null;
+
     return {
       code: 200,
       message: 'tạo lịch thành công',
@@ -235,6 +243,9 @@ export class BookingService {
         ticket_code: rs.flow.ticket_code,
         doctor: slot.shift.staff.full_name,
         room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
         payment: rs.paymentLink,
       },
     };
@@ -394,6 +405,14 @@ export class BookingService {
 
     const generateResult = await this.generateNumber(rs.step.step_id);
 
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+          new Date(slot.shift.date),
+          'Asia/Ho_Chi_Minh',
+          'yyyy-MM-dd',
+        )
+      : null;
+
     return {
       code: 200,
       message: 'Tạo lịch, thanh toán và lấy số khám thành công',
@@ -402,6 +421,11 @@ export class BookingService {
         step_id: rs.step.step_id,
         booking_id: rs.booking.booking_id,
         ticket_code: rs.flow.ticket_code,
+        doctor: slot.shift.staff.full_name,
+        room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
         queue: generateResult.data.queue,
       },
     };
@@ -794,6 +818,14 @@ export class BookingService {
       return { booking, serviceOrder, paymentLink };
     });
 
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+          new Date(slot.shift.date),
+          'Asia/Ho_Chi_Minh',
+          'yyyy-MM-dd',
+        )
+      : null;
+
     return {
       code: 200,
       message:
@@ -805,6 +837,9 @@ export class BookingService {
         package_name: examPackage.package_name,
         doctor: slot.shift.staff.full_name,
         room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
         amount: packagePrice,
         payment: rs.paymentLink,
       },
