@@ -8,12 +8,39 @@ export class CreateBookingRequestDto {
     example: '4d70c7b0-5b61-4e51-923d-401d14d6c441',
   })
   patient_id: string;
+
   @IsUUID('all', { message: 'ID slot khám phải là một UUID hợp lệ' })
   @ApiProperty({
     name: 'slot_id',
     example: '0135e4ec-01df-41f5-8a26-428e759c7cc6',
   })
   slot_id: string;
+}
+
+export class CreateBookingCashPackageDto {
+  @IsUUID('all', { message: 'ID bệnh nhân phải là một UUID hợp lệ' })
+  @ApiProperty({
+    name: 'patient_id',
+    example: '4d70c7b0-5b61-4e51-923d-401d14d6c441',
+    description: 'ID của bệnh nhân',
+  })
+  patient_id: string;
+
+  @IsUUID('all', { message: 'ID slot khám phải là một UUID hợp lệ' })
+  @ApiProperty({
+    name: 'slot_id',
+    example: '0135e4ec-01df-41f5-8a26-428e759c7cc6',
+    description: 'ID slot khám',
+  })
+  slot_id: string;
+
+  @IsUUID('all', { message: 'ID gói khám phải là một UUID hợp lệ' })
+  @ApiProperty({
+    name: 'package_id',
+    example: '0135e4ec-01df-41f5-8a26-428e759c7cc6',
+    description: 'ID của Exam_Package (gói khám)',
+  })
+  package_id: string;
 }
 
 export class UpdateBookingRequestDto extends PartialType(

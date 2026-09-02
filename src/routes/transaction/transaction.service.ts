@@ -54,13 +54,14 @@ export class TransactionService {
     try {
       const db = tx || this.prismaService;
       const orderCode = parseInt(
+        
         `${Date.now().toString().slice(-3)}${randomInt(10, 999)}`,
       );
 
       const paymentLink = await this.payosClient.paymentRequests.create({
         orderCode: orderCode,
         amount: createTransactionRequestDto.amount,
-        description: 'Thanh toán',
+        description: 'Thanh toan',
         returnUrl: createTransactionRequestDto.returnUrl,
         cancelUrl: createTransactionRequestDto.cancelUrl,
       });
@@ -77,7 +78,7 @@ export class TransactionService {
 
       return {
         code: 200,
-        message: 'Lấy lin thanh toán thành công',
+        message: 'Lấy link thanh toán thành công',
         status: 'success',
         data: paymentLink,
       };

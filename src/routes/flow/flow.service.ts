@@ -11,6 +11,8 @@ import { ClinicalRoomType, StepTypeEnum } from '@prisma/client';
 import type { IServiceOrderDetailRepository } from '../../shared/interfaces/i-service-order-detail.repository';
 import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
 import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
+import { format } from 'date-fns';
+import { randomInt } from 'crypto';
 // import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
@@ -27,6 +29,12 @@ export class FlowService {
   ) {}
 
   private roundRobinTracker = new Map<string, number>();
+
+  private generateTicketCode(): string {
+    const dateStr = format(new Date(), 'yyyyMMdd');
+    const randomNum = randomInt(1000, 9999);
+    return `V-${dateStr}-${randomNum}`;
+  }
 
   async findAllByPatientId(patient_id: string) {
     const data = await this.flowRepository.findAllByPatientId(patient_id);
@@ -136,10 +144,12 @@ export class FlowService {
       };
     }
 
+    const ticketCode = this.generateTicketCode();
     const newFlow = await this.prismaService.flow.create({
       data: {
         booking_id: serviceOrder.booking_id,
-        status: 'PENDING',
+        status: 'IN_PROGRESS',
+        ticket_code: ticketCode,
       },
     });
 
@@ -347,7 +357,7 @@ export class FlowService {
               step.room_type,
             );
 
-            const availableRooms = await tx.room.findMany({
+            let availableRooms = await tx.room.findMany({
               where: {
                 room_type: step.room_type,
                 ...(neededSpecialFilter && { specialty_id: specialtyId }),
@@ -373,15 +383,30 @@ export class FlowService {
             });
 
             if (availableRooms.length === 0) {
-              if (step.room_type === 'CASHIER') {
-                // Cho phép CASHIER không cần gán phòng/nhân viên cụ thể ngay lập tức
+              const fallbackRooms = await tx.room.findMany({
+                where: {
+                  room_type: step.room_type,
+                  ...(neededSpecialFilter && { specialty_id: specialtyId }),
+                },
+                include: {
+                  shifts: {
+                    include: {
+                      slots: true,
+                    },
+                  },
+                },
+              });
+
+              if (fallbackRooms.length > 0) {
+                availableRooms = fallbackRooms;
+              } else if (step.room_type === 'CASHIER') {
                 availableRooms.push({
                   room_id: null,
                   shifts: [{ staff_id: null }],
                 } as any);
               } else {
                 throw new Error(
-                  `Không có phòng nào trống cho dịch vụ: ${step.room_type}`,
+                  `Không tìm thấy phòng nào trong hệ thống cho dịch vụ: ${step.room_type}`,
                 );
               }
             }
@@ -402,13 +427,18 @@ export class FlowService {
               currentServiceOrderId = (step as any).service_order_id;
             }
 
+            const staffId =
+              selectedRoom.shifts && selectedRoom.shifts.length > 0
+                ? selectedRoom.shifts[0].staff_id
+                : null;
+
             const createdStep = await tx.step.create({
               data: {
                 flow_id: flowId,
                 step_status: 'PENDING',
                 step_name: step.step_name,
                 room_id: selectedRoom.room_id,
-                staff_id: selectedRoom.shifts[0].staff_id,
+                staff_id: staffId,
                 parent_step_id: parentStepId,
                 service_code: step.service_code,
                 service_order_id: currentServiceOrderId,

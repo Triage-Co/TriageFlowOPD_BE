@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   BookingSpecialtyDto,
+  CreateBookingCashPackageDto,
   CreateBookingRequestDto,
   CreateBookingWithPackageDto,
 } from './dto/request-booking.dto';
@@ -90,7 +91,7 @@ export class BookingService {
     private readonly roomServiceRepository: IRoomServiceRepository,
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
-  ) {}
+  ) { }
 
   private generateTicketCode(): string {
     const dateStr = format(new Date(), 'yyyyMMdd');
@@ -203,7 +204,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
+          'Lỗi tạo giao dịch thanh toán',
         );
       }
 
@@ -234,6 +235,14 @@ export class BookingService {
       return { serviceOrder, step, booking, paymentLink, flow };
     });
 
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
+      : null;
+
     return {
       code: 200,
       message: 'tạo lịch thành công',
@@ -244,6 +253,9 @@ export class BookingService {
         ticket_code: rs.flow.ticket_code,
         doctor: slot.shift.staff.full_name,
         room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
         payment: rs.paymentLink,
       },
     };
@@ -403,6 +415,14 @@ export class BookingService {
 
     const generateResult = await this.generateNumber(rs.step.step_id);
 
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
+      : null;
+
     return {
       code: 200,
       message: 'Tạo lịch, thanh toán và lấy số khám thành công',
@@ -411,7 +431,186 @@ export class BookingService {
         step_id: rs.step.step_id,
         booking_id: rs.booking.booking_id,
         ticket_code: rs.flow.ticket_code,
+        doctor: slot.shift.staff.full_name,
+        room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
         queue: generateResult.data.queue,
+      },
+    };
+  }
+
+  async createCashBookingWithPackage(dto: CreateBookingCashPackageDto) {
+    const { patient_id, slot_id, package_id } = dto;
+
+    const [patient, slot, examPackage] = await Promise.all([
+      this.patientRepository.findOne(patient_id),
+      this.SlotRepository.findAvailableBySlotId(slot_id),
+      this.prismaService.exam_Package.findUnique({
+        where: { package_id },
+      }),
+    ]);
+
+    if (!patient) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy bệnh nhân',
+        detail: `Không tìm thấy bệnh nhân với id ${patient_id}`,
+      });
+    }
+
+    if (!slot) {
+      throw SlotErrors.NotFoundAvailableSlot(slot_id);
+    }
+
+    if (!examPackage) {
+      throw new NotFoundException({
+        message: 'Không tìm thấy gói khám',
+        detail: `Không tìm thấy gói khám với id ${package_id}`,
+      });
+    }
+
+    const flowInProgress = await this.flowRepository.findIsActiveByDate(
+      patient_id,
+      slot.shift.date,
+    );
+
+    if (flowInProgress.length > 0) {
+      throw new BadRequestException({
+        message: 'Bệnh nhân đã đặt khám trong ngày hôm này',
+        detail: `Bệnh nhân với id ${patient_id} đang có lịch khám trong ngày hôm nay`,
+      });
+    }
+
+    const packagePrice = examPackage.price || 0;
+
+    const rs = await this.prismaService.$transaction(async (tx) => {
+      const booking = await this.bookingRepository.create(
+        { patient_id, slot_id },
+        tx,
+      );
+
+      if (slot.capacity <= 0) {
+        throw SlotErrors.SlotFullError();
+      }
+
+      await this.SlotRepository.update(
+        slot_id,
+        { capacity: { decrement: 1 } },
+        tx,
+      );
+
+      const serviceOrder = await tx.service_Order.create({
+        data: {
+          booking_id: booking.booking_id,
+          name: `Thanh toán gói: ${examPackage.package_name}`,
+          status: 'PENDING',
+          payment_status: 'PENDING',
+          package_id: package_id,
+        },
+      });
+
+      const invoice = await tx.invoice.create({
+        data: {
+          service_order_id: serviceOrder.service_order_id,
+          status: 'PENDING',
+          total_amount: packagePrice,
+        },
+      });
+
+      await tx.invoice_Detail.create({
+        data: {
+          invoice_id: invoice.invoice_id,
+          item_name: examPackage.package_name,
+          quantity: 1,
+          unit_price: packagePrice,
+          sub_total: packagePrice,
+        },
+      });
+
+      if (patient.account_id) {
+        await this.notificationRepository.create(
+          {
+            account_id: patient.account_id,
+            message: `Bạn đã đặt lịch và thanh toán gói khám ${examPackage.package_name} thành công.`,
+          },
+          tx,
+        );
+      }
+
+      if (slot.shift?.staff_id) {
+        await this.notificationRepository.create(
+          {
+            account_id: slot.shift.staff_id,
+            message: `Có bệnh nhân mới đặt lịch gói ${examPackage.package_name} lúc ${slot.start_time} - ${slot.end_time}.`,
+          },
+          tx,
+        );
+      }
+
+      return { booking, serviceOrder };
+    });
+
+    const payResult = await this.transactionService.payCash({
+      service_order_id: rs.serviceOrder.service_order_id,
+    });
+
+    const createdFlow = await this.prismaService.flow.findUnique({
+      where: { booking_id: rs.booking.booking_id },
+      include: {
+        steps: {
+          include: {
+            room: true,
+            queues: true,
+          },
+        },
+      },
+    });
+
+    let primaryQueue: any = null;
+    let primaryStepId: string | null = null;
+    if (createdFlow?.steps) {
+      for (const step of createdFlow.steps) {
+        const activeQueue = (step.queues || []).find(
+          (q) =>
+            q.status !== QueueStatusEnum.FINISHED &&
+            q.status !== QueueStatusEnum.CANCELLED,
+        );
+        if (activeQueue) {
+          primaryQueue = activeQueue;
+          primaryStepId = step.step_id;
+          break;
+        }
+      }
+    }
+
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
+      : null;
+
+    return {
+      code: 200,
+      message:
+        'Đặt lịch gói khám, thanh toán tiền mặt và lấy số thứ tự thành công',
+      status: 'success',
+      data: {
+        step_id: primaryStepId,
+        booking_id: rs.booking.booking_id,
+        service_order_id: rs.serviceOrder.service_order_id,
+        package_name: examPackage.package_name,
+        ticket_code: createdFlow?.ticket_code || null,
+        doctor: slot.shift.staff.full_name,
+        room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        amount: packagePrice,
+        queue: primaryQueue,
+        flow: (payResult as any)?.data?.flow || createdFlow,
       },
     };
   }
@@ -464,11 +663,42 @@ export class BookingService {
     if (bookingId && patientId) {
       await this.ensureVisitSessionForBooking(bookingId, patientId);
     }
+    // Kiểm tra xem đã có queue nào đang active trong flow chưa
+    if (step.flow_id) {
+      const allFlowSteps = await this.prismaService.step.findMany({
+        where: { flow_id: step.flow_id },
+        include: { room: true, queues: true },
+      });
+
+      for (const s of allFlowSteps) {
+        const activeQueue = (s.queues || []).find(
+          (q) =>
+            q.status !== QueueStatusEnum.FINISHED &&
+            q.status !== QueueStatusEnum.CANCELLED,
+        );
+        if (activeQueue && activeQueue.room_id) {
+          return {
+            code: 200,
+            message: 'Bạn đã có số khám bệnh',
+            status: 'success',
+            data: {
+              slot: slot,
+              room: s.room,
+              specialty: s.room?.specialty_id,
+              queue: activeQueue,
+            },
+          };
+        }
+      }
+    }
 
     let stepKhamBenh = await this.prismaService.step.findFirst({
       where: {
         flow_id: step.flow_id,
-        step_name: 'Khám chuyên khoa',
+        OR: [
+          { step_name: 'Khám chuyên khoa' },
+          { step_type: StepTypeEnum.CLINICAL },
+        ],
       },
       include: {
         room: true,
@@ -839,7 +1069,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
+          'Lỗi tạo giao dịch thanh toán',
         );
       }
 
@@ -871,6 +1101,14 @@ export class BookingService {
       return { booking, serviceOrder, paymentLink };
     });
 
+    const appointmentDate = slot.shift?.date
+      ? formatInTimeZone(
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
+      : null;
+
     return {
       code: 200,
       message:
@@ -882,6 +1120,9 @@ export class BookingService {
         package_name: examPackage.package_name,
         doctor: slot.shift.staff.full_name,
         room: slot.shift.room.room_name,
+        date: appointmentDate,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
         amount: packagePrice,
         payment: rs.paymentLink,
       },
