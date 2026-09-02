@@ -496,13 +496,15 @@ export class QueueService {
 
     if (steps.length === 0) return;
 
-    // Skip if any clinical step is pharmacy room
-    if (steps.some((s) => s.room?.room_type === ClinicalRoomType.PHARMACY)) {
-      return;
-    }
+    // Lọc ra các bước khám lâm sàng / cận lâm sàng (bỏ qua bước cấp thuốc nhà thuốc)
+    const clinicalSteps = steps.filter(
+      (s) => s.room?.room_type !== ClinicalRoomType.PHARMACY,
+    );
+
+    if (clinicalSteps.length === 0) return;
 
     // Idempotent: if any step of this SO already has an active queue, do not create another
-    for (const step of steps) {
+    for (const step of clinicalSteps) {
       const activeQueue = (step.queues || []).find(
         (q) =>
           q.status !== QueueStatusEnum.FINISHED &&
@@ -522,7 +524,12 @@ export class QueueService {
       }
     }
 
-    const primary = steps.find((s) => !!s.room_id);
+    // Ưu tiên chọn bước đang IN_PROGRESS hoặc bước đầu tiên có phòng
+    const primary =
+      clinicalSteps.find(
+        (s) => s.step_status === StepStatusEnum.IN_PROGRESS && !!s.room_id,
+      ) || clinicalSteps.find((s) => !!s.room_id);
+
     if (!primary) return;
 
     const hasBooking = Boolean(primary.flow?.booking?.slot_id);
