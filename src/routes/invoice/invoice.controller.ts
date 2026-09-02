@@ -33,7 +33,7 @@ export class InvoiceController {
   }
 
   @Get('patient/:patient_id/booking/:booking_id')
-  @UseGuards(IsAuthGuard)
+  @UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[USER / STAFF] Chi tiết hóa đơn theo lần khám',
