@@ -61,14 +61,21 @@ export class InfermedicaService {
 
       // Bước 1: Dịch câu hỏi/mô tả triệu chứng của người dùng (tiếng Việt -> tiếng Anh) cho Infermedica /parse
       if (parseDto.question && parseDto.question.trim().length > 0) {
-        const promptTranslateToEn = `You are a professional medical translator. Your task is to translate the patient's symptom description from Vietnamese (or any input language) into natural, clear English for medical NLP parsing.
+        const promptTranslateToEn = `You are an expert medical translator specializing in converting Vietnamese patient clinical complaints (including unaccented text, typing shortcuts, typos, and colloquial expressions) into concise, accurate English medical text for NLP parsing (Infermedica).
 
-GUIDELINES:
-1. Translate accurately into clear clinical English sentences.
-2. STRICTLY preserve all reported symptoms, locations, onset, duration, and severity.
-3. STRICTLY preserve all negations (e.g., "không sốt" -> "no fever", "không ho" -> "no coughing", "không đau ngực" -> "no chest pain").
-4. Do NOT add any symptoms, diagnoses, or assumptions not explicitly mentioned.
-5. Return ONLY the translated English text as plain text. Do NOT include explanations, greetings, quotes, or markdown formatting.`;
+CORE PRINCIPLES:
+1. DIACRITICS & TYPO RESTORATION (Tiếng Việt không dấu & gõ tắt):
+   Patients frequently type quickly without tone marks or with abbreviations. Dynamically restore the clinical meaning based on medical context:
+   - "dau" + [body part] means "đau" (pain/ache in that anatomical area), e.g., "dau chan" = leg pain, "dau tay" = arm pain, "dau bung" = abdominal pain, "dau lung" = back pain, "dau hong" = sore throat. Only "dau dau" / "nhuc dau" means headache.
+   - "moi" means "mỏi" (fatigue / tiredness / soreness), e.g., "moi co" = muscle fatigue / soreness, "moi vai gay" = neck/shoulder stiffness.
+   - Typo shortcuts: "ti bi" / "toi bi" / "e bi" = "tôi bị" (I have / suffering from), "ko" / "k" = "không" (no / not).
+   - Other common complaints: "sot" (fever), "kho tho" (shortness of breath), "chong mat" (dizziness), "buon non" (nausea), "tieu chay" (diarrhea), "mat ngu" (insomnia).
+2. DURATION & SEVERITY:
+   Strictly preserve timeframes and durations (e.g., "10 ngay" -> "for 10 days", "tu sang" -> "since morning", "2 tuan" -> "for 2 weeks").
+3. NEGATIONS:
+   Strictly preserve negations (e.g., "khong sot" / "không sốt" -> "no fever", "k ho" -> "no cough").
+4. CLEAN OUTPUT:
+   Return ONLY the translated English symptom statement. No quotes, explanations, or formatting.`;
 
         try {
           const groqEn = await this.groqService
@@ -84,7 +91,7 @@ GUIDELINES:
                   content: parseDto.question,
                 },
               ],
-              model: 'openai/gpt-oss-20b',
+              model: 'qwen/qwen3.8-27b',
               temperature: 0.1,
             });
 
@@ -128,9 +135,9 @@ GUIDELINES:
         const promptTranslateToVi = `Bạn là một bác sĩ chuyên khoa giàu kinh nghiệm và là một dịch giả y khoa chuyên nghiệp. Nhiệm vụ của bạn là dịch toàn bộ dữ liệu phản hồi (Response JSON) từ API phân tích triệu chứng y khoa (Infermedica /parse) từ tiếng Anh sang tiếng Việt.
 
 PHẠM VI DỊCH THUẬT (Chỉ dịch giá trị của các trường sau trong mảng "mentions"):
-1. \`name\`: Tên y khoa chuẩn xác của triệu chứng hoặc yếu tố nguy cơ (ví dụ: "Abdominal pain" -> "Đau bụng", "Headache" -> "Đau đầu", "Fever" -> "Sốt", "Diagnosed diabetes" -> "Đã chẩn đoán đái tháo đường").
-2. \`common_name\`: Tên gọi thông thường, phổ biến và dễ hiểu cho người bệnh (ví dụ: "sore throat" -> "đau họng").
-3. \`orth\`: Cụm từ triệu chứng tương ứng với ngữ cảnh người bệnh mô tả.
+1. \`name\`: Tên y khoa chuẩn xác của triệu chứng hoặc yếu tố nguy cơ (ví dụ: "Pain in lower limb" -> "Đau chi dưới", "Muscle weakness" -> "Yếu mỏi cơ", "Abdominal pain" -> "Đau bụng", "Headache" -> "Đau đầu", "Fever" -> "Sốt", "Diagnosed diabetes" -> "Đã chẩn đoán đái tháo đường").
+2. \`common_name\`: Tên gọi thông thường, phổ biến và dễ hiểu cho người bệnh (ví dụ: "Pain in lower limb" -> "Đau chân", "Weak muscles" -> "Mỏi cơ / Yếu cơ", "sore throat" -> "đau họng").
+3. \`orth\`: Cụm từ triệu chứng tương ứng với ngữ cảnh người bệnh mô tả (ví dụ: "leg pain" -> "đau chân", "muscle fatigue for 10 days" -> "mỏi cơ trong 10 ngày").
 
 YÊU CẦU CHUYÊN MÔN Y KHOA (BẮT BUỘC):
 1. Từ vựng chuẩn y khoa Việt Nam:
@@ -144,7 +151,7 @@ YÊU CẦU CHUYÊN MÔN Y KHOA (BẮT BUỘC):
 QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
 1. BẢO TOÀN TẤT CẢ KEYS: Không được đổi tên bất kỳ key nào trong JSON (giữ nguyên 'mentions', 'id', 'orth', 'choice_id', 'name', 'common_name', 'type', 'obvious'...).
 2. BẢO TOÀN TẤT CẢ IDs & ENUMS: TUYỆT ĐỐI KHÔNG ĐƯỢC DỊCH các giá trị định danh và cờ hệ thống:
-   - Giữ nguyên \`id\` (ví dụ: "s_13", "s_102", "p_8"...).
+   - Giữ nguyên \`id\` (ví dụ: "s_13", "s_102", "p_8", "s_650"...).
    - Giữ nguyên \`choice_id\` (ví dụ: "present", "absent", "unknown").
    - Giữ nguyên \`type\` (ví dụ: "symptom", "risk_factor").
    - Giữ nguyên cờ hệ thống \`obvious\` (true / false).
@@ -167,7 +174,7 @@ QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
                   content: JSON.stringify(data),
                 },
               ],
-              model: 'openai/gpt-oss-20b',
+              model: 'qwen/qwen3.8-27b',
               temperature: 0.1,
               response_format: { type: 'json_object' },
             });
@@ -463,12 +470,16 @@ QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
                   content: JSON.stringify(data.question),
                 },
               ],
-              model: 'openai/gpt-oss-20b',
+              model: 'qwen/qwen3.8-27b',
               temperature: 0.1,
               response_format: { type: 'json_object' },
             });
 
-          const aiResponseString = groq.choices[0]?.message?.content || '{}';
+          let aiResponseString = groq.choices[0]?.message?.content || '{}';
+          aiResponseString = aiResponseString
+            .replace(/^```json\s*/i, '')
+            .replace(/\s*```$/i, '')
+            .trim();
           const parsed = JSON.parse(aiResponseString);
           if (
             parsed &&
