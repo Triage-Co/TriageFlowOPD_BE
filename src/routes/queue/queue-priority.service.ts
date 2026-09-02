@@ -13,7 +13,11 @@ import {
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueCacheService } from './queue-cache.service';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { buildQueueDateFilter } from './queue.constants';
+import {
+  buildQueueDateFilter,
+  FLAGGABLE_RULE_TYPES,
+  parseStringCodeList,
+} from './queue.constants';
 
 const TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
@@ -31,11 +35,15 @@ export interface RuleEvaluationInput {
   missedCount: number;
   roomType: ClinicalRoomType | null;
   specialtyId: string | null;
+  /** Staff-attached rule codes; unioned with auto-matched rules. */
+  manualRuleCodes?: string[];
 }
 
 export interface RuleEvaluationResult {
   basePriority: number;
   appliedRules: { rule_code: string; weight: number }[];
+  /** Set when QUICK_TASK / RETURNING is in the applied union (interleave). */
+  queueType?: QueueTypeEnum;
 }
 
 export type QueueOrderStep = {
@@ -77,6 +85,8 @@ const QUEUE_ORDER_SELECT = {
   is_pinned: true,
   pinned_at: true,
   hold_positions: true,
+  rebalance_locked: true,
+  manual_rule_codes: true,
   enqueued_at: true,
   called_at: true,
   serving_started_at: true,
@@ -365,6 +375,42 @@ export class QueuePriorityService {
     return rules;
   }
 
+  async getFlaggableRules(): Promise<
+    Array<{
+      rule_id: string;
+      rule_code: string;
+      name: string;
+      description: string | null;
+      rule_type: QueueRuleTypeEnum;
+      weight: number;
+    }>
+  > {
+    const rules = await this.getActiveRules();
+    const seen = new Set<string>();
+    const result: Array<{
+      rule_id: string;
+      rule_code: string;
+      name: string;
+      description: string | null;
+      rule_type: QueueRuleTypeEnum;
+      weight: number;
+    }> = [];
+    for (const rule of rules) {
+      if (!FLAGGABLE_RULE_TYPES.includes(rule.rule_type)) continue;
+      if (seen.has(rule.rule_code)) continue;
+      seen.add(rule.rule_code);
+      result.push({
+        rule_id: rule.rule_id,
+        rule_code: rule.rule_code,
+        name: rule.name,
+        description: rule.description,
+        rule_type: rule.rule_type,
+        weight: rule.weight,
+      });
+    }
+    return result;
+  }
+
   async evaluateRulesForEntry(
     input: RuleEvaluationInput,
   ): Promise<RuleEvaluationResult> {
@@ -433,19 +479,59 @@ export class QueuePriorityService {
 
     let basePriority = 0;
     const appliedRules: { rule_code: string; weight: number }[] = [];
+    const appliedCodes = new Set<string>();
 
     for (const rule of scopedRulesMap.values()) {
       const matched = matchConditions(
-        rule.conditions as Record<string, any>,
+        rule.conditions as Record<string, unknown>,
         facts,
       );
       if (matched) {
         basePriority += rule.weight;
         appliedRules.push({ rule_code: rule.rule_code, weight: rule.weight });
+        appliedCodes.add(rule.rule_code);
       }
     }
 
-    return { basePriority, appliedRules };
+    const manualCodes = parseStringCodeList(input.manualRuleCodes);
+    let queueTypeOverride: QueueTypeEnum | undefined;
+    if (manualCodes.length > 0) {
+      const rulesByCode = new Map<string, Queue_Priority_Rule>();
+      for (const rule of allRules) {
+        if (!rulesByCode.has(rule.rule_code)) {
+          rulesByCode.set(rule.rule_code, rule);
+        }
+      }
+
+      for (const code of manualCodes) {
+        const rule = rulesByCode.get(code);
+        if (!rule) continue;
+
+        if (!appliedCodes.has(rule.rule_code)) {
+          basePriority += rule.weight;
+          appliedRules.push({
+            rule_code: rule.rule_code,
+            weight: rule.weight,
+          });
+          appliedCodes.add(rule.rule_code);
+        }
+
+        if (rule.rule_type === QueueRuleTypeEnum.RETURNING) {
+          queueTypeOverride = QueueTypeEnum.RETURNING;
+        } else if (
+          rule.rule_type === QueueRuleTypeEnum.QUICK_TASK &&
+          queueTypeOverride !== QueueTypeEnum.RETURNING
+        ) {
+          queueTypeOverride = QueueTypeEnum.QUICK_TASK;
+        }
+      }
+    }
+
+    return {
+      basePriority,
+      appliedRules,
+      ...(queueTypeOverride ? { queueType: queueTypeOverride } : {}),
+    };
   }
 
   async autoEnqueueDueAppointments(

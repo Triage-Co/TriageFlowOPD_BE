@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  forwardRef,
 } from '@nestjs/common';
 import {
   CreateVisitSessionReqDto,
@@ -14,6 +15,7 @@ import type { IPatientRepository } from '../../shared/interfaces/i-patient.repos
 import type { IAccountRepository } from '../../shared/interfaces/i-account.repository';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { HisService } from '../his/his.service';
+import { QueueService } from '../queue/queue.service';
 
 @Injectable()
 export class VisitSessionService {
@@ -28,6 +30,8 @@ export class VisitSessionService {
     private readonly accountRepository: IAccountRepository,
     private readonly prismaService: PrismaService,
     private readonly hisService: HisService,
+    @Inject(forwardRef(() => QueueService))
+    private readonly queueService: QueueService,
   ) {}
 
   async create(createDto: CreateVisitSessionReqDto) {
@@ -38,6 +42,12 @@ export class VisitSessionService {
       throw new NotFoundException(
         `Patient with ID ${createDto.patient_id} not found`,
       );
+    }
+    if (createDto.manual_rule_codes !== undefined) {
+      createDto.manual_rule_codes =
+        await this.queueService.assertValidManualRuleCodes(
+          createDto.manual_rule_codes,
+        );
     }
     return this.visitSessionRepository.create(createDto);
   }
@@ -145,7 +155,20 @@ export class VisitSessionService {
     if (!session) {
       throw new NotFoundException(`Visit session with ID ${id} not found`);
     }
+    if (updateDto.manual_rule_codes !== undefined) {
+      updateDto.manual_rule_codes =
+        await this.queueService.assertValidManualRuleCodes(
+          updateDto.manual_rule_codes,
+        );
+    }
     const updated = await this.visitSessionRepository.update(id, updateDto);
+
+    if (updateDto.manual_rule_codes !== undefined) {
+      await this.queueService.applyManualRuleCodesForVisit(
+        id,
+        updateDto.manual_rule_codes,
+      );
+    }
 
     // Tự động đồng bộ các cập nhật sang hệ thống HIS
     try {
@@ -219,10 +242,23 @@ export class VisitSessionService {
         `No visit session found for patient ID ${patientId}`,
       );
     }
+    if (updateDto.manual_rule_codes !== undefined) {
+      updateDto.manual_rule_codes =
+        await this.queueService.assertValidManualRuleCodes(
+          updateDto.manual_rule_codes,
+        );
+    }
     const updated = await this.visitSessionRepository.update(
       session.visit_session_id,
       updateDto,
     );
+
+    if (updateDto.manual_rule_codes !== undefined) {
+      await this.queueService.applyManualRuleCodesForVisit(
+        session.visit_session_id,
+        updateDto.manual_rule_codes,
+      );
+    }
 
     // Tự động đồng bộ các cập nhật sang hệ thống HIS
     try {

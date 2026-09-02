@@ -125,6 +125,8 @@ describe('QueuePriorityService Pure Functions', () => {
         is_pinned: partial.is_pinned ?? false,
         pinned_at: partial.pinned_at ?? null,
         hold_positions: partial.hold_positions ?? null,
+        rebalance_locked: partial.rebalance_locked ?? false,
+        manual_rule_codes: partial.manual_rule_codes ?? null,
         enqueued_at: partial.enqueued_at ?? now,
         called_at: null,
         serving_started_at: null,
@@ -356,5 +358,100 @@ describe('QueuePriorityService Pure Functions', () => {
       const resPinned = orderEntries([p1, p2], [defaultRuleAging], now);
       expect(resPinned.map((r) => r.queue.queue_id)).toEqual(['p1', 'p2']);
     });
+  });
+});
+
+describe('QueuePriorityService.evaluateRulesForEntry', () => {
+  const now = new Date('2026-08-04T10:00:00Z');
+
+  function makeRule(
+    partial: Partial<Queue_Priority_Rule> &
+      Pick<Queue_Priority_Rule, 'rule_code' | 'rule_type' | 'weight'>,
+  ): Queue_Priority_Rule {
+    return {
+      rule_id: partial.rule_id || partial.rule_code,
+      name: partial.name || partial.rule_code,
+      description: null,
+      conditions: partial.conditions ?? null,
+      aging_rate: 0,
+      max_aging: 0,
+      params: null,
+      room_type: null,
+      specialty_id: null,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+      ...partial,
+    };
+  }
+
+  const pediatric = makeRule({
+    rule_code: 'PEDIATRIC_ACUTE',
+    rule_type: QueueRuleTypeEnum.PATIENT_CATEGORY,
+    weight: 10,
+    conditions: { age: { lte: 6 } },
+  });
+  const quickTask = makeRule({
+    rule_code: 'QUICK_TASK_INTERLEAVE',
+    rule_type: QueueRuleTypeEnum.QUICK_TASK,
+    weight: 2,
+    conditions: { queue_type: { in: ['QUICK_TASK'] } },
+  });
+  const returning = makeRule({
+    rule_code: 'RETURNING_INTERLEAVE',
+    rule_type: QueueRuleTypeEnum.RETURNING,
+    weight: 1,
+    conditions: { queue_type: { in: ['RETURNING'] } },
+  });
+
+  function createService(rules: Queue_Priority_Rule[]) {
+    const prisma = {
+      queue_Priority_Rule: {
+        findMany: jest.fn().mockResolvedValue(rules),
+      },
+    };
+    const cache = { bumpRulesVersion: jest.fn() };
+    const { QueuePriorityService } = jest.requireActual(
+      './queue-priority.service',
+    ) as typeof import('./queue-priority.service');
+    return new QueuePriorityService(prisma as never, cache as never);
+  }
+
+  const baseInput = {
+    patient: { dob: new Date('2010-01-01'), gender: GenderTypeEnum.MALE },
+    queueType: QueueTypeEnum.NEW,
+    suggestedPriority: null,
+    vitals: null,
+    appointmentOnTime: false,
+    missedCount: 0,
+    roomType: null,
+    specialtyId: null,
+  };
+
+  it('unions auto-matched rules with manual codes and adds weights once', async () => {
+    const service = createService([pediatric, quickTask]);
+    const result = await service.evaluateRulesForEntry({
+      ...baseInput,
+      patient: { dob: new Date('2024-01-01'), gender: GenderTypeEnum.MALE },
+      manualRuleCodes: ['PEDIATRIC_ACUTE', 'QUICK_TASK_INTERLEAVE'],
+    });
+
+    expect(result.basePriority).toBe(12);
+    expect(result.appliedRules.map((r) => r.rule_code).sort()).toEqual([
+      'PEDIATRIC_ACUTE',
+      'QUICK_TASK_INTERLEAVE',
+    ]);
+    expect(result.queueType).toBe(QueueTypeEnum.QUICK_TASK);
+  });
+
+  it('sets RETURNING queue type when returning is flagged (over QUICK_TASK)', async () => {
+    const service = createService([quickTask, returning]);
+    const result = await service.evaluateRulesForEntry({
+      ...baseInput,
+      manualRuleCodes: ['QUICK_TASK_INTERLEAVE', 'RETURNING_INTERLEAVE'],
+    });
+
+    expect(result.queueType).toBe(QueueTypeEnum.RETURNING);
+    expect(result.basePriority).toBe(3);
   });
 });

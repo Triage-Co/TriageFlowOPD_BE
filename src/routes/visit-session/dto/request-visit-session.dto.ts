@@ -1,6 +1,7 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDate,
   IsInt,
   IsNumber,
@@ -123,7 +124,19 @@ export class CreateVisitSessionReqDto {
     required: false,
     example: { lungs: 'clear', heart: 'normal rhythm' },
   })
-  pe?: any;
+  pe?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ApiProperty({
+    description:
+      'Cờ quy tắc ưu tiên gắn tay (rule_code: PATIENT_CATEGORY, QUICK_TASK, RETURNING, TRANSFER)',
+    required: false,
+    type: [String],
+    example: ['PEDIATRIC_ACUTE'],
+  })
+  manual_rule_codes?: string[];
 }
 
 export class UpdateVisitSessionReqDto extends PartialType(

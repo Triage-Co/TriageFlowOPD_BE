@@ -29,6 +29,7 @@ import {
   TransferQueueDto,
   UpdateRoomStatDto,
 } from './dto/create-queue.dto';
+import { UpdateManualRuleCodesDto } from './dto/manual-rule-codes.dto';
 import { QueueService } from './queue.service';
 import { QueueRebalanceService } from './queue-rebalance.service';
 
@@ -40,12 +41,30 @@ export class QueueController {
     private readonly queueRebalanceService: QueueRebalanceService,
   ) {}
 
-  private getUser(req: any) {
+  private getUser(req: { user?: Record<string, string> }) {
     const u = req?.user;
     return {
       id: u?.account_id || u?.id || u?.sub || 'system',
       role: u?.role || 'USER',
     };
+  }
+
+  @Get('flaggable-rules')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(
+    RoleTypeEnum.DOCTOR,
+    RoleTypeEnum.NURSE,
+    RoleTypeEnum.RECEPTIONIST,
+    RoleTypeEnum.ADMIN,
+  )
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Danh sách rule active có thể gắn tay (PATIENT_CATEGORY, QUICK_TASK, RETURNING, TRANSFER)',
+  })
+  @ApiResponse({ status: 200, description: 'Danh sách quy tắc gắn cờ.' })
+  async getFlaggableRules() {
+    return await this.queueService.getFlaggableRules();
   }
 
   @Post('call-next')
@@ -152,6 +171,32 @@ export class QueueController {
   async recallQueue(@Param('queueId') queueId: string, @Req() req: any) {
     const user = this.getUser(req);
     return await this.queueService.recallQueue(queueId, user);
+  }
+
+  @Patch(':queueId/manual-rule-codes')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles(
+    RoleTypeEnum.DOCTOR,
+    RoleTypeEnum.NURSE,
+    RoleTypeEnum.RECEPTIONIST,
+    RoleTypeEnum.ADMIN,
+  )
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Gắn / gỡ cờ quy tắc ưu tiên trên lượt chờ rồi tính lại điểm',
+  })
+  @ApiResponse({ status: 200, description: 'Đã cập nhật cờ quy tắc.' })
+  async updateQueueManualRuleCodes(
+    @Param('queueId') queueId: string,
+    @Body() body: UpdateManualRuleCodesDto,
+    @Req() req: any,
+  ) {
+    const user = this.getUser(req);
+    return await this.queueService.updateQueueManualRuleCodes(
+      queueId,
+      body.manual_rule_codes,
+      user,
+    );
   }
 
   @Post(':queueId/complete')
