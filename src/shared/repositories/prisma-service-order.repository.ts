@@ -5,6 +5,7 @@ import {
   Prisma,
   Service_Order,
   ServiceOrderStatusEnum,
+  StepTypeEnum,
 } from '@prisma/client';
 import {
   BookingBillingContext,
@@ -270,6 +271,8 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
             ServiceOrderStatusEnum.COMPLETED,
           ],
         },
+        prescription: null,
+        NOT: [{ type: StepTypeEnum.DISPENSING }],
         OR: [
           {
             booking: {
@@ -287,15 +290,6 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
         serviceOrderDetails: {
           include: {
             service: true,
-          },
-        },
-        prescription: {
-          include: {
-            prescriptionDetails: {
-              include: {
-                medicine: true,
-              },
-            },
           },
         },
         invoices: {
