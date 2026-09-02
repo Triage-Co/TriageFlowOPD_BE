@@ -370,8 +370,14 @@ export class InvoiceService {
     bookingMeta: BillingOrderRaw['booking'] | null,
     detailed: boolean,
   ) {
-    const paidFlags = orders.map((order) => this.isOrderPaid(order));
-    const mappedOrders = orders.map((order) => this.mapOrder(order, detailed));
+    const payableOrders = orders.filter(
+      (order) => this.resolveOrderAmount(order) > 0,
+    );
+
+    const paidFlags = payableOrders.map((order) => this.isOrderPaid(order));
+    const mappedOrders = payableOrders.map((order) =>
+      this.mapOrder(order, detailed),
+    );
     const totalAmount = mappedOrders.reduce(
       (sum, order) => sum + order.amount,
       0,
@@ -523,7 +529,7 @@ export class InvoiceService {
 
   private resolveVisitPaymentStatus(paidFlags: boolean[]): VisitPaymentStatus {
     if (paidFlags.length === 0) {
-      return 'UNPAID';
+      return 'PAID';
     }
     const paidCount = paidFlags.filter(Boolean).length;
     if (paidCount === paidFlags.length) {
