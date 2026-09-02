@@ -37,11 +37,11 @@ const findQuery = {
 export class PrismaFlowRepository implements IFlowRepository {
   constructor(private readonly prismaService: PrismaService) {}
   findIsActiveByDate(patient_id: string, date: Date): Promise<Flow[]> {
-    const timeZone = 'Asia/Ho_Chi_Minh';
-    const currentDate = formatInTimeZone(date, timeZone, 'yyyy-MM-dd');
+    // const timeZone = 'Asia/Ho_Chi_Minh';
+    // const currentDate = formatInTimeZone(date, timeZone, 'yyyy-MM-dd');
 
-    const start = toDate(`${currentDate}T00:00:00`, { timeZone });
-    const end = toDate(`${currentDate}T23:59:59`, { timeZone });
+    // const start = toDate(`${currentDate}T00:00:00`, { timeZone });
+    // const end = toDate(`${currentDate}T23:59:59`, { timeZone });
 
     return this.prismaService.flow.findMany({
       where: {
@@ -50,14 +50,6 @@ export class PrismaFlowRepository implements IFlowRepository {
         },
         booking: {
           patient_id: patient_id,
-          slot: {
-            shift: {
-              date: {
-                gte: start,
-                lte: end,
-              },
-            },
-          },
         },
       },
     });
