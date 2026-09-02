@@ -115,6 +115,28 @@ const QUEUE_ORDER_SELECT = {
   },
 } satisfies Prisma.QueueSelect;
 
+/** True when the rule has no predicates (null, {}, or non-object). */
+export function isVacuousConditions(conditions: unknown): boolean {
+  return (
+    conditions == null ||
+    typeof conditions !== 'object' ||
+    Array.isArray(conditions) ||
+    Object.keys(conditions as object).length === 0
+  );
+}
+
+/**
+ * Admin catalog flags with empty conditions must not auto-stamp every ticket.
+ * Only WALK_IN_BASE is designed to match everyone (weight 0).
+ */
+export function shouldAutoMatchScoringRule(rule: {
+  rule_type: QueueRuleTypeEnum;
+  conditions: unknown;
+}): boolean {
+  if (!isVacuousConditions(rule.conditions)) return true;
+  return rule.rule_type === QueueRuleTypeEnum.WALK_IN;
+}
+
 /**
  * Pure function to evaluate rule conditions against fact object.
  */
@@ -385,7 +407,22 @@ export class QueuePriorityService {
       weight: number;
     }>
   > {
-    const rules = await this.getActiveRules();
+    // Catalog for the staff picker: always hit DB (do not use the 60s engine cache).
+    const rules = await this.prisma.queue_Priority_Rule.findMany({
+      where: {
+        is_active: true,
+        rule_type: { in: FLAGGABLE_RULE_TYPES },
+      },
+      orderBy: [{ weight: 'desc' }, { name: 'asc' }, { rule_code: 'asc' }],
+      select: {
+        rule_id: true,
+        rule_code: true,
+        name: true,
+        description: true,
+        rule_type: true,
+        weight: true,
+      },
+    });
     const seen = new Set<string>();
     const result: Array<{
       rule_id: string;
@@ -396,17 +433,9 @@ export class QueuePriorityService {
       weight: number;
     }> = [];
     for (const rule of rules) {
-      if (!FLAGGABLE_RULE_TYPES.includes(rule.rule_type)) continue;
       if (seen.has(rule.rule_code)) continue;
       seen.add(rule.rule_code);
-      result.push({
-        rule_id: rule.rule_id,
-        rule_code: rule.rule_code,
-        name: rule.name,
-        description: rule.description,
-        rule_type: rule.rule_type,
-        weight: rule.weight,
-      });
+      result.push(rule);
     }
     return result;
   }
@@ -482,6 +511,7 @@ export class QueuePriorityService {
     const appliedCodes = new Set<string>();
 
     for (const rule of scopedRulesMap.values()) {
+      if (!shouldAutoMatchScoringRule(rule)) continue;
       const matched = matchConditions(
         rule.conditions as Record<string, unknown>,
         facts,

@@ -5,7 +5,7 @@ import {
   SlotWithShiftAndRoom,
 } from '../interfaces/i-slot.repository';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
-import { Prisma, Shift, Slot } from '@prisma/client';
+import { ClinicalRoomType, Prisma, Slot } from '@prisma/client';
 
 @Injectable()
 export class PrismaSlotRepository implements ISlotRepository {
@@ -111,6 +111,7 @@ export class PrismaSlotRepository implements ISlotRepository {
     specialtyId: string,
     currentHours: string,
     starOfDate: Date,
+    roomType: ClinicalRoomType = ClinicalRoomType.CLINICAL_ROOM,
   ): Promise<SlotWithShiftAndRoom[]> {
     return await this.prismaService.slot.findMany({
       where: {
@@ -120,6 +121,7 @@ export class PrismaSlotRepository implements ISlotRepository {
         shift: {
           room: {
             specialty_id: specialtyId,
+            room_type: roomType,
           },
         },
         OR: [

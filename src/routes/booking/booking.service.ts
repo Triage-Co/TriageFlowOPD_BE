@@ -951,12 +951,14 @@ export class BookingService {
       exitedTriageInformation.specialty_id,
       currentHours,
       startOfToday,
+      ClinicalRoomType.CLINICAL_ROOM,
     );
 
     if (!availableSlots || availableSlots.length === 0) {
       throw new NotFoundException({
-        detail: 'Hiện tại đã hết slot trống cho chuyên khoa này',
-        message: 'Không tìm thấy slot trong hệ thống',
+        detail:
+          'Hiện tại đã hết slot trống tại phòng khám lâm sàng cho chuyên khoa này',
+        message: 'Không tìm thấy slot phòng khám trong hệ thống',
       });
     }
 
