@@ -1,5 +1,10 @@
 import { isAppointmentOnTime } from './queue.service';
-import { buildQueueDateFilter } from './queue.constants';
+import {
+  buildQueueDateFilter,
+  pickSameDayFlaggedSession,
+  pickUnbookedFlaggedSession,
+  resolveManualCodesForEnqueue,
+} from './queue.constants';
 
 describe('QueueService isAppointmentOnTime', () => {
   const shiftDate = new Date('2026-08-04T00:00:00.000Z');
@@ -243,6 +248,127 @@ describe('QueueService Payload Builders', () => {
         service_code: 'KMAT',
       },
       service_order: null,
+    });
+  });
+});
+
+describe('pickSameDayFlaggedSession', () => {
+  const day = new Date('2026-09-02T03:00:00.000Z');
+
+  it('prefers the booking-attached session, then unbooked reception flags', () => {
+    const sessions = [
+      {
+        booking_id: 'other-booking',
+        visit_date: day,
+        manual_rule_codes: ['OTHER'],
+      },
+      {
+        booking_id: null,
+        visit_date: day,
+        manual_rule_codes: ['ELDERLY', 'PREGNANT'],
+      },
+      {
+        booking_id: 'booking-1',
+        visit_date: day,
+        manual_rule_codes: ['RETURNING'],
+      },
+    ];
+
+    expect(
+      pickSameDayFlaggedSession(sessions, 'booking-1')?.manual_rule_codes,
+    ).toEqual(['RETURNING']);
+    expect(pickSameDayFlaggedSession(sessions)?.manual_rule_codes).toEqual([
+      'ELDERLY',
+      'PREGNANT',
+    ]);
+  });
+
+  it('skips empty arrays and returns undefined when nothing is flagged', () => {
+    const sessions = [
+      {
+        booking_id: null,
+        visit_date: day,
+        manual_rule_codes: [],
+      },
+      {
+        booking_id: null,
+        visit_date: day,
+        manual_rule_codes: null,
+      },
+    ];
+    expect(pickSameDayFlaggedSession(sessions, 'booking-1')).toBeUndefined();
+  });
+});
+
+describe('pickUnbookedFlaggedSession', () => {
+  const day = new Date('2026-09-02T03:00:00.000Z');
+
+  it('attaches only an unbooked session that has flags', () => {
+    const sessions = [
+      {
+        booking_id: null,
+        visit_date: day,
+        manual_rule_codes: [],
+      },
+      {
+        booking_id: null,
+        visit_date: day,
+        manual_rule_codes: ['PEDIATRIC'],
+      },
+      {
+        booking_id: 'other',
+        visit_date: day,
+        manual_rule_codes: ['GERIATRIC'],
+      },
+    ];
+    expect(pickUnbookedFlaggedSession(sessions)?.manual_rule_codes).toEqual([
+      'PEDIATRIC',
+    ]);
+  });
+
+  it('does not reuse an unflagged walk-in session', () => {
+    const sessions = [
+      {
+        booking_id: null,
+        visit_date: day,
+        manual_rule_codes: [],
+      },
+      {
+        booking_id: 'other',
+        visit_date: day,
+        manual_rule_codes: ['GERIATRIC'],
+      },
+    ];
+    expect(pickUnbookedFlaggedSession(sessions)).toBeUndefined();
+  });
+});
+
+describe('resolveManualCodesForEnqueue copies visit flags when queue is empty', () => {
+  it('keeps existing queue codes and does not copy', () => {
+    expect(
+      resolveManualCodesForEnqueue(['QUEUE_FLAG'], ['VISIT_FLAG'], ['FALLBACK']),
+    ).toEqual({ codes: ['QUEUE_FLAG'], copyToQueue: false });
+  });
+
+  it('copies visit-session codes onto an empty queue', () => {
+    expect(
+      resolveManualCodesForEnqueue([], ['ELDERLY', 'PREGNANT'], ['FALLBACK']),
+    ).toEqual({
+      codes: ['ELDERLY', 'PREGNANT'],
+      copyToQueue: true,
+    });
+  });
+
+  it('falls back to the latest flagged same-day session when visit session has none', () => {
+    expect(
+      resolveManualCodesForEnqueue(null, [], ['ELDERLY']),
+    ).toEqual({ codes: ['ELDERLY'], copyToQueue: true });
+  });
+
+  it('does not copy when every source is empty', () => {
+    expect(resolveManualCodesForEnqueue(null, null, [])).toEqual({
+      codes: [],
+      copyToQueue: false,
     });
   });
 });

@@ -17,6 +17,8 @@ describe('QueueController', () => {
     recallQueue: jest.fn(),
     getRoomQueueView: jest.fn(),
     updateRoomDefaultDurationSec: jest.fn(),
+    getFlaggableRules: jest.fn(),
+    updateQueueManualRuleCodes: jest.fn(),
   };
 
   const mockQueueRebalanceService = {

@@ -42,7 +42,16 @@ import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-
 import type { IServiceRepository } from '../../shared/interfaces/i-service.repository';
 import type { IRoomRepository } from '../../shared/interfaces/i-room.repository';
 import { StepErrors } from '../../shared/exceptions/step.exceptions';
-import { QueueService } from '../queue/queue.service';
+import {
+  getEndOfDayVn,
+  getStartOfDayVn,
+  QueueService,
+} from '../queue/queue.service';
+import {
+  parseStringCodeList,
+  pickSameDayFlaggedSession,
+  pickUnbookedFlaggedSession,
+} from '../queue/queue.constants';
 import { SlotErrors } from '../../shared/exceptions/slot.exceptions';
 import { FlowErrors } from '../../shared/exceptions/flow.exceptions';
 import { PatientErrors } from '../../shared/exceptions/patient.exceptions';
@@ -82,7 +91,7 @@ export class BookingService {
     private readonly roomServiceRepository: IRoomServiceRepository,
     @Inject(forwardRef(() => QueueService))
     private readonly queueService: QueueService,
-  ) {}
+  ) { }
 
   private generateTicketCode(): string {
     const dateStr = format(new Date(), 'yyyyMMdd');
@@ -195,7 +204,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
+          'Lỗi tạo giao dịch thanh toán',
         );
       }
 
@@ -228,10 +237,10 @@ export class BookingService {
 
     const appointmentDate = slot.shift?.date
       ? formatInTimeZone(
-          new Date(slot.shift.date),
-          'Asia/Ho_Chi_Minh',
-          'yyyy-MM-dd',
-        )
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
       : null;
 
     return {
@@ -408,10 +417,10 @@ export class BookingService {
 
     const appointmentDate = slot.shift?.date
       ? formatInTimeZone(
-          new Date(slot.shift.date),
-          'Asia/Ho_Chi_Minh',
-          'yyyy-MM-dd',
-        )
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
       : null;
 
     return {
@@ -577,10 +586,10 @@ export class BookingService {
 
     const appointmentDate = slot.shift?.date
       ? formatInTimeZone(
-          new Date(slot.shift.date),
-          'Asia/Ho_Chi_Minh',
-          'yyyy-MM-dd',
-        )
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
       : null;
 
     return {
@@ -649,6 +658,11 @@ export class BookingService {
       });
     }
 
+    const bookingId = serviceOrder.booking_id;
+    const patientId = serviceOrder.booking?.patient_id;
+    if (bookingId && patientId) {
+      await this.ensureVisitSessionForBooking(bookingId, patientId);
+    }
     // Kiểm tra xem đã có queue nào đang active trong flow chưa
     if (step.flow_id) {
       const allFlowSteps = await this.prismaService.step.findMany({
@@ -699,6 +713,10 @@ export class BookingService {
           q.status !== QueueStatusEnum.CANCELLED,
       );
       if (activeQueue?.room_id) {
+        const queue = await this.queueService.enqueueStep(
+          stepKhamBenh.step_id,
+          QueueTypeEnum.APPOINTMENT,
+        );
         return {
           code: 200,
           message: 'Bạn đã có số khám bệnh',
@@ -707,7 +725,7 @@ export class BookingService {
             slot: slot,
             room: stepKhamBenh.room,
             specialty: stepKhamBenh.room?.specialty_id,
-            queue: activeQueue,
+            queue,
           },
         };
       }
@@ -761,32 +779,6 @@ export class BookingService {
         where: { flow_id: step.flow_id },
         data: { status: FlowStatusEnum.IN_PROGRESS },
       });
-
-      const bookingId = serviceOrder.booking_id;
-      const patientId = serviceOrder.booking?.patient_id;
-      if (bookingId && patientId) {
-        const existingSession =
-          await this.prismaService.visit_Session.findUnique({
-            where: { booking_id: bookingId },
-          });
-        if (!existingSession) {
-          const prevWithPmh = await this.prismaService.visit_Session.findFirst({
-            where: {
-              patient_id: patientId,
-              pmh: { not: null },
-            },
-            orderBy: { visit_date: 'desc' },
-          });
-
-          await this.prismaService.visit_Session.create({
-            data: {
-              patient_id: patientId,
-              booking_id: bookingId,
-              pmh: prevWithPmh?.pmh ? prevWithPmh.pmh.trim() : null,
-            },
-          });
-        }
-      }
     }
 
     return {
@@ -800,6 +792,90 @@ export class BookingService {
         queue: queue,
       },
     };
+  }
+
+  /**
+   * Link the booking to a same-day walk-in visit only when that visit has
+   * priority flags (reception chips). Unflagged walk-in sessions stay separate;
+   * the booking gets a new visit with flags copied if needed.
+   */
+  private async ensureVisitSessionForBooking(
+    bookingId: string,
+    patientId: string,
+  ): Promise<void> {
+    const sameDaySessions = await this.prismaService.visit_Session.findMany({
+      where: {
+        patient_id: patientId,
+        visit_date: { gte: getStartOfDayVn(), lte: getEndOfDayVn() },
+      },
+      orderBy: { visit_date: 'desc' },
+      take: 20,
+    });
+
+    const flagged = pickSameDayFlaggedSession(sameDaySessions, bookingId);
+    const flaggedCodes = parseStringCodeList(flagged?.manual_rule_codes);
+
+    const existingSession = await this.prismaService.visit_Session.findUnique({
+      where: { booking_id: bookingId },
+    });
+
+    const prevWithPmh = await this.prismaService.visit_Session.findFirst({
+      where: {
+        patient_id: patientId,
+        pmh: { not: null },
+      },
+      orderBy: { visit_date: 'desc' },
+    });
+    const pmh = prevWithPmh?.pmh ? prevWithPmh.pmh.trim() : null;
+
+    if (existingSession) {
+      const existingCodes = parseStringCodeList(
+        existingSession.manual_rule_codes,
+      );
+      const data: {
+        manual_rule_codes?: string[];
+        pmh?: string;
+      } = {};
+      if (existingCodes.length === 0 && flaggedCodes.length > 0) {
+        data.manual_rule_codes = flaggedCodes;
+      }
+      if ((!existingSession.pmh || !existingSession.pmh.trim()) && pmh) {
+        data.pmh = pmh;
+      }
+      if (Object.keys(data).length > 0) {
+        await this.prismaService.visit_Session.update({
+          where: { visit_session_id: existingSession.visit_session_id },
+          data,
+        });
+      }
+      return;
+    }
+
+    const unbookedFlagged = pickUnbookedFlaggedSession(sameDaySessions);
+
+    if (unbookedFlagged) {
+      await this.prismaService.visit_Session.update({
+        where: { visit_session_id: unbookedFlagged.visit_session_id },
+        data: {
+          booking_id: bookingId,
+          ...((!unbookedFlagged.pmh || !unbookedFlagged.pmh.trim()) && pmh
+            ? { pmh }
+            : {}),
+        },
+      });
+      return;
+    }
+
+    await this.prismaService.visit_Session.create({
+      data: {
+        patient_id: patientId,
+        booking_id: bookingId,
+        pmh,
+        ...(flaggedCodes.length > 0
+          ? { manual_rule_codes: flaggedCodes }
+          : {}),
+      },
+    });
   }
 
   async findAll() {
@@ -993,7 +1069,7 @@ export class BookingService {
       if (!paymentLink || !('data' in paymentLink)) {
         throw new BadRequestException(
           (paymentLink?.detail as any)?.error?.desc ||
-            'Lỗi tạo giao dịch thanh toán',
+          'Lỗi tạo giao dịch thanh toán',
         );
       }
 
@@ -1027,10 +1103,10 @@ export class BookingService {
 
     const appointmentDate = slot.shift?.date
       ? formatInTimeZone(
-          new Date(slot.shift.date),
-          'Asia/Ho_Chi_Minh',
-          'yyyy-MM-dd',
-        )
+        new Date(slot.shift.date),
+        'Asia/Ho_Chi_Minh',
+        'yyyy-MM-dd',
+      )
       : null;
 
     return {
