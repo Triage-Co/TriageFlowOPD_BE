@@ -11,6 +11,7 @@ import {
 import { BookingService } from './booking.service';
 import {
   BookingSpecialtyDto,
+  CreateBookingCashPackageDto,
   CreateBookingRequestDto,
   CreateBookingWithPackageDto,
   UpdateBookingRequestDto,
@@ -35,12 +36,25 @@ export class BookingController {
   @UseGuards(IsAuthGuard, IsRoleGuard)
   @roles('RECEPTIONIST')
   @ApiOperation({
-    summary: 'Tạo booking thanh toán bằng tiền mặt (dành cho lễ tân)',
+    summary: 'Tạo booking khám thường thanh toán bằng tiền mặt (dành cho lễ tân)',
     description:
-      'Tạo booking, hóa đơn và hoàn thành thanh toán tiền mặt ngay lập tức không tạo mã QR.',
+      'Tạo booking khám thường, hóa đơn và hoàn thành thanh toán tiền mặt ngay lập tức không tạo mã QR.',
   })
   createCash(@Body() createBookingRequestDto: CreateBookingRequestDto) {
     return this.bookingService.createCashBooking(createBookingRequestDto);
+  }
+
+  @Post('/cash-package')
+  @ApiBearerAuth()
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  @roles('RECEPTIONIST')
+  @ApiOperation({
+    summary: 'Tạo booking gói khám thanh toán bằng tiền mặt (dành cho lễ tân)',
+    description:
+      'Tạo booking gói khám, hóa đơn và hoàn thành thanh toán tiền mặt ngay lập tức, tự động tạo luồng khám và cấp số thứ tự.',
+  })
+  createCashPackage(@Body() dto: CreateBookingCashPackageDto) {
+    return this.bookingService.createCashBookingWithPackage(dto);
   }
 
   @Post('/with-package')
