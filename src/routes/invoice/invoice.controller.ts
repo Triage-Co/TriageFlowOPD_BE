@@ -19,6 +19,8 @@ import {
 import { IsAuthGuard } from '../../shared/guards/is-auth.guard';
 import { QueryPatientBillingDto } from './dto/query-patient-billing.dto';
 import { InvoiceService } from './invoice.service';
+import { orGuard } from '../../shared/guards/orGuards';
+import { IsKioskGuard } from '../../shared/guards/is_kiosk.guard';
 
 @ApiTags('Invoice')
 @Controller('invoice')
@@ -56,7 +58,7 @@ export class InvoiceController {
   }
 
   @Get('patient/:patient_id')
-  @UseGuards(IsAuthGuard)
+  @UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[USER / STAFF] Tổng hợp hóa đơn bệnh nhân theo lần khám',
