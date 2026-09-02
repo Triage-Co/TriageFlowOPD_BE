@@ -57,20 +57,145 @@ export class InfermedicaService {
 
   async parse(parseDto: ParseDto) {
     try {
+      let englishText = parseDto.question?.trim() || '';
+
+      // Bước 1: Dịch câu hỏi/mô tả triệu chứng của người dùng (tiếng Việt -> tiếng Anh) cho Infermedica /parse
+      if (parseDto.question && parseDto.question.trim().length > 0) {
+        const promptTranslateToEn = `You are a professional medical translator. Your task is to translate the patient's symptom description from Vietnamese (or any input language) into natural, clear English for medical NLP parsing.
+
+GUIDELINES:
+1. Translate accurately into clear clinical English sentences.
+2. STRICTLY preserve all reported symptoms, locations, onset, duration, and severity.
+3. STRICTLY preserve all negations (e.g., "không sốt" -> "no fever", "không ho" -> "no coughing", "không đau ngực" -> "no chest pain").
+4. Do NOT add any symptoms, diagnoses, or assumptions not explicitly mentioned.
+5. Return ONLY the translated English text as plain text. Do NOT include explanations, greetings, quotes, or markdown formatting.`;
+
+        try {
+          const groqEn = await this.groqService
+            .groqInstance()
+            .chat.completions.create({
+              messages: [
+                {
+                  role: 'system',
+                  content: promptTranslateToEn,
+                },
+                {
+                  role: 'user',
+                  content: parseDto.question,
+                },
+              ],
+              model: 'openai/gpt-oss-20b',
+              temperature: 0.1,
+            });
+
+          const aiTranslated = groqEn.choices[0]?.message?.content?.trim();
+          if (aiTranslated) {
+            englishText = aiTranslated.replace(/^["']|["']$/g, '').trim();
+          }
+        } catch (aiError) {
+          console.error(
+            'Lỗi khi dịch câu hỏi sang tiếng Anh qua Groq AI:',
+            aiError,
+          );
+          englishText = parseDto.question;
+        }
+      }
+
+      if (englishText.length > 2048) {
+        englishText = englishText.slice(0, 2048);
+      }
+
+      // Bước 2: Gửi sang Infermedica /parse với text tiếng Anh
+      const parsePayload: Record<string, any> = {
+        text: englishText,
+        age: {
+          value: parseDto.age,
+        },
+      };
+
+      if (parseDto.sex) {
+        parsePayload.sex = parseDto.sex;
+      }
+
       const { data } = await firstValueFrom(
-        this.httpService.post('/parse', {
-          text: parseDto.question,
-          age: {
-            value: parseDto.age,
-          },
-        }),
+        this.httpService.post('/parse', parsePayload),
       );
+
+      let translatedData = data;
+
+      // Bước 3: Dịch dữ liệu phản hồi từ Infermedica (tiếng Anh -> tiếng Việt) tương tự như diagnosis
+      if (data && Array.isArray(data.mentions) && data.mentions.length > 0) {
+        const promptTranslateToVi = `Bạn là một bác sĩ chuyên khoa giàu kinh nghiệm và là một dịch giả y khoa chuyên nghiệp. Nhiệm vụ của bạn là dịch toàn bộ dữ liệu phản hồi (Response JSON) từ API phân tích triệu chứng y khoa (Infermedica /parse) từ tiếng Anh sang tiếng Việt.
+
+PHẠM VI DỊCH THUẬT (Chỉ dịch giá trị của các trường sau trong mảng "mentions"):
+1. \`name\`: Tên y khoa chuẩn xác của triệu chứng hoặc yếu tố nguy cơ (ví dụ: "Abdominal pain" -> "Đau bụng", "Headache" -> "Đau đầu", "Fever" -> "Sốt", "Diagnosed diabetes" -> "Đã chẩn đoán đái tháo đường").
+2. \`common_name\`: Tên gọi thông thường, phổ biến và dễ hiểu cho người bệnh (ví dụ: "sore throat" -> "đau họng").
+3. \`orth\`: Cụm từ triệu chứng tương ứng với ngữ cảnh người bệnh mô tả.
+
+YÊU CẦU CHUYÊN MÔN Y KHOA (BẮT BUỘC):
+1. Từ vựng chuẩn y khoa Việt Nam:
+   - "Diabetes" -> "Đái tháo đường" (không dùng tiểu đường).
+   - "High blood pressure" / "Hypertension" -> "Tăng huyết áp".
+   - "Dyspnea" / "Shortness of breath" -> "Khó thở".
+   - "Fatigue" -> "Mệt mỏi".
+   - Các từ chỉ mức độ: "Mild / Moderate / Severe" -> "Nhẹ / Vừa / Nặng".
+2. Dịch chính xác nghĩa lâm sàng, tự nhiên, không dịch máy móc word-by-word.
+
+QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
+1. BẢO TOÀN TẤT CẢ KEYS: Không được đổi tên bất kỳ key nào trong JSON (giữ nguyên 'mentions', 'id', 'orth', 'choice_id', 'name', 'common_name', 'type', 'obvious'...).
+2. BẢO TOÀN TẤT CẢ IDs & ENUMS: TUYỆT ĐỐI KHÔNG ĐƯỢC DỊCH các giá trị định danh và cờ hệ thống:
+   - Giữ nguyên \`id\` (ví dụ: "s_13", "s_102", "p_8"...).
+   - Giữ nguyên \`choice_id\` (ví dụ: "present", "absent", "unknown").
+   - Giữ nguyên \`type\` (ví dụ: "symptom", "risk_factor").
+   - Giữ nguyên cờ hệ thống \`obvious\` (true / false).
+3. ĐẦU RA BẮT BUỘC:
+   - Trả về DUY NHẤT một chuỗi JSON hợp lệ.
+   - KHÔNG bọc trong markdown (\`\`\`json).
+   - KHÔNG thêm bất kỳ câu chào hỏi hay giải thích nào ở đầu và cuối.`;
+
+        try {
+          const groqVi = await this.groqService
+            .groqInstance()
+            .chat.completions.create({
+              messages: [
+                {
+                  role: 'system',
+                  content: promptTranslateToVi,
+                },
+                {
+                  role: 'user',
+                  content: JSON.stringify(data),
+                },
+              ],
+              model: 'openai/gpt-oss-20b',
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            });
+
+          let aiResponseString = groqVi.choices[0]?.message?.content || '{}';
+          aiResponseString = aiResponseString
+            .replace(/^```json\s*/i, '')
+            .replace(/\s*```$/i, '')
+            .trim();
+          const parsed = JSON.parse(aiResponseString);
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            Array.isArray(parsed.mentions)
+          ) {
+            translatedData = parsed;
+          }
+        } catch (aiError) {
+          console.error('Lỗi khi dịch phản hồi /parse qua Groq AI:', aiError);
+          translatedData = data;
+        }
+      }
 
       return {
         code: 200,
         message: 'Trả kết quả thành công',
         status: 'success',
-        data: data,
+        data: translatedData,
       };
     } catch (error) {
       return {

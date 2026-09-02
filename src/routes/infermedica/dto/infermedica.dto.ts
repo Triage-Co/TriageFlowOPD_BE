@@ -37,7 +37,7 @@ export class ParseDto {
   @IsString({ message: 'question phải là một chuỗi ký tự' })
   @ApiProperty({
     name: 'question',
-    example: 'I have diabetes and pain in hand',
+    example: 'Tôi bị đau bụng nhưng không sốt',
   })
   question: string;
 
@@ -47,6 +47,15 @@ export class ParseDto {
     example: 30,
   })
   age: number;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({
+    name: 'sex',
+    example: 'male',
+    required: false,
+  })
+  sex?: string;
 }
 
 export class TriageDto {
