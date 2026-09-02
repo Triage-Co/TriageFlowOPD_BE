@@ -1,7 +1,7 @@
 import { PrismaClient, NodeType } from '@prisma/client';
 import * as turf from '@turf/turf';
-import { createNodesBatch, NodeInsertData } from './utils';
-import { randomUUID } from 'crypto';
+import { Polygon, MultiPolygon } from 'geojson';
+import { readAllGeoms } from './utils';
 
 interface BBox {
   minX: number;
@@ -303,4 +303,204 @@ export async function generateGraphEdges(
   }
 
   return { totalEdges: edgesToCreate.length };
+}
+
+type RoomBBox = {
+  feature: any;
+  bbox: BBox;
+  id?: string;
+};
+
+type WallBBox = {
+  feature: any;
+  bbox: BBox;
+};
+
+function hasCleanLineOfSight(
+  p1: [number, number],
+  p2: [number, number],
+  roomBBoxes: RoomBBox[],
+  wallBBoxes: WallBBox[],
+  options?: {
+    maxDistMeters?: number;
+    skipRoomIds?: Array<string | null | undefined>;
+  },
+): boolean {
+  const maxDist = options?.maxDistMeters ?? 25;
+  const dist = turf.distance(turf.point(p1), turf.point(p2), {
+    units: 'meters',
+  });
+  if (dist > maxDist) return false;
+
+  const line = turf.lineString([p1, p2]);
+  const lineBBox = getBBox([p1, p2]);
+  const pt1 = turf.point(p1);
+  const pt2 = turf.point(p2);
+  const skip = new Set(
+    (options?.skipRoomIds ?? []).filter((id): id is string => Boolean(id)),
+  );
+
+  for (const roomItem of roomBBoxes) {
+    if (roomItem.id && skip.has(roomItem.id)) continue;
+    if (intersectsBBox(lineBBox, roomItem.bbox)) {
+      const intersects = turf.lineIntersect(line, roomItem.feature);
+      const realIntersects = intersects.features.filter((f) => {
+        const dStart = turf.distance(pt1, f, { units: 'meters' });
+        const dEnd = turf.distance(pt2, f, { units: 'meters' });
+        return dStart > 0.15 && dEnd > 0.15;
+      });
+      if (realIntersects.length > 0) return false;
+      const mid = turf.midpoint(pt1, pt2);
+      if (turf.booleanPointInPolygon(mid, roomItem.feature)) return false;
+    }
+  }
+
+  for (const wallItem of wallBBoxes) {
+    if (intersectsBBox(lineBBox, wallItem.bbox)) {
+      const intersects = turf.lineIntersect(line, wallItem.feature);
+      const realIntersects = intersects.features.filter((f) => {
+        const dStart = turf.distance(pt1, f, { units: 'meters' });
+        const dEnd = turf.distance(pt2, f, { units: 'meters' });
+        return dStart > 0.35 && dEnd > 0.15;
+      });
+      if (realIntersects.length > 0) return false;
+    }
+  }
+
+  return true;
+}
+
+async function loadFloorObstacles(prisma: PrismaClient, floorId: string) {
+  const roomFeatures = await readAllGeoms(
+    prisma,
+    'physical_room',
+    floorId,
+    'outlineGeom',
+  );
+  const roomPolygons = roomFeatures
+    .filter(
+      (rf) =>
+        rf.geometry &&
+        (rf.geometry.type === 'Polygon' || rf.geometry.type === 'MultiPolygon'),
+    )
+    .map((rf) =>
+      turf.feature(rf.geometry as Polygon | MultiPolygon, rf.properties),
+    );
+
+  const boundaryFeatures = await readAllGeoms(
+    prisma,
+    'boundary',
+    floorId,
+    'lineGeom',
+  );
+  const wallBoundaries = boundaryFeatures
+    .filter((bf) => bf.properties.boundaryType === 'WALL' && bf.geometry)
+    .map((bf) => turf.feature(bf.geometry));
+
+  return { roomPolygons, wallBoundaries };
+}
+
+/**
+ * Rebuild intra-floor edges from remaining nodes after manual corridor edits.
+ * Does not regenerate MPRSS nodes. Connects corridor/junction k-nearest with
+ * line-of-sight, then reuses door-to-corridor wiring in generateGraphEdges.
+ */
+export async function rebuildEdgesFromExistingNodes(
+  prisma: PrismaClient,
+  floorId: string,
+  options?: { kNearest?: number; maxDistMeters?: number },
+): Promise<{ totalEdges: number; nodesUsed: number }> {
+  const kNearest = options?.kNearest ?? 3;
+  const maxDistMeters = options?.maxDistMeters ?? 20;
+
+  const { roomPolygons, wallBoundaries } = await loadFloorObstacles(
+    prisma,
+    floorId,
+  );
+
+  const nodeFeatures = await readAllGeoms(prisma, 'node', floorId, 'coordsGeom');
+  const nodeMap = new Map<string, string>();
+  const nodeCoordsMap = new Map<string, [number, number]>();
+  const createdNodeTypesMap = new Map<string, NodeType>();
+  const doorNodeCoordsMap = new Map<string, [number, number]>();
+  const corridorNodes: { id: string; coords: [number, number] }[] = [];
+
+  for (const feature of nodeFeatures) {
+    if (!feature.geometry || feature.geometry.type !== 'Point') continue;
+    const id = String(feature.properties.id);
+    const coords = feature.geometry.coordinates as [number, number];
+    const type = feature.properties.type as NodeType;
+    const key = `${coords[0].toFixed(6)}_${coords[1].toFixed(6)}`;
+    nodeMap.set(key, id);
+    nodeCoordsMap.set(id, coords);
+    createdNodeTypesMap.set(id, type);
+    if (type === NodeType.CORRIDOR || type === NodeType.JUNCTION) {
+      corridorNodes.push({ id, coords });
+    }
+    if (type === NodeType.ROOM_ENTRANCE) {
+      doorNodeCoordsMap.set(id, coords);
+    }
+  }
+
+  const roomBBoxes: RoomBBox[] = roomPolygons.map((room) => ({
+    feature: room,
+    bbox: getBBox(turf.coordAll(room) as [number, number][]),
+    id: room.properties?.id,
+  }));
+  const wallBBoxes: WallBBox[] = wallBoundaries.map((wall) => ({
+    feature: wall,
+    bbox: getBBox(turf.coordAll(wall) as [number, number][]),
+  }));
+
+  const centerlineEdges: [[number, number], [number, number]][] = [];
+  const seenPairs = new Set<string>();
+
+  for (const a of corridorNodes) {
+    const ranked = corridorNodes
+      .filter((b) => b.id !== a.id)
+      .map((b) => ({
+        b,
+        dist: turf.distance(turf.point(a.coords), turf.point(b.coords), {
+          units: 'meters',
+        }),
+      }))
+      .filter((item) => item.dist > 0 && item.dist <= maxDistMeters)
+      .sort((x, y) => x.dist - y.dist);
+
+    let added = 0;
+    for (const { b } of ranked) {
+      if (added >= kNearest) break;
+      if (
+        !hasCleanLineOfSight(a.coords, b.coords, roomBBoxes, wallBBoxes, {
+          maxDistMeters,
+        })
+      ) {
+        continue;
+      }
+      const pairKey = [a.id, b.id].sort().join('||');
+      added += 1;
+      if (seenPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      centerlineEdges.push([a.coords, b.coords]);
+    }
+  }
+
+  await prisma.edge.deleteMany({
+    where: {
+      fromNode: { floorId },
+      toNode: { floorId },
+    },
+  });
+
+  const result = await generateGraphEdges(prisma, floorId, doorNodeCoordsMap, {
+    walkable: null,
+    roomPolygons,
+    wallBoundaries,
+    centerlineEdges,
+    nodeMap,
+    nodeCoordsMap,
+    createdNodeTypesMap,
+  });
+
+  return { totalEdges: result.totalEdges, nodesUsed: nodeCoordsMap.size };
 }

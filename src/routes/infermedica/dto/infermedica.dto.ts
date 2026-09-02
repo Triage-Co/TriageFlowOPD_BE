@@ -22,6 +22,15 @@ export class EvidenceDto {
     example: 'present',
   })
   choice_id: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({
+    name: 'name',
+    example: 'Diagnosed diabetes',
+    required: false,
+  })
+  name?: string;
 }
 
 export class ParseDto {

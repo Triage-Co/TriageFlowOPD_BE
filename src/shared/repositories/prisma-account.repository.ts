@@ -7,6 +7,20 @@ import { meta } from '@turf/turf';
 @Injectable()
 export class PrismaAccountRepository implements IAccountRepository {
   constructor(private readonly prismaService: PrismaService) {}
+  findEmailByCitizentId(citizen_id: string): Promise<{ email: string } | null> {
+    return this.prismaService.account.findFirst({
+      where: {
+        patients: {
+          some: {
+            citizen_id: citizen_id,
+          },
+        },
+      },
+      select: {
+        email: true,
+      },
+    });
+  }
   async findAllUsers(
     page?: number,
     limit?: number,

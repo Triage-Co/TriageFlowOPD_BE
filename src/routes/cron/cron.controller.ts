@@ -76,4 +76,23 @@ export class CronController {
     }
     return this.cronService.updatePrescriptionExpired();
   }
+
+  @Get('rebalance')
+  @ApiBearerAuth()
+  @roles('ADMIN')
+  @UseGuards(IsAuthGuard, IsRoleGuard)
+  handleRebalanceDetectorWithCron() {
+    return this.cronService.handleRebalanceDetector();
+  }
+
+  @Get('rebalance-run')
+  @ApiExcludeEndpoint()
+  handleRebalanceDetector(@Headers('authorization') authHeader: string) {
+    if (authHeader != `Bearer ${envInstance.CRON_SECRET}`) {
+      throw new UnauthorizedException(
+        'Chỉ hệ thống Cron mới được quyền gọi API này',
+      );
+    }
+    return this.cronService.handleRebalanceDetector();
+  }
 }

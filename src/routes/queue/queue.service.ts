@@ -16,6 +16,7 @@ import {
   QueueStatusEnum,
   QueueTypeEnum,
   RoleTypeEnum,
+  RebalanceSuggestionStatusEnum,
   ServiceOrderDetailStatusEnum,
   ServiceOrderStatusEnum,
   StepStatusEnum,
@@ -30,15 +31,37 @@ import { QueueRebalanceService } from './queue-rebalance.service';
 import { QueueCacheService } from './queue-cache.service';
 import {
   buildQueueDateFilter,
+  parseStringCodeList,
+  pickSameDayFlaggedSession,
+  resolveManualCodesForEnqueue,
+  REBALANCE_REDIRECT_OVERLAY_MS,
   REBALANCEABLE_STEP_TYPES,
 } from './queue.constants';
 import { StepService } from '../step/step.service';
+import { ScanQueueDto } from './dto/create-queue.dto';
 
 const ACTIVE_SOD_STATUSES: ServiceOrderDetailStatusEnum[] = [
   ServiceOrderDetailStatusEnum.PENDING,
   ServiceOrderDetailStatusEnum.PAID,
   ServiceOrderDetailStatusEnum.IN_PROGRESS,
 ];
+
+function toValidUuidOrNull(val?: string | null): string | null {
+  if (!val) return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val)
+    ? val
+    : null;
+}
+
+function readOldQueueNumber(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const old = (payload as Record<string, unknown>).old_queue_number;
+  if (typeof old === 'string' && old.trim()) return old;
+  if (typeof old === 'number') return String(old);
+  return null;
+}
 
 const SERVING_STEP_INCLUDE = {
   flow: {
@@ -244,6 +267,7 @@ export class QueueService {
             heart_rate: number | null;
             spo2: number | null;
             blood_pressure_sys: number | null;
+            manual_rule_codes?: unknown;
           } | null;
         } | null;
       } | null;
@@ -251,7 +275,12 @@ export class QueueService {
     queueType: QueueTypeEnum,
     missedCount: number,
     prismaTx: Prisma.TransactionClient,
-  ): Promise<{ basePriority: number; appliedRules: any }> {
+    manualRuleCodes?: string[],
+  ): Promise<{
+    basePriority: number;
+    appliedRules: { rule_code: string; weight: number }[] | null;
+    queueType?: QueueTypeEnum;
+  }> {
     if (process.env.QUEUE_ENGINE_ENABLED === 'false') {
       return { basePriority: 0, appliedRules: null };
     }
@@ -295,12 +324,52 @@ export class QueueService {
       missedCount,
       roomType: step.room?.room_type ?? null,
       specialtyId: step.room?.specialty_id ?? null,
+      manualRuleCodes,
     });
 
     return {
       basePriority: evalResult.basePriority,
       appliedRules: evalResult.appliedRules,
+      queueType: evalResult.queueType,
     };
+  }
+
+  private async loadVisitManualRuleCodes(
+    prismaTx: Prisma.TransactionClient,
+    booking:
+      | {
+          booking_id?: string;
+          patient_id?: string;
+          patient?: { patient_id: string } | null;
+          visitSession?: { manual_rule_codes?: unknown } | null;
+        }
+      | null
+      | undefined,
+  ): Promise<string[]> {
+    const attached = parseStringCodeList(
+      booking?.visitSession?.manual_rule_codes,
+    );
+    if (attached.length > 0) return attached;
+
+    const patientId = booking?.patient_id ?? booking?.patient?.patient_id;
+    if (!patientId) return [];
+
+    const sessions = await prismaTx.visit_Session.findMany({
+      where: {
+        patient_id: patientId,
+        visit_date: { gte: getStartOfDayVn(), lte: getEndOfDayVn() },
+      },
+      orderBy: { visit_date: 'desc' },
+      take: 20,
+      select: {
+        booking_id: true,
+        visit_date: true,
+        manual_rule_codes: true,
+      },
+    });
+
+    const picked = pickSameDayFlaggedSession(sessions, booking?.booking_id);
+    return parseStringCodeList(picked?.manual_rule_codes);
   }
 
   /**
@@ -353,30 +422,47 @@ export class QueueService {
         },
       });
 
+      const visitCodes = await this.loadVisitManualRuleCodes(
+        prismaTx,
+        step.flow?.booking,
+      );
+
       if (existingQueue) {
+        const { codes: manualCodes, copyToQueue: needsCopyFlags } =
+          resolveManualCodesForEnqueue(
+            existingQueue.manual_rule_codes,
+            visitCodes,
+          );
         const needsRepair = !existingQueue.room_id;
         const needsRetype =
           options?.forceType === true && existingQueue.queue_type !== queueType;
 
-        if (!needsRepair && !needsRetype) {
+        if (!needsRepair && !needsRetype && !needsCopyFlags) {
           return existingQueue;
         }
 
-        const { basePriority, appliedRules } =
-          await this.evaluatePriorityForStep(
-            step,
-            queueType,
-            existingQueue.missed_count ?? 0,
-            prismaTx,
-          );
+        const baseType = needsRetype ? queueType : existingQueue.queue_type;
+
+        const {
+          basePriority,
+          appliedRules,
+          queueType: typeOverride,
+        } = await this.evaluatePriorityForStep(
+          step,
+          baseType,
+          existingQueue.missed_count ?? 0,
+          prismaTx,
+          manualCodes,
+        );
 
         return prismaTx.queue.update({
           where: { queue_id: existingQueue.queue_id },
           data: {
             room_id: step.room_id,
-            queue_type: queueType,
+            queue_type: typeOverride ?? baseType,
             base_priority: basePriority,
             applied_rules: appliedRules ?? undefined,
+            ...(needsCopyFlags ? { manual_rule_codes: manualCodes } : {}),
             status:
               existingQueue.status === QueueStatusEnum.PENDING
                 ? QueueStatusEnum.QUEUED
@@ -394,11 +480,20 @@ export class QueueService {
         prismaTx,
         targetDate,
       );
-      const { basePriority, appliedRules } = await this.evaluatePriorityForStep(
+      const { codes: manualCodes, copyToQueue } = resolveManualCodesForEnqueue(
+        null,
+        visitCodes,
+      );
+      const {
+        basePriority,
+        appliedRules,
+        queueType: typeOverride,
+      } = await this.evaluatePriorityForStep(
         step,
         queueType,
         0,
         prismaTx,
+        manualCodes,
       );
 
       return prismaTx.queue.create({
@@ -406,9 +501,10 @@ export class QueueService {
           step_id: stepId,
           room_id: step.room_id,
           queue_number: nextNumber,
-          queue_type: queueType,
+          queue_type: typeOverride ?? queueType,
           base_priority: basePriority,
           applied_rules: appliedRules ?? undefined,
+          ...(copyToQueue ? { manual_rule_codes: manualCodes } : {}),
           enqueued_at: new Date(),
           status: QueueStatusEnum.QUEUED,
         },
@@ -495,13 +591,15 @@ export class QueueService {
 
     if (steps.length === 0) return;
 
-    // Skip if any clinical step is pharmacy room
-    if (steps.some((s) => s.room?.room_type === ClinicalRoomType.PHARMACY)) {
-      return;
-    }
+    // Lọc ra các bước khám lâm sàng / cận lâm sàng (bỏ qua bước cấp thuốc nhà thuốc)
+    const clinicalSteps = steps.filter(
+      (s) => s.room?.room_type !== ClinicalRoomType.PHARMACY,
+    );
+
+    if (clinicalSteps.length === 0) return;
 
     // Idempotent: if any step of this SO already has an active queue, do not create another
-    for (const step of steps) {
+    for (const step of clinicalSteps) {
       const activeQueue = (step.queues || []).find(
         (q) =>
           q.status !== QueueStatusEnum.FINISHED &&
@@ -521,7 +619,12 @@ export class QueueService {
       }
     }
 
-    const primary = steps.find((s) => !!s.room_id);
+    // Ưu tiên chọn bước đang IN_PROGRESS hoặc bước đầu tiên có phòng
+    const primary =
+      clinicalSteps.find(
+        (s) => s.step_status === StepStatusEnum.IN_PROGRESS && !!s.room_id,
+      ) || clinicalSteps.find((s) => !!s.room_id);
+
     if (!primary) return;
 
     const hasBooking = Boolean(primary.flow?.booking?.slot_id);
@@ -631,47 +734,58 @@ export class QueueService {
       await this.assertCanManageRoom(user, roomId, stepId);
     }
 
+    let rebalanceStepType: StepTypeEnum | null = null;
     await this.prisma.$transaction(async (tx) => {
-      // 1. Process currently serving patient if any
-      const currentlyServing = await tx.queue.findFirst({
+      // 1. Process currently active patient in room (SERVING or CALLED)
+      const currentlyActive = await tx.queue.findFirst({
         where: {
           room_id: roomId,
-          status: QueueStatusEnum.SERVING,
+          status: { in: [QueueStatusEnum.SERVING, QueueStatusEnum.CALLED] },
         },
         include: {
           step: true,
         },
       });
 
-      if (currentlyServing) {
+      if (currentlyActive) {
         const now = new Date();
-        if (currentlyServing.step?.step_status === StepStatusEnum.COMPLETED) {
+        if (currentlyActive.status === QueueStatusEnum.SERVING) {
+          rebalanceStepType = currentlyActive.step?.step_type ?? null;
+          // Direction A: Auto-finish SERVING patient when calling next
           await tx.queue.update({
-            where: { queue_id: currentlyServing.queue_id },
+            where: { queue_id: currentlyActive.queue_id },
             data: {
               status: QueueStatusEnum.FINISHED,
               finished_at: now,
             },
           });
 
+          if (currentlyActive.step_id) {
+            await tx.step.update({
+              where: { step_id: currentlyActive.step_id },
+              data: { step_status: StepStatusEnum.COMPLETED },
+            });
+          }
+
           await tx.move_Log.create({
             data: {
-              queue_id: currentlyServing.queue_id,
+              queue_id: currentlyActive.queue_id,
               action_type: 'FINISHED',
               actor_account_id: user?.id ?? null,
+              reason: 'Tự động hoàn thành lượt phục vụ khi gọi lượt tiếp theo',
             },
           });
 
-          if (currentlyServing.serving_started_at) {
+          if (currentlyActive.serving_started_at) {
             const durationSec = Math.round(
               (now.getTime() -
-                new Date(currentlyServing.serving_started_at).getTime()) /
+                new Date(currentlyActive.serving_started_at).getTime()) /
                 1000,
             );
             this.queueEtaService
               .recordServiceDuration(
                 roomId,
-                currentlyServing.step?.step_type ?? null,
+                currentlyActive.step?.step_type ?? null,
                 durationSec,
               )
               .catch((err) =>
@@ -680,10 +794,11 @@ export class QueueService {
                 ),
               );
           }
-        } else {
-          // Patient did not show up before calling next -> auto mark MISSING
+        } else if (currentlyActive.status === QueueStatusEnum.CALLED) {
+          rebalanceStepType = currentlyActive.step?.step_type ?? null;
+          // Patient was CALLED but did not show up before calling next -> mark MISSING
           await tx.queue.update({
-            where: { queue_id: currentlyServing.queue_id },
+            where: { queue_id: currentlyActive.queue_id },
             data: {
               status: QueueStatusEnum.MISSING,
               missed_at: now,
@@ -691,14 +806,16 @@ export class QueueService {
             },
           });
 
-          await tx.step.update({
-            where: { step_id: currentlyServing.step_id },
-            data: { step_status: StepStatusEnum.PENDING },
-          });
+          if (currentlyActive.step_id) {
+            await tx.step.update({
+              where: { step_id: currentlyActive.step_id },
+              data: { step_status: StepStatusEnum.PENDING },
+            });
+          }
 
           await tx.move_Log.create({
             data: {
-              queue_id: currentlyServing.queue_id,
+              queue_id: currentlyActive.queue_id,
               action_type: 'MISSED',
               actor_account_id: user?.id ?? null,
               reason: 'Tự động đánh dấu vắng mặt khi gọi lượt tiếp theo',
@@ -741,16 +858,15 @@ export class QueueService {
         nextQueueId = order[0].queue.queue_id;
       }
 
-      // 3. Optimistic locking check & update to SERVING
+      // 3. Optimistic locking check & update to CALLED
       const updateResult = await tx.queue.updateMany({
         where: {
           queue_id: nextQueueId,
           status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
         },
         data: {
-          status: QueueStatusEnum.SERVING,
+          status: QueueStatusEnum.CALLED,
           called_at: new Date(),
-          serving_started_at: new Date(),
         },
       });
 
@@ -765,14 +881,6 @@ export class QueueService {
       });
 
       if (nextQueue) {
-        await tx.step.update({
-          where: { step_id: nextQueue.step_id },
-          data: {
-            step_status: StepStatusEnum.IN_PROGRESS,
-            staff_id: staffId,
-          },
-        });
-
         await tx.move_Log.create({
           data: {
             queue_id: nextQueue.queue_id,
@@ -785,6 +893,7 @@ export class QueueService {
 
     const displayPayload = await this.getRoomDisplayPayload(roomId, staffId);
     await this.broadcastRoomUpdate(roomId, staffId, displayPayload);
+    this.scheduleRebalanceIfCls(rebalanceStepType);
 
     return {
       code: 200,
@@ -792,6 +901,161 @@ export class QueueService {
       message: 'Đã gọi bệnh nhân và cập nhật màn hình TV',
       data: displayPayload,
     };
+  }
+
+  async scanQueueTicket(
+    dto: ScanQueueDto,
+    user: { id: string; role: string },
+  ) {
+    const { ticket_code, queue_id, room_id, staff_id } = dto;
+    await this.assertCanManageRoom(user, room_id);
+
+    let queueItem: any;
+
+    if (ticket_code) {
+      queueItem = await this.prisma.queue.findFirst({
+        where: {
+          step: {
+            flow: {
+              ticket_code: ticket_code,
+            },
+          },
+          status: {
+            in: [
+              QueueStatusEnum.CALLED,
+              QueueStatusEnum.MISSING,
+              QueueStatusEnum.SERVING,
+            ],
+          },
+        },
+        include: {
+          step: true,
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      if (!queueItem) {
+        throw new NotFoundException(
+          `Không tìm thấy lượt chờ hợp lệ cho vé ${ticket_code}.`,
+        );
+      }
+    } else if (queue_id) {
+      queueItem = await this.prisma.queue.findUnique({
+        where: { queue_id },
+        include: { step: true },
+      });
+
+      if (!queueItem) {
+        throw new NotFoundException('Không tìm thấy lượt chờ.');
+      }
+    } else {
+      throw new BadRequestException(
+        'Vui lòng cung cấp ticket_code hoặc queue_id.',
+      );
+    }
+
+    // Edge Case 1: Wrong room check
+    if (queueItem.room_id && queueItem.room_id !== room_id) {
+      throw new BadRequestException(
+        'Vé khám này thuộc phòng khác, không phải phòng hiện tại!',
+      );
+    }
+
+    // Edge Case 3: Already SERVING (Duplicate scan)
+    if (queueItem.status === QueueStatusEnum.SERVING) {
+      const displayPayload = await this.getRoomDisplayPayload(room_id, staff_id);
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Bệnh nhân đã ở trạng thái đang khám.',
+        data: displayPayload,
+      };
+    }
+
+    // Edge Case 2: MISSING ticket -> Recall back to QUEUED
+    if (queueItem.status === QueueStatusEnum.MISSING) {
+      const rules = await this.queuePriorityService.getActiveRules();
+      const missedRule = rules.find(
+        (r) => r.rule_type === QueueRuleTypeEnum.MISSED_TURN,
+      );
+      const holdPositions = (missedRule?.params as any)?.hold_positions ?? 3;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.queue.update({
+          where: { queue_id: queueItem.queue_id },
+          data: {
+            status: QueueStatusEnum.QUEUED,
+            hold_positions: holdPositions,
+            room_id: room_id,
+          },
+        });
+
+        await tx.move_Log.create({
+          data: {
+            queue_id: queueItem.queue_id,
+            action_type: 'RECALLED',
+            actor_account_id: user.id,
+            reason: 'Quét vé lỡ lượt đưa lại vào hàng chờ',
+          },
+        });
+      });
+
+      await this.broadcastRoomUpdate(room_id, staff_id);
+
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Bệnh nhân lỡ lượt đã được đưa lại vào hàng chờ.',
+        data: await this.getRoomDisplayPayload(room_id, staff_id),
+      };
+    }
+
+    // Normal case: CALLED -> SERVING
+    if (queueItem.status === QueueStatusEnum.CALLED) {
+      const now = new Date();
+      await this.prisma.$transaction(async (tx) => {
+        await tx.queue.update({
+          where: { queue_id: queueItem.queue_id },
+          data: {
+            status: QueueStatusEnum.SERVING,
+            serving_started_at: now,
+            room_id: room_id,
+          },
+        });
+
+        if (queueItem.step_id) {
+          await tx.step.update({
+            where: { step_id: queueItem.step_id },
+            data: {
+              step_status: StepStatusEnum.IN_PROGRESS,
+              staff_id: staff_id ?? null,
+            },
+          });
+        }
+
+        await tx.move_Log.create({
+          data: {
+            queue_id: queueItem.queue_id,
+            action_type: 'SERVING',
+            actor_account_id: user.id,
+          },
+        });
+      });
+
+      const displayPayload = await this.getRoomDisplayPayload(room_id, staff_id);
+      await this.broadcastRoomUpdate(room_id, staff_id, displayPayload);
+
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Đã bắt đầu khám cho bệnh nhân.',
+        data: displayPayload,
+      };
+    }
+
+    throw new BadRequestException(
+      `Không thể quét vé ở trạng thái ${queueItem.status}.`,
+    );
   }
 
   async broadcastRoomUpdate(
@@ -804,10 +1068,15 @@ export class QueueService {
       const payload =
         preloadedPayload || (await this.getRoomDisplayPayload(roomId, staffId));
       this.queueGateway.emitQueueUpdate(roomId, payload);
-    } catch (err: any) {
-      this.logger.warn(
-        `WS emit failed for room ${roomId}: ${err?.message || err}`,
-      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`WS emit failed for room ${roomId}: ${message}`);
+    }
+  }
+
+  private scheduleRebalanceIfCls(stepType?: StepTypeEnum | null): void {
+    if (stepType && REBALANCEABLE_STEP_TYPES.includes(stepType)) {
+      this.queueRebalanceService.scheduleDetectAndSuggest();
     }
   }
 
@@ -874,6 +1143,8 @@ export class QueueService {
       ? this.buildServingPayload(currentQueue)
       : null;
 
+    const redirectedPatients = await this.getRedirectedPatientsForRoom(roomId);
+
     return {
       room_info: {
         specialty_name: room?.specialty?.specialty_name || 'KHOA KHÁM BỆNH',
@@ -910,8 +1181,62 @@ export class QueueService {
           eta_minutes: etaInfo ? Math.round(etaInfo.etaSec / 60) : 0,
         };
       }),
+      redirected_patients: redirectedPatients,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  private async getRedirectedPatientsForRoom(roomId: string): Promise<
+    Array<{
+      queue_number: string;
+      patient_name: string;
+      to_room_name: string;
+      expires_at: Date;
+    }>
+  > {
+    const since = new Date(Date.now() - REBALANCE_REDIRECT_OVERLAY_MS);
+    const suggestions = await this.prisma.queue_Rebalance_Suggestion.findMany({
+      where: {
+        from_room_id: roomId,
+        status: RebalanceSuggestionStatusEnum.CONFIRMED,
+        updated_at: { gte: since },
+      },
+      include: {
+        toRoom: { select: { room_name: true } },
+        queue: {
+          include: {
+            moveLogs: {
+              where: { action_type: 'REBALANCED' },
+              orderBy: { created_at: 'desc' },
+              take: 1,
+            },
+            step: {
+              include: {
+                flow: {
+                  include: {
+                    booking: { include: { patient: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { updated_at: 'desc' },
+    });
+
+    return suggestions.map((s) => {
+      const oldNumber = readOldQueueNumber(s.queue.moveLogs[0]?.payload);
+      return {
+        queue_number: oldNumber ?? s.queue.queue_number,
+        patient_name:
+          s.queue.step?.flow?.booking?.patient?.full_name || '---',
+        to_room_name: s.toRoom.room_name,
+        expires_at: new Date(
+          s.updated_at.getTime() + REBALANCE_REDIRECT_OVERLAY_MS,
+        ),
+      };
+    });
   }
 
   /**
@@ -1110,6 +1435,7 @@ export class QueueService {
   async markQueueMissed(queueId: string, user: { id: string; role: string }) {
     const queue = await this.prisma.queue.findUnique({
       where: { queue_id: queueId },
+      include: { step: { select: { step_type: true } } },
     });
 
     if (!queue || !queue.room_id) {
@@ -1156,7 +1482,7 @@ export class QueueService {
         data: {
           queue_id: queueId,
           action_type: 'MISSED',
-          actor_account_id: user.id,
+          actor_account_id: toValidUuidOrNull(user?.id),
         },
       });
 
@@ -1164,6 +1490,7 @@ export class QueueService {
     });
 
     await this.broadcastRoomUpdate(queue.room_id);
+    this.scheduleRebalanceIfCls(queue.step?.step_type);
 
     return {
       code: 200,
@@ -1226,6 +1553,151 @@ export class QueueService {
     };
   }
 
+  async getFlaggableRules() {
+    const data = await this.queuePriorityService.getFlaggableRules();
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Lấy danh sách quy tắc có thể gắn cờ thành công.',
+      data,
+    };
+  }
+
+  async assertValidManualRuleCodes(codes: string[]): Promise<string[]> {
+    return this.validateAndNormalizeManualCodes(codes);
+  }
+
+  async updateQueueManualRuleCodes(
+    queueId: string,
+    codes: string[],
+    user: { id: string; role: string },
+  ) {
+    const queue = await this.prisma.queue.findUnique({
+      where: { queue_id: queueId },
+    });
+    if (!queue || !queue.room_id) {
+      throw new NotFoundException('Không tìm thấy lượt chờ.');
+    }
+    await this.assertCanManageRoom(user, queue.room_id);
+    const normalized = await this.validateAndNormalizeManualCodes(codes);
+    const updated = await this.applyManualCodesToQueue(
+      queue.queue_id,
+      normalized,
+    );
+    await this.broadcastRoomUpdate(queue.room_id);
+    return {
+      code: 200,
+      status: 'success',
+      message: 'Đã cập nhật cờ quy tắc ưu tiên.',
+      data: updated,
+    };
+  }
+
+  async applyManualRuleCodesForVisit(
+    visitSessionId: string,
+    codes: string[],
+  ): Promise<void> {
+    const normalized = await this.validateAndNormalizeManualCodes(codes);
+    const visit = await this.prisma.visit_Session.findUnique({
+      where: { visit_session_id: visitSessionId },
+      select: { booking_id: true },
+    });
+    if (!visit?.booking_id) {
+      return;
+    }
+
+    const queues = await this.prisma.queue.findMany({
+      where: {
+        status: {
+          notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED],
+        },
+        step: { flow: { booking_id: visit.booking_id } },
+      },
+      select: { queue_id: true, room_id: true },
+    });
+
+    const roomIds = new Set<string>();
+    for (const q of queues) {
+      await this.applyManualCodesToQueue(q.queue_id, normalized);
+      if (q.room_id) roomIds.add(q.room_id);
+    }
+    for (const roomId of roomIds) {
+      await this.broadcastRoomUpdate(roomId);
+    }
+  }
+
+  private async validateAndNormalizeManualCodes(
+    codes: string[],
+  ): Promise<string[]> {
+    const normalized = parseStringCodeList(codes);
+    if (normalized.length === 0) {
+      return [];
+    }
+    const flaggable = await this.queuePriorityService.getFlaggableRules();
+    const allowed = new Set(flaggable.map((r) => r.rule_code));
+    const invalid = normalized.filter((c) => !allowed.has(c));
+    if (invalid.length > 0) {
+      throw new BadRequestException(
+        `rule_code không hợp lệ hoặc không gắn được: ${invalid.join(', ')}`,
+      );
+    }
+    return normalized;
+  }
+
+  private async applyManualCodesToQueue(
+    queueId: string,
+    codes: string[],
+  ): Promise<Queue> {
+    return this.prisma.$transaction(async (tx) => {
+      const queue = await tx.queue.findUnique({
+        where: { queue_id: queueId },
+        include: {
+          step: {
+            include: {
+              room: true,
+              flow: {
+                include: {
+                  booking: {
+                    include: {
+                      patient: true,
+                      slot: { include: { shift: true } },
+                      visitSession: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!queue?.step) {
+        throw new NotFoundException('Không tìm thấy lượt chờ.');
+      }
+
+      const {
+        basePriority,
+        appliedRules,
+        queueType: typeOverride,
+      } = await this.evaluatePriorityForStep(
+        queue.step,
+        queue.queue_type,
+        queue.missed_count ?? 0,
+        tx,
+        codes,
+      );
+
+      return tx.queue.update({
+        where: { queue_id: queueId },
+        data: {
+          manual_rule_codes: codes,
+          base_priority: basePriority,
+          applied_rules: appliedRules ?? undefined,
+          queue_type: typeOverride ?? queue.queue_type,
+        },
+      });
+    });
+  }
+
   async getRoomQueueView(roomId: string, user: { id: string; role: string }) {
     await this.assertCanManageRoom(user, roomId);
 
@@ -1245,7 +1717,7 @@ export class QueueService {
     const servingQueue = await this.prisma.queue.findFirst({
       where: {
         room_id: roomId,
-        status: QueueStatusEnum.SERVING,
+        status: { in: [QueueStatusEnum.SERVING, QueueStatusEnum.CALLED] },
         ...buildQueueDateFilter(startOfDay, endOfDay),
       },
       include: {
@@ -1361,6 +1833,9 @@ export class QueueService {
             effective_score: entry.effectiveScore,
             reasons: entry.reasons,
             is_pinned: entry.queue.is_pinned,
+            manual_rule_codes: parseStringCodeList(
+              entry.queue.manual_rule_codes,
+            ),
             enqueued_at: entry.queue.enqueued_at,
             waited_minutes: waitedMinutes,
             eta_minutes: etaMinutes,
@@ -1511,13 +1986,58 @@ export class QueueService {
     if (!queue || !queue.room_id) {
       throw new NotFoundException('Không tìm thấy lượt chờ.');
     }
-    if (queue.status !== QueueStatusEnum.SERVING) {
+
+    const allowedStatuses: QueueStatusEnum[] = [
+      QueueStatusEnum.SERVING,
+      QueueStatusEnum.CALLED,
+    ];
+
+    if (!allowedStatuses.includes(queue.status)) {
       throw new BadRequestException(
-        'Chỉ thao tác được trên lượt đang phục vụ (SERVING).',
+        'Chỉ thao tác được trên lượt đang phục vụ (SERVING) hoặc đang gọi (CALLED).',
       );
     }
 
     await this.assertCanManageRoom(user, queue.room_id, queue.step_id);
+
+    if (queue.status === QueueStatusEnum.CALLED) {
+      const now = new Date();
+      const servingStartedAt = queue.called_at || now;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.queue.update({
+          where: { queue_id: queueId },
+          data: {
+            status: QueueStatusEnum.SERVING,
+            serving_started_at: servingStartedAt,
+          },
+        });
+
+        if (queue.step_id) {
+          await tx.step.update({
+            where: { step_id: queue.step_id },
+            data: { step_status: StepStatusEnum.IN_PROGRESS },
+          });
+        }
+
+        await tx.move_Log.create({
+          data: {
+            queue_id: queueId,
+            action_type: 'SERVING',
+            actor_account_id: user.id,
+            reason:
+              'Tự động chuyển sang SERVING khi thực hiện thao tác dịch vụ/hoàn thành',
+          },
+        });
+      });
+
+      queue.status = QueueStatusEnum.SERVING;
+      queue.serving_started_at = servingStartedAt;
+      if (queue.step) {
+        (queue.step as any).step_status = StepStatusEnum.IN_PROGRESS;
+      }
+    }
+
     return queue;
   }
 
@@ -1724,6 +2244,9 @@ export class QueueService {
 
     if (queue.room_id) {
       await this.broadcastRoomUpdate(queue.room_id);
+    }
+    if (outcome === 'complete') {
+      this.scheduleRebalanceIfCls(queue.step?.step_type);
     }
 
     return updated;

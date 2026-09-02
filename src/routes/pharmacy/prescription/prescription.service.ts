@@ -8,6 +8,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { DisplayScreenService } from '../../display-screen/display-screen.service';
 import { PrismaService } from '../../../shared/config/prisma.service';
 import { QueueGateway } from '../../../shared/gateways/queue.gateway';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
@@ -58,6 +59,7 @@ export class PrescriptionService {
     private readonly prismaService: PrismaService,
     @Inject(forwardRef(() => QueueGateway))
     private readonly queueGateway: QueueGateway,
+    private readonly displayScreenService: DisplayScreenService,
   ) {}
 
   private generatePrescriptionCode(): string {
@@ -637,7 +639,7 @@ export class PrescriptionService {
     });
   }
 
-  async markAsPrepared(id: string) {
+  async markAsPrepared(id: string, displayScreenId?: string) {
     const prescription = await this.prismaService.prescription.findUnique({
       where: { prescription_id: id },
       include: {
@@ -657,12 +659,28 @@ export class PrescriptionService {
       );
     }
 
+    let screenRoomId: string | undefined;
+    if (displayScreenId) {
+      const screen =
+        await this.displayScreenService.assertPharmacyScreen(displayScreenId);
+      screenRoomId = screen.room_id ?? undefined;
+    }
+
     const patientAccountId = prescription.visitSession?.patient?.account_id;
 
     const result = await this.prismaService.$transaction(async (tx) => {
       const updated = await tx.prescription.update({
         where: { prescription_id: id },
-        data: { status: PrescriptionStatusEnum.PREPARED },
+        data: {
+          status: PrescriptionStatusEnum.PREPARED,
+          ...(displayScreenId
+            ? {
+                called_at: new Date(),
+                display_screen_id: displayScreenId,
+                missed_at: null,
+              }
+            : {}),
+        },
         include: {
           serviceOrder: true,
           prescriptionDetails: {
@@ -685,7 +703,7 @@ export class PrescriptionService {
 
       return updated;
     });
-    void this.emitPharmacyDisplay();
+    void this.emitPharmacyDisplay(screenRoomId);
     return result;
   }
 
@@ -767,7 +785,8 @@ export class PrescriptionService {
 
       return updated;
     });
-    void this.emitPharmacyDisplay();
+    const emitRoomId = await this.resolvePrescriptionPharmacyRoomId(prescription.display_screen_id);
+    void this.emitPharmacyDisplay(emitRoomId, { removed_ids: [id] });
     return result;
   }
 
@@ -935,7 +954,7 @@ export class PrescriptionService {
     const room = await this.resolvePharmacyRoom(roomId);
     const today = this.vnTodayDateOnly();
 
-    const [calling, readyUnshownCount] = await Promise.all([
+    const [calling, missed, readyUnshownCount] = await Promise.all([
       this.prismaService.prescription.findMany({
         where: {
           status: PrescriptionStatusEnum.PREPARED,
@@ -948,8 +967,24 @@ export class PrescriptionService {
           prescription_id: true,
           pickup_number: true,
           called_at: true,
+          display_screen_id: true,
         },
         orderBy: [{ called_at: 'asc' }],
+      }),
+      this.prismaService.prescription.findMany({
+        where: {
+          status: PrescriptionStatusEnum.PREPARED,
+          pickup_date: today,
+          pickup_number: { not: null },
+          missed_at: { not: null },
+        },
+        select: {
+          prescription_id: true,
+          pickup_number: true,
+          missed_at: true,
+          display_screen_id: true,
+        },
+        orderBy: [{ missed_at: 'asc' }],
       }),
       this.prismaService.prescription.count({
         where: {
@@ -982,32 +1017,76 @@ export class PrescriptionService {
       calling_numbers: callingNumbers.map((item) => ({
         prescription_id: item.prescription_id,
         pickup_number: item.pickup_number as string,
+        display_screen_id: item.display_screen_id,
+      })),
+      missed_numbers: missed.map((item) => ({
+        prescription_id: item.prescription_id,
+        pickup_number: item.pickup_number as string,
+        display_screen_id: item.display_screen_id,
       })),
       ready_unshown_count: readyUnshownCount,
     };
   }
 
-  async callNextPrepared(roomId?: string) {
-    const room = await this.resolvePharmacyRoom(roomId);
+  async callNextPrepared(options?: {
+    room_id?: string;
+    display_screen_id?: string;
+    prescription_id?: string;
+  }) {
+    const displayScreenId = options?.display_screen_id;
+    let screenRoomId = options?.room_id;
+    if (displayScreenId) {
+      const screen =
+        await this.displayScreenService.assertPharmacyScreen(displayScreenId);
+      screenRoomId = screen.room_id ?? screenRoomId;
+    }
+
+    const room = await this.resolvePharmacyRoom(screenRoomId);
     const today = this.vnTodayDateOnly();
     const now = new Date();
 
-    const result = await this.prismaService.prescription.updateMany({
-      where: {
-        status: PrescriptionStatusEnum.PREPARED,
-        pickup_date: today,
-        pickup_number: { not: null },
-        called_at: null,
+    let targetId = options?.prescription_id;
+    if (!targetId) {
+      const next = await this.prismaService.prescription.findFirst({
+        where: {
+          status: PrescriptionStatusEnum.PREPARED,
+          pickup_date: today,
+          pickup_number: { not: null },
+          called_at: null,
+          missed_at: null,
+        },
+        orderBy: [{ updated_at: 'asc' }],
+        select: { prescription_id: true },
+      });
+      targetId = next?.prescription_id;
+    }
+
+    if (!targetId) {
+      const payload = await this.getPharmacyDisplayPayload(room.room_id);
+      this.queueGateway.emitPharmacyDisplayUpdate(room.room_id, payload);
+      return { called_count: 0, ...payload };
+    }
+
+    if (!displayScreenId) {
+      throw new BadRequestException(
+        'Cần display_screen_id (quầy TV nhà thuốc) để gọi số lên màn hình.',
+      );
+    }
+
+    await this.prismaService.prescription.update({
+      where: { prescription_id: targetId },
+      data: {
+        called_at: now,
+        display_screen_id: displayScreenId,
         missed_at: null,
       },
-      data: { called_at: now },
     });
 
     const payload = await this.getPharmacyDisplayPayload(room.room_id);
     this.queueGateway.emitPharmacyDisplayUpdate(room.room_id, payload);
 
     return {
-      called_count: result.count,
+      called_count: 1,
       ...payload,
     };
   }
@@ -1046,7 +1125,9 @@ export class PrescriptionService {
       },
     });
 
-    void this.emitPharmacyDisplay();
+    void this.emitPharmacyDisplay(
+      await this.resolvePrescriptionPharmacyRoomId(prescription.display_screen_id),
+    );
     return updated;
   }
 
@@ -1087,7 +1168,11 @@ export class PrescriptionService {
       },
     });
 
-    void this.emitPharmacyDisplay();
+    void this.emitPharmacyDisplay(
+      await this.resolvePrescriptionPharmacyRoomId(
+        updated.display_screen_id ?? prescription.display_screen_id,
+      ),
+    );
     return updated;
   }
 
@@ -1219,17 +1304,30 @@ export class PrescriptionService {
     return room;
   }
 
-  private async emitPharmacyDisplay(roomId?: string) {
+  private async resolvePrescriptionPharmacyRoomId(
+    displayScreenId?: string | null,
+  ): Promise<string | undefined> {
+    if (!displayScreenId) return undefined;
+    const screen = await this.prismaService.display_Screen.findUnique({
+      where: { display_screen_id: displayScreenId },
+      select: { room_id: true },
+    });
+    return screen?.room_id ?? undefined;
+  }
+
+  private async emitPharmacyDisplay(
+    roomId?: string,
+    extra?: { removed_ids?: string[] },
+  ) {
     try {
       const payload = await this.getPharmacyDisplayPayload(roomId);
-      this.queueGateway.emitPharmacyDisplayUpdate(
-        payload.room.room_id,
-        payload,
-      );
-    } catch (error: any) {
-      this.logger.warn(
-        `Không phát được TV nhà thuốc: ${error?.message || error}`,
-      );
+      this.queueGateway.emitPharmacyDisplayUpdate(payload.room.room_id, {
+        ...payload,
+        ...(extra?.removed_ids ? { removed_ids: extra.removed_ids } : {}),
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Không phát được TV nhà thuốc: ${message}`);
     }
   }
 }

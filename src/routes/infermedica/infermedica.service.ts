@@ -11,6 +11,7 @@ import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
 import { UpdateQuestionLimitDto } from './dto/triage-config.dto';
 import { formatInTimeZone, toDate } from 'date-fns-tz';
 import type { ISlotRepository } from '../../shared/interfaces/i-slot.repository';
+import { GroqService } from '../../shared/config/groq.service';
 
 @Injectable()
 export class InfermedicaService {
@@ -28,6 +29,7 @@ export class InfermedicaService {
     private readonly aiSpecialtyService: AiSpecialtyService,
     @Inject('ISlotRepository')
     private readonly slotRepository: ISlotRepository,
+    private readonly groqService: GroqService,
   ) {
     this.PATIENT_ANSWER = prismaService.patient_Answer;
     this.ACCOUNT = prismaService.account;
@@ -105,14 +107,35 @@ export class InfermedicaService {
       );
 
       const currentToken = interview_token || `new_session_${Date.now()}`;
+      const finalToken = interview_token || currentToken;
 
       const cacheKey = `interview_${currentToken}`;
+      const lastQuestionKey = `last_question_${finalToken}`;
 
       let currentTurn = await this.cacheManager.get<number>(cacheKey);
-
       if (!currentTurn) {
-        currentTurn = interview_token ? 1 : 0;
+        currentTurn = 1;
       }
+
+      const lastQuestion: any = await this.cacheManager.get(lastQuestionKey);
+
+      let cleanedEvidence = [...(triageDto.evidence || [])];
+      if (lastQuestion && lastQuestion.type === 'group_single') {
+        const groupItemIds = new Set(
+          lastQuestion.items?.map((item: any) => item.id) || [],
+        );
+        cleanedEvidence = cleanedEvidence.filter((e) => {
+          if (groupItemIds.has(e.id)) {
+            return e.choice_id === 'present';
+          }
+          return true;
+        });
+      }
+
+      const evidenceForApi = cleanedEvidence.map((item) => ({
+        id: item.id,
+        choice_id: item.choice_id,
+      }));
 
       const { data } = await firstValueFrom(
         this.httpService.post('/diagnosis', {
@@ -120,38 +143,227 @@ export class InfermedicaService {
           age: {
             value: triageDto.age,
           },
-          evidence: triageDto.evidence,
+          evidence: evidenceForApi,
         }),
       );
 
-      currentTurn += 1;
-      await this.cacheManager.set(cacheKey, currentTurn, 3600000);
-
+      console.log(currentTurn);
+      console.log(numberOfDiagnoses);
       const isOverLimit = currentTurn >= numberOfDiagnoses;
+      await this.cacheManager.set(cacheKey, currentTurn + 1, 3600000);
 
-      const finalToken = interview_token || currentToken;
+      const existingAnswer = await this.PATIENT_ANSWER.findUnique({
+        where: {
+          interview_token: finalToken,
+        },
+      });
+
+      let questionnaireData: any = existingAnswer?.questionnaire_data;
+      if (
+        !questionnaireData ||
+        typeof questionnaireData !== 'object' ||
+        Array.isArray(questionnaireData)
+      ) {
+        questionnaireData = {
+          sex: triageDto.sex,
+          age: triageDto.age,
+          history: [],
+          evidence: [],
+        };
+      }
+      if (!Array.isArray(questionnaireData.history)) {
+        questionnaireData.history = [];
+      }
+
+      if (lastQuestion) {
+        const qType = lastQuestion.type;
+
+        if (qType === 'single') {
+          const item = lastQuestion.items?.[0];
+          const matchedEv = cleanedEvidence.find((e) => e.id === item?.id);
+          const choiceId = matchedEv?.choice_id || 'unknown';
+          const choiceMeta = item?.choices?.find((c: any) => c.id === choiceId);
+
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: 'single',
+            question_text: lastQuestion.text,
+            answer: {
+              id: item?.id,
+              name: item?.name || matchedEv?.name,
+              choice_id: choiceId,
+              choice_label: choiceMeta?.label || choiceId,
+            },
+          });
+        } else if (qType === 'group_single') {
+          const selectedEvidence = cleanedEvidence.find(
+            (e) =>
+              lastQuestion.items?.some((item: any) => item.id === e.id) &&
+              e.choice_id === 'present',
+          );
+          const selectedItem = lastQuestion.items?.find(
+            (item: any) => item.id === selectedEvidence?.id,
+          );
+
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: 'group_single',
+            question_text: lastQuestion.text,
+            answer: selectedItem
+              ? {
+                  id: selectedItem.id,
+                  name: selectedItem.name,
+                  choice_id: 'present',
+                }
+              : {
+                  id: null,
+                  name: 'Không rõ / Không chọn',
+                  choice_id: 'unknown',
+                },
+          });
+        } else if (qType === 'group_multiple') {
+          const selectedItems = lastQuestion.items
+            ?.map((item: any) => {
+              const ev = cleanedEvidence.find((e) => e.id === item.id);
+              if (!ev) return null;
+              const choiceMeta = item.choices?.find(
+                (c: any) => c.id === ev.choice_id,
+              );
+              return {
+                id: item.id,
+                name: item.name,
+                choice_id: ev.choice_id,
+                choice_label: choiceMeta?.label || ev.choice_id,
+              };
+            })
+            .filter(Boolean);
+
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: 'group_multiple',
+            question_text: lastQuestion.text,
+            answers: selectedItems || [],
+          });
+        } else {
+          questionnaireData.history.push({
+            turn: currentTurn,
+            question_type: qType,
+            question_text: lastQuestion.text,
+            evidence: cleanedEvidence,
+          });
+        }
+      } else {
+        const hasTurn1 = questionnaireData.history.some(
+          (h: any) => h.turn === 1,
+        );
+        if (!hasTurn1) {
+          questionnaireData.history.push({
+            turn: 1,
+            question_type: 'initial',
+            question_text: 'Khai báo triệu chứng ban đầu',
+            answers: cleanedEvidence,
+          });
+        }
+      }
+
+      questionnaireData.sex = triageDto.sex;
+      questionnaireData.age = triageDto.age;
+      questionnaireData.evidence = cleanedEvidence;
+
+      if (data.question) {
+        await this.cacheManager.set(lastQuestionKey, data.question, 3600000);
+      } else {
+        await this.cacheManager.del(lastQuestionKey);
+      }
 
       await this.PATIENT_ANSWER.upsert({
         where: {
           interview_token: finalToken,
         },
         update: {
-          questionnaire_data: triageDto as unknown as Prisma.InputJsonObject,
+          questionnaire_data:
+            questionnaireData as unknown as Prisma.InputJsonObject,
         },
         create: {
           citizen_id: citizen_id,
           patient_id: existedPatient.patient_id,
-          questionnaire_data: triageDto as unknown as Prisma.InputJsonObject,
+          questionnaire_data:
+            questionnaireData as unknown as Prisma.InputJsonObject,
           interview_token: finalToken,
         },
       });
+      let translatedQuestionObject = data.question;
+
+      if (data.question) {
+        const promptSystem = `Bạn là một bác sĩ chuyên khoa giàu kinh nghiệm và là một dịch giả y khoa chuyên nghiệp. Nhiệm vụ của bạn là dịch toàn bộ dữ liệu phản hồi (Response JSON) từ API Chẩn đoán y khoa (Infermedica /diagnosis) từ tiếng Anh sang tiếng Việt.
+
+PHẠM VI DỊCH THUẬT (Chỉ dịch giá trị của các trường sau):
+1. Trong phần "question": Dịch các trường \`text\` (Câu hỏi), \`name\` (Tên triệu chứng/thuộc tính), \`label\` (Nhãn lựa chọn: Yes/No/Don't know -> Có/Không/Không biết).
+2. Nếu có \`explication\` (giải thích) và \`instruction\` (hướng dẫn đo khám), phải dịch chuẩn xác, dễ hiểu để bệnh nhân tự thực hiện được.
+3. Trong phần "conditions": Dịch \`name\` (Tên y khoa của bệnh) và \`common_name\` (Tên thông thường của bệnh). Dịch \`hint\` (nếu có trong \`condition_details\`).
+
+YÊU CẦU CHUYÊN MÔN Y KHOA (BẮT BUỘC):
+1. Văn phong: Tự nhiên, ân cần nhưng chuyên nghiệp, giống như bác sĩ đang trực tiếp khám bệnh. Tuyệt đối không dịch word-by-word.
+2. Từ vựng chuẩn y khoa:
+   - "Diabetes" -> "Đái tháo đường" (không dùng tiểu đường).
+   - "High blood pressure" / "Hypertension" -> "Tăng huyết áp".
+   - Các từ chỉ mức độ: "How severe/strong..." -> "Mức độ... như thế nào?". "Mild / Moderate / Severe" -> "Nhẹ / Vừa / Nặng".
+   - "Pulsing or throbbing" -> "Đau thành nhịp hoặc đau nhói".
+3. Câu hỏi tiền sử bệnh: Nếu có "Have you been diagnosed with..." hoặc "history of...", bắt buộc dịch là "Bạn có tiền sử mắc... không?".
+4. Câu hỏi thời gian (duration): Nếu câu hỏi về thời gian (How long...), dịch là "Triệu chứng [tên triệu chứng] đã kéo dài bao lâu?".
+
+QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
+1. BẢO TOÀN TẤT CẢ KEYS: Không được đổi tên bất kỳ key nào trong JSON (giữ nguyên 'id', 'type', 'text', 'items', 'choices', 'conditions', 'probability', 'extras'...).
+2. BẢO TOÀN TẤT CẢ IDs & ENUMS: KHÔNG ĐƯỢC DỊCH các giá trị id/system.
+   - Giữ nguyên \`id\` (ví dụ: "s_98", "c_130", "present", "absent", "unknown").
+   - Giữ nguyên \`type\` (ví dụ: "single", "group_single", "group_multiple", "duration").
+   - Giữ nguyên \`unit\` (ví dụ: "day", "week", "month", "year").
+   - Giữ nguyên các flag hệ thống ("should_stop": false, "has_emergency_evidence": false).
+3. ĐẦU RA BẮT BUỘC:
+   - Trả về DUY NHẤT một chuỗi JSON hợp lệ.
+   - KHÔNG bọc trong markdown (\`\`\`json).
+   - KHÔNG thêm bất kỳ câu chào hỏi hay giải thích nào ở đầu và cuối.`;
+
+        try {
+          const groq = await this.groqService
+            .groqInstance()
+            .chat.completions.create({
+              messages: [
+                {
+                  role: 'system',
+                  content: promptSystem,
+                },
+                {
+                  role: 'user',
+                  content: JSON.stringify(data.question),
+                },
+              ],
+              model: 'openai/gpt-oss-20b',
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            });
+
+          const aiResponseString = groq.choices[0]?.message?.content || '{}';
+          const parsed = JSON.parse(aiResponseString);
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            Object.keys(parsed).length > 0
+          ) {
+            translatedQuestionObject = parsed;
+          }
+        } catch (aiError) {
+          console.error('Lỗi khi dịch câu hỏi qua Groq AI:', aiError);
+          translatedQuestionObject = data.question;
+        }
+      }
       return {
         code: 200,
         message: 'Thành công',
         status: 'success',
         data: {
           ...data,
-          question: data.question,
+          question: translatedQuestionObject,
           ...(interview_token && { interview_token: interview_token }),
           should_stop: isOverLimit || !data.question,
         },
@@ -168,13 +380,18 @@ export class InfermedicaService {
 
   async triage(triageDto: TriageDto) {
     try {
+      const evidenceForApi = triageDto.evidence?.map((item) => ({
+        id: item.id,
+        choice_id: item.choice_id,
+      }));
+
       const { data } = await firstValueFrom(
         this.httpService.post('/triage', {
           sex: triageDto.sex,
           age: {
             value: triageDto.age,
           },
-          evidence: triageDto.evidence,
+          evidence: evidenceForApi,
         }),
       );
 
@@ -209,13 +426,18 @@ export class InfermedicaService {
         });
       }
 
+      const evidenceForApi = triageDto.evidence?.map((item) => ({
+        id: item.id,
+        choice_id: item.choice_id,
+      }));
+
       const { data } = await firstValueFrom(
         this.httpService.post('/recommend_specialist', {
           sex: triageDto.sex,
           age: {
             value: triageDto.age,
           },
-          evidence: triageDto.evidence,
+          evidence: evidenceForApi,
         }),
       );
 
@@ -233,6 +455,8 @@ export class InfermedicaService {
       });
 
       let best_slot_id: string | null = null;
+      let doctor: string | null = null;
+      let room: string | null = null;
 
       if (exitedSpecialty) {
         const timeZone = 'Asia/Ho_Chi_Minh';
@@ -251,6 +475,8 @@ export class InfermedicaService {
 
         if (availableSlots && availableSlots.length > 0) {
           best_slot_id = availableSlots[0].slot_id;
+          doctor = availableSlots[0].shift.staff.full_name;
+          room = availableSlots[0].shift.room.room_name;
         }
 
         if (!exitedPatientInfo) {
@@ -284,6 +510,8 @@ export class InfermedicaService {
             name: exitedSpecialty?.specialty_name,
           },
           best_slot_id: best_slot_id,
+          room: room,
+          doctor: doctor,
         },
       };
     } catch (error) {
@@ -303,6 +531,8 @@ export class InfermedicaService {
           params: {
             'age.value': Number(searchDto.age),
             phrase: searchDto.phrase,
+            include_pro: false,
+            types: 'symptom',
             max_results: 999,
           },
         }),

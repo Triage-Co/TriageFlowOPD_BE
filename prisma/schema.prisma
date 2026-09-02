@@ -141,6 +141,18 @@ enum ClinicalRoomType {
   OTHER
 }
 
+enum DisplayScreenKind {
+  KIOSK
+  TV_CLINIC
+  TV_PHARMACY
+  TV_PAYMENT
+}
+
+enum DisplayScreenStatus {
+  ENABLED
+  DISABLED
+}
+
 enum StepTypeEnum {
   REGISTRATION
   TRIAGE
@@ -206,7 +218,7 @@ model Account {
 
 model Patient {
   patient_id          String         @id @default(uuid()) @db.Uuid
-  account_id          String         @db.Uuid
+  account_id          String?         @db.Uuid
   medical_coverage_id String?        @unique
   full_name           String
   dob                 DateTime?      @db.Timestamptz()
@@ -218,7 +230,7 @@ model Patient {
   blood_type    String?
   allergy_notes String?
 
-  account        Account          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
+  account        Account?          @relation(fields: [account_id], references: [account_id], onDelete: Cascade)
   bookings       Booking[]
   patientAnswers Patient_Answer[]
   visitSessions  Visit_Session[]
@@ -412,6 +424,7 @@ model Room {
   roomServiceStats         Room_Service_Stat[]
   rebalanceSuggestionsFrom Queue_Rebalance_Suggestion[] @relation("RebalanceFromRoom")
   rebalanceSuggestionsTo   Queue_Rebalance_Suggestion[] @relation("RebalanceToRoom")
+  displayScreens           Display_Screen[]
 
   @@index([room_name, room_type])
   @@index([physical_room_id])
@@ -511,9 +524,11 @@ model Queue {
   applied_rules Json?         @db.JsonB // snapshot [{rule_code, weight}] phục vụ audit/hiển thị lý do
 
   // Override cấu trúc
-  is_pinned      Boolean   @default(false) // manual override lên đầu hàng
-  pinned_at      DateTime? @db.Timestamptz()
-  hold_positions Int? // missed-turn: phải đứng sau ít nhất n người tại thời điểm recall
+  is_pinned         Boolean   @default(false) // manual override lên đầu hàng
+  pinned_at         DateTime? @db.Timestamptz()
+  hold_positions    Int? // missed-turn: phải đứng sau ít nhất n người tại thời điểm recall
+  rebalance_locked  Boolean   @default(false) // đã điều phối 1 lần — detector bỏ qua (chống ping-pong)
+  manual_rule_codes Json?     @db.JsonB // string[] rule_code gắn tay (union với auto-match)
 
   // Lifecycle timestamps (nguồn dữ liệu cho ETA + heatmap)
   enqueued_at        DateTime  @default(now()) @db.Timestamptz() // mốc bắt đầu chờ (aging tính từ đây)
@@ -618,6 +633,7 @@ model Prescription {
   pickup_date       DateTime?              @db.Date
   called_at         DateTime?              @db.Timestamptz()
   missed_at         DateTime?              @db.Timestamptz()
+  display_screen_id String?                @db.Uuid
   created_at        DateTime               @default(now()) @db.Timestamptz()
   updated_at        DateTime               @default(now()) @updatedAt @db.Timestamptz()
 
@@ -626,11 +642,13 @@ model Prescription {
   booking             Booking?              @relation(fields: [booking_id], references: [booking_id], onDelete: Cascade)
   flow                Flow?                 @relation(fields: [flow_id], references: [flow_id], onDelete: Cascade)
   doctor              Staff?                @relation(fields: [prescribed_by], references: [staff_id], onDelete: SetNull)
+  displayScreen       Display_Screen?       @relation(fields: [display_screen_id], references: [display_screen_id], onDelete: SetNull)
   prescriptionDetails Prescription_Detail[]
 
   @@unique([pickup_date, pickup_number], map: "prescription_pickup_date_number_key")
   @@index([prescription_code])
   @@index([status, called_at, missed_at])
+  @@index([display_screen_id])
   @@map("prescription")
 }
 
@@ -858,6 +876,7 @@ model Visit_Session {
   hpi                String?  @db.Text
   pmh                String?  @db.Text
   pe                 Json?    @db.JsonB
+  manual_rule_codes  Json?    @db.JsonB // string[] rule_code gắn tay trước khi enqueue
 
   patient           Patient             @relation(fields: [patient_id], references: [patient_id], onDelete: Cascade)
   clinicalDocuments Clinical_Document[]
@@ -1253,4 +1272,30 @@ model ScheduledBlockage {
   @@index([nodeId, edgeId, status])
   @@index([startAt, endAt])
   @@map("scheduled_blockage")
+}
+
+model Display_Screen {
+  display_screen_id String              @id @default(uuid()) @db.Uuid
+  code              String              @unique
+  name              String
+  kind              DisplayScreenKind
+  status            DisplayScreenStatus @default(ENABLED)
+  room_id           String?             @db.Uuid
+  settings          Json                @default("{}")
+  created_at        DateTime            @default(now()) @db.Timestamptz()
+  updated_at        DateTime            @default(now()) @updatedAt @db.Timestamptz()
+
+  room          Room?          @relation(fields: [room_id], references: [room_id], onDelete: SetNull)
+  prescriptions Prescription[]
+
+  @@index([kind, status])
+  @@map("display_screen")
+}
+
+model Display_Pin {
+  id         String   @id @default("default")
+  pin_hash   String
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz()
+
+  @@map("display_pin")
 }

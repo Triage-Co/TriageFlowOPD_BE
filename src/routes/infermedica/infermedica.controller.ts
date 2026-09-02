@@ -5,6 +5,7 @@ import {
   Patch,
   Post,
   Query,
+  Param,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -12,6 +13,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
+  ApiBody,
 } from '@nestjs/swagger';
 import { RoleTypeEnum } from '@prisma/client';
 import { roles } from '../../shared/decorator/role.decorator';
@@ -204,6 +206,22 @@ export class InfermedicaController {
     description: 'Nhập từ câu hỏi số 2',
     type: 'string',
   })
+  @ApiBody({
+    description: 'Dữ liệu chẩn đoán (thêm name để hiển thị trên frontend)',
+    schema: {
+      example: {
+        sex: 'male',
+        age: 30,
+        evidence: [
+          {
+            id: 's_3055',
+            choice_id: 'present',
+            name: 'Diagnosed diabetes',
+          },
+        ],
+      },
+    },
+  })
   diagnoise(
     @Body() triageDto: TriageDto,
     @Query('citizen_id') citizen_id: string,
@@ -245,6 +263,22 @@ export class InfermedicaController {
       },
     },
   })
+  @ApiBody({
+    description: 'Dữ liệu triage',
+    schema: {
+      example: {
+        sex: 'male',
+        age: 30,
+        evidence: [
+          {
+            id: 's_3055',
+            choice_id: 'present',
+            name: 'Diagnosed diabetes',
+          },
+        ],
+      },
+    },
+  })
   @Post('/triage')
   triage(@Body() triageDto: TriageDto) {
     return this.infermedicaService.triage(triageDto);
@@ -260,9 +294,25 @@ export class InfermedicaController {
           specialty_id: '123-abc',
           specialty_code: 'sp_22',
           name: 'Diabetologist',
-          best_slot_id: 'slot-456-def'
+          best_slot_id: 'slot-456-def',
         },
         recommended_channel: 'personal_visit',
+      },
+    },
+  })
+  @ApiBody({
+    description: 'Dữ liệu tìm khoa khám bệnh',
+    schema: {
+      example: {
+        sex: 'male',
+        age: 30,
+        evidence: [
+          {
+            id: 's_3055',
+            choice_id: 'present',
+            name: 'Diagnosed diabetes',
+          },
+        ],
       },
     },
   })
@@ -328,6 +378,18 @@ export class InfermedicaController {
   @roles(RoleTypeEnum.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: '[ADMIN] Lấy số câu hỏi tối đa của phiên triage' })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: {
+          number_of_diagnosis: 5,
+        },
+      },
+    },
+  })
   getQuestionLimit() {
     return this.infermedicaService.getQuestionLimit();
   }
@@ -338,6 +400,25 @@ export class InfermedicaController {
   @ApiBearerAuth()
   @ApiOperation({
     summary: '[ADMIN] Cập nhật số câu hỏi tối đa của phiên triage',
+  })
+  @ApiBody({
+    schema: {
+      example: {
+        number_of_diagnosis: 5,
+      },
+    },
+  })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        code: 200,
+        message: 'Thành công',
+        status: 'success',
+        data: {
+          number_of_diagnosis: 5,
+        },
+      },
+    },
   })
   updateQuestionLimit(@Body() dto: UpdateQuestionLimitDto) {
     return this.infermedicaService.updateQuestionLimit(dto);

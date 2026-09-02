@@ -358,11 +358,14 @@ export class CronService {
     });
   }
 
+  @Cron('*/2 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
   async handleRebalanceDetector() {
     try {
-      await this.queueRebalanceService.detectAndSuggest();
-    } catch (err: any) {
-      this.logger.warn(`Failed handleRebalanceDetector cron: ${err.message}`);
+      return await this.queueRebalanceService.detectAndSuggest();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed handleRebalanceDetector cron: ${message}`);
+      return { created: 0 };
     }
   }
 }

@@ -72,3 +72,10 @@ init/data.ts
 scratch
 scratch/*
 /scratch/
+
+/scripts
+scripts
+scripts/*
+/scripts/*
+*/scripts
+*/scripts/*

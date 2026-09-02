@@ -42,6 +42,9 @@ import { PharmacyModule } from './routes/pharmacy/pharmacy.module';
 import { TicketModule } from './routes/ticket/ticket.module';
 import { ExamPackageModule } from './routes/exam-package/exam-package.module';
 import { AdminDashboardModule } from './routes/admin-dashboard/admin-dashboard.module';
+import { DisplayScreenModule } from './routes/display-screen/display-screen.module';
+
+import { HisModule } from './routes/his/his.module';
 
 @Module({
   imports: [
@@ -114,6 +117,8 @@ import { AdminDashboardModule } from './routes/admin-dashboard/admin-dashboard.m
     TicketModule,
     ExamPackageModule,
     AdminDashboardModule,
+    DisplayScreenModule,
+    HisModule,
   ],
 })
 export class AppModule {}

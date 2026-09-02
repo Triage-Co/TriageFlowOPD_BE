@@ -90,12 +90,15 @@ export class PrismaPatientRepository implements IPatientRepository {
   }
 
   delete(patient_id: string, account_id?: string): Promise<any> {
-    return this.prismaService.patient.delete({
+    return this.prismaService.patient.update({
       where: {
         patient_id: patient_id,
         ...(account_id && {
           account_id: account_id,
         }),
+      },
+      data: {
+        account_id: null,
       },
     });
   }
