@@ -663,14 +663,60 @@ export class ServiceOrderService {
         await this.serviceOrderRepository.findPendingByPatientId(patientId);
 
       const enrichedData = data.map((order: any) => {
-        const totalPrice = order.serviceOrderDetails.reduce(
-          (sum: number, detail: any) => {
-            return sum + (detail.price_at_order || 0) * (detail.quantity || 1);
-          },
-          0,
-        );
+        let totalPrice = 0;
+
+        // 1. Nếu có hóa đơn (invoices)
+        if (order.invoices && order.invoices.length > 0) {
+          const validInvoices = order.invoices.filter(
+            (inv: any) => inv.status !== 'CANCELLED',
+          );
+          const invTotal = validInvoices.reduce(
+            (sum: number, inv: any) => sum + (inv.total_amount || 0),
+            0,
+          );
+          if (invTotal > 0) {
+            totalPrice = invTotal;
+          }
+        }
+
+        // 2. Nếu là đơn thuốc (prescription)
+        if (totalPrice === 0 && order.prescription?.total_amount) {
+          totalPrice = order.prescription.total_amount;
+        }
+
+        // 3. Nếu là các dịch vụ có serviceOrderDetails
+        if (totalPrice === 0 && Array.isArray(order.serviceOrderDetails)) {
+          totalPrice = order.serviceOrderDetails.reduce(
+            (sum: number, detail: any) => {
+              return sum + (detail.price_at_order || 0) * (detail.quantity || 1);
+            },
+            0,
+          );
+        }
+
+        // Nếu là đơn thuốc và serviceOrderDetails rỗng: ánh xạ các thuốc từ prescriptionDetails
+        // vào serviceOrderDetails để client hiển thị danh sách dòng dịch vụ / thuốc đầy đủ
+        let details = order.serviceOrderDetails || [];
+        if (
+          details.length === 0 &&
+          order.prescription?.prescriptionDetails?.length > 0
+        ) {
+          details = order.prescription.prescriptionDetails.map((pd: any) => ({
+            service_order_detail_id: pd.prescription_detail_id,
+            name: pd.medicine?.medicine_name || 'Thuốc',
+            price_at_order: pd.unit_price,
+            quantity: pd.quantity,
+            dosage_instruction: pd.dosage_instruction,
+            service: {
+              service_code: pd.medicine?.medicine_code || null,
+              service_name: pd.medicine?.medicine_name || 'Thuốc',
+            },
+          }));
+        }
+
         return {
           ...order,
+          serviceOrderDetails: details,
           total_price: totalPrice,
         };
       });
