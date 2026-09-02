@@ -289,6 +289,20 @@ export class PrismaServiceOrderRepository implements IServiceOrderRepository {
             service: true,
           },
         },
+        prescription: {
+          include: {
+            prescriptionDetails: {
+              include: {
+                medicine: true,
+              },
+            },
+          },
+        },
+        invoices: {
+          include: {
+            invoice_details: true,
+          },
+        },
       },
       orderBy: {
         created_at: 'desc',
