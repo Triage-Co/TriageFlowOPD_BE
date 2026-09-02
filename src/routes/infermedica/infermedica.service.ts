@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { TriageDto, ParseDto, SearchDto } from './dto/infermedica.dto';
 import type { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { ClinicalRoomType, Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { AuthErrors } from '../../shared/exceptions/auth.exceptions';
 import { AiSpecialtyService } from '../ai-specialty/ai-specialty.service';
@@ -607,6 +607,7 @@ QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
           exitedSpecialty.specialty_id,
           currentHours,
           startOfToday,
+          ClinicalRoomType.CLINICAL_ROOM,
         );
 
         if (availableSlots && availableSlots.length > 0) {

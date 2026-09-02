@@ -6,7 +6,11 @@ import {
   QueueStatusEnum,
   QueueTypeEnum,
 } from '@prisma/client';
-import { matchConditions, orderEntries } from './queue-priority.service';
+import {
+  matchConditions,
+  orderEntries,
+  shouldAutoMatchScoringRule,
+} from './queue-priority.service';
 
 describe('QueuePriorityService Pure Functions', () => {
   describe('matchConditions', () => {
@@ -453,5 +457,60 @@ describe('QueuePriorityService.evaluateRulesForEntry', () => {
 
     expect(result.queueType).toBe(QueueTypeEnum.RETURNING);
     expect(result.basePriority).toBe(3);
+  });
+
+  it('does not auto-apply PATIENT_CATEGORY rules with empty conditions', async () => {
+    const wheelchair = makeRule({
+      rule_code: 'WHEELCHAIR',
+      rule_type: QueueRuleTypeEnum.PATIENT_CATEGORY,
+      weight: 5,
+      conditions: {},
+    });
+    const walkIn = makeRule({
+      rule_code: 'WALK_IN_BASE',
+      rule_type: QueueRuleTypeEnum.WALK_IN,
+      weight: 0,
+      conditions: {},
+    });
+    const service = createService([wheelchair, walkIn]);
+    const autoOnly = await service.evaluateRulesForEntry(baseInput);
+
+    expect(autoOnly.appliedRules.map((r) => r.rule_code)).toEqual([
+      'WALK_IN_BASE',
+    ]);
+    expect(autoOnly.basePriority).toBe(0);
+
+    const withManual = await service.evaluateRulesForEntry({
+      ...baseInput,
+      manualRuleCodes: ['WHEELCHAIR'],
+    });
+    expect(withManual.appliedRules.map((r) => r.rule_code).sort()).toEqual([
+      'WALK_IN_BASE',
+      'WHEELCHAIR',
+    ]);
+    expect(withManual.basePriority).toBe(5);
+  });
+});
+
+describe('shouldAutoMatchScoringRule', () => {
+  it('allows WALK_IN with empty conditions and rejects other empty types', () => {
+    expect(
+      shouldAutoMatchScoringRule({
+        rule_type: QueueRuleTypeEnum.WALK_IN,
+        conditions: {},
+      }),
+    ).toBe(true);
+    expect(
+      shouldAutoMatchScoringRule({
+        rule_type: QueueRuleTypeEnum.PATIENT_CATEGORY,
+        conditions: {},
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoMatchScoringRule({
+        rule_type: QueueRuleTypeEnum.PATIENT_CATEGORY,
+        conditions: { age: { lte: 6 } },
+      }),
+    ).toBe(true);
   });
 });

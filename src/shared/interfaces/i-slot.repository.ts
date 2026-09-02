@@ -1,4 +1,4 @@
-import { Booking, Prisma, Shift, Slot } from '@prisma/client';
+import { ClinicalRoomType, Prisma, Slot } from '@prisma/client';
 export type SlotWithShiftAndRoom = Prisma.SlotGetPayload<{
   include: {
     shift: {
@@ -14,6 +14,7 @@ export interface ISlotRepository {
     specialtyId: string,
     currentHours: string,
     starOfDate: Date,
+    roomType?: ClinicalRoomType,
   ): Promise<SlotWithShiftAndRoom[]>;
 
   update(
