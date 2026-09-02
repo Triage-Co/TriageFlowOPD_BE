@@ -510,6 +510,16 @@ export class BookingService {
         },
       });
 
+      await tx.service_Order_Detail.create({
+        data: {
+          service_order_id: serviceOrder.service_order_id,
+          name: examPackage.package_name,
+          price_at_order: packagePrice,
+          quantity: 1,
+          status: 'PENDING',
+        },
+      });
+
       const invoice = await tx.invoice.create({
         data: {
           service_order_id: serviceOrder.service_order_id,
@@ -1035,6 +1045,16 @@ export class BookingService {
           status: 'PENDING',
           payment_status: 'PENDING',
           package_id: package_id,
+        },
+      });
+
+      await tx.service_Order_Detail.create({
+        data: {
+          service_order_id: serviceOrder.service_order_id,
+          name: examPackage.package_name,
+          price_at_order: packagePrice,
+          quantity: 1,
+          status: 'PENDING',
         },
       });
 
