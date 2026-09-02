@@ -8,11 +8,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  Prisma,
   QueueRuleTypeEnum,
   QueueStatusEnum,
   RebalanceSuggestionStatusEnum,
   RoleTypeEnum,
-  StepTypeEnum,
 } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueGateway } from '../../shared/gateways/queue.gateway';
@@ -21,16 +21,48 @@ import {
   expectedSecFromStat,
 } from './queue-eta.service';
 import { QueuePriorityService } from './queue-priority.service';
+import type { OrderedQueueEntry } from './queue-priority.service';
 import { QueueService } from './queue.service';
 import { QueueCacheService } from './queue-cache.service';
 import {
+  computeFairInsertAt,
   DEFAULT_REBALANCE_PARAMS,
   QUEUE_REBALANCE_ENQUEUE_DEBOUNCE_MS,
+  REBALANCE_PROTECTED_TOP_N,
   REBALANCEABLE_STEP_TYPES,
   toRebalanceConfig,
 } from './queue.constants';
 
 export { REBALANCEABLE_STEP_TYPES } from './queue.constants';
+
+export function isEligibleRebalanceCandidate(
+  entry: OrderedQueueEntry,
+  serviceCode: string,
+): boolean {
+  if (entry.position < REBALANCE_PROTECTED_TOP_N) {
+    return false;
+  }
+  const q = entry.queue;
+  if (q.rebalance_locked) {
+    return false;
+  }
+  if (q.is_pinned) {
+    return false;
+  }
+  if (q.status !== QueueStatusEnum.QUEUED) {
+    return false;
+  }
+  const step = q.step;
+  const stepType = step?.step_type ?? undefined;
+  const stepServiceCode = step?.service_code ?? null;
+  if (stepServiceCode !== serviceCode) {
+    return false;
+  }
+  if (!stepType || !REBALANCEABLE_STEP_TYPES.includes(stepType)) {
+    return false;
+  }
+  return true;
+}
 
 @Injectable()
 export class QueueRebalanceService {
@@ -224,30 +256,11 @@ export class QueueRebalanceService {
       const maxRoomOrdered = await this.queuePriorityService.computeQueueOrder(
         maxRoom.roomId,
       );
-      const maxRoomExpectedSec = expectedSecFromStat(
-        statsByRoomType.get(`${maxRoom.roomId}:${StepTypeEnum.OTHER}`),
-      );
-      const minRoomExpectedSec = expectedSecFromStat(
-        statsByRoomType.get(`${minRoom.roomId}:${StepTypeEnum.OTHER}`),
-      );
 
       const candidates: typeof maxRoomOrdered = [];
       for (let i = maxRoomOrdered.length - 1; i >= 0; i--) {
         const entry = maxRoomOrdered[i];
-        const q = entry.queue;
-        const step = q.step;
-        const stepType = step?.step_type ?? undefined;
-        const stepServiceCode = step?.service_code ?? null;
-
-        // Only move patients whose step belongs to this service group
-        if (stepServiceCode !== serviceCode) continue;
-
-        if (
-          q.status === QueueStatusEnum.QUEUED &&
-          !q.is_pinned &&
-          stepType &&
-          REBALANCEABLE_STEP_TYPES.includes(stepType)
-        ) {
+        if (isEligibleRebalanceCandidate(entry, serviceCode)) {
           candidates.push(entry);
         }
       }
@@ -259,6 +272,17 @@ export class QueueRebalanceService {
         if (moved >= 3 || currentGap <= etaGapSec) break;
 
         const queueId = candidate.queue.queue_id;
+        const candidateStepType = candidate.queue.step?.step_type;
+        const maxRoomExpectedSec = expectedSecFromStat(
+          candidateStepType
+            ? statsByRoomType.get(`${maxRoom.roomId}:${candidateStepType}`)
+            : undefined,
+        );
+        const minRoomExpectedSec = expectedSecFromStat(
+          candidateStepType
+            ? statsByRoomType.get(`${minRoom.roomId}:${candidateStepType}`)
+            : undefined,
+        );
         const expiresAt = new Date(
           Date.now() + suggestionTtlMinutes * 60 * 1000,
         );
@@ -331,9 +355,10 @@ export class QueueRebalanceService {
               service_id: serviceId,
             },
           );
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
           this.logger.warn(
-            `Failed to create suggestion for queue ${queueId}: ${err.message}`,
+            `Failed to create suggestion for queue ${queueId}: ${message}`,
           );
         }
       }
@@ -366,13 +391,13 @@ export class QueueRebalanceService {
     }
 
     const now = new Date();
-    const whereCondition: any = {
+    const whereCondition: Prisma.Queue_Rebalance_SuggestionWhereInput = {
       status: RebalanceSuggestionStatusEnum.PENDING,
       expires_at: { gt: now },
+      ...(roomId
+        ? { OR: [{ from_room_id: roomId }, { to_room_id: roomId }] }
+        : {}),
     };
-    if (roomId) {
-      whereCondition.OR = [{ from_room_id: roomId }, { to_room_id: roomId }];
-    }
 
     const suggestions = await this.prisma.queue_Rebalance_Suggestion.findMany({
       where: whereCondition,
@@ -409,7 +434,7 @@ export class QueueRebalanceService {
         queue_id: s.queue_id,
         queue_number: s.queue.queue_number,
         patient_name:
-          (s.queue as any).step?.flow?.booking?.patient?.full_name || '---',
+          s.queue.step?.flow?.booking?.patient?.full_name || '---',
         eta_gain_minutes: Math.round(s.eta_gain_sec / 60),
         status: s.status,
         expires_at: s.expires_at,
@@ -488,12 +513,21 @@ export class QueueRebalanceService {
     }
 
     const oldQueueNumber = suggestion.queue.queue_number;
-    const patient = (suggestion.queue as any).step?.flow?.booking?.patient;
+    const patient = suggestion.queue.step?.flow?.booking?.patient;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const newQueueNumber = await this.queueService.generateQueueNumberForRoom(
         suggestion.to_room_id,
         tx,
+      );
+
+      const destOrder = await this.queuePriorityService.computeQueueOrder(
+        suggestion.to_room_id,
+        tx,
+      );
+      const insertAt = computeFairInsertAt(
+        destOrder,
+        suggestion.queue.enqueued_at,
       );
 
       await tx.step.update({
@@ -509,6 +543,10 @@ export class QueueRebalanceService {
         data: {
           room_id: suggestion.to_room_id,
           queue_number: newQueueNumber,
+          rebalance_locked: true,
+          hold_positions: insertAt,
+          is_pinned: false,
+          pinned_at: null,
         },
       });
 
@@ -531,20 +569,22 @@ export class QueueRebalanceService {
             suggestion_id: suggestionId,
             old_queue_number: oldQueueNumber,
             new_queue_number: newQueueNumber,
+            insert_at: insertAt,
           },
         },
       });
 
       if (patient?.account_id) {
+        const destName = suggestion.toRoom.room_name;
         await tx.notification.create({
           data: {
             account_id: patient.account_id,
-            message: `Lượt chờ của bạn đã được chuyển từ phòng ${suggestion.fromRoom.room_name} sang phòng ${suggestion.toRoom.room_name}. Số thứ tự mới của bạn là ${newQueueNumber}.`,
+            message: `Để giảm thời gian chờ, hệ thống đã ưu tiên sắp xếp quý khách sang phòng ${destName}. Vui lòng di chuyển đến phòng ${destName}. Số thứ tự mới: ${newQueueNumber}.`,
           },
         });
       }
 
-      return { newQueueNumber };
+      return { newQueueNumber, insertAt };
     });
 
     await this.queueService.broadcastRoomUpdate(suggestion.from_room_id);
