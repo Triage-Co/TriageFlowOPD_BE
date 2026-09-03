@@ -1,4 +1,10 @@
-import { Prisma, QueueRuleTypeEnum, StepTypeEnum } from '@prisma/client';
+import {
+  Prisma,
+  QueueRuleTypeEnum,
+  QueueTypeEnum,
+  StepTypeEnum,
+} from '@prisma/client';
+import { toDate, toZonedTime } from 'date-fns-tz';
 
 /** Step types allowed for cross-room load balancing (non-booking queues). */
 export const REBALANCEABLE_STEP_TYPES: StepTypeEnum[] = [
@@ -220,5 +226,89 @@ export function buildQueueDateFilter(
       },
     ],
   };
+}
+
+const DEFAULT_TZ = 'Asia/Ho_Chi_Minh';
+
+/** Normalize "15:00:00" / "9:5" → "15:00" / "09:05". */
+export function normalizeHmTime(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const parts = raw.trim().split(':');
+  if (parts.length < 2) return null;
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+export function parseSlotStartOnDate(
+  slotStartTime: string,
+  dateFormatted: string,
+  timeZone: string = DEFAULT_TZ,
+): Date | null {
+  const hm = normalizeHmTime(slotStartTime);
+  if (!hm || !dateFormatted) return null;
+  try {
+    return toDate(`${dateFormatted}T${hm}:00`, { timeZone });
+  } catch {
+    return null;
+  }
+}
+
+function isSameCalendarDay(
+  shiftDate: Date,
+  checkTime: Date,
+  timeZone: string,
+): boolean {
+  const zonedShift = toZonedTime(shiftDate, timeZone);
+  const zonedCheck = toZonedTime(checkTime, timeZone);
+  return (
+    zonedShift.getFullYear() === zonedCheck.getFullYear() &&
+    zonedShift.getMonth() === zonedCheck.getMonth() &&
+    zonedShift.getDate() === zonedCheck.getDate()
+  );
+}
+
+/** True when `checkTime` is on the shift calendar day and at/after slot start. */
+export function isAppointmentSlotDue(
+  slotStartTime: string,
+  shiftDate: Date,
+  checkTime: Date = new Date(),
+  timeZone: string = DEFAULT_TZ,
+): boolean {
+  if (!slotStartTime || !shiftDate) return false;
+  const hm = normalizeHmTime(slotStartTime);
+  if (!hm) return false;
+  if (!isSameCalendarDay(shiftDate, checkTime, timeZone)) return false;
+
+  const [startH, startM] = hm.split(':').map(Number);
+  const zonedCheck = toZonedTime(checkTime, timeZone);
+  const startMinutes = startH * 60 + startM;
+  const checkMinutes = zonedCheck.getHours() * 60 + zonedCheck.getMinutes();
+  return checkMinutes >= startMinutes;
+}
+
+/**
+ * Hold APPOINTMENT + CLINICAL off the live queue until slot start,
+ * unless the patient is physically present (`activateNow`).
+ */
+export function shouldDeferAppointmentQueue(input: {
+  activateNow?: boolean;
+  queueType: QueueTypeEnum;
+  stepType: StepTypeEnum | null | undefined;
+  slotStartTime?: string | null;
+  shiftDate?: Date | null;
+  now?: Date;
+}): boolean {
+  if (input.activateNow) return false;
+  if (input.queueType !== QueueTypeEnum.APPOINTMENT) return false;
+  if (input.stepType !== StepTypeEnum.CLINICAL) return false;
+  if (!input.slotStartTime || !input.shiftDate) return false;
+  return !isAppointmentSlotDue(
+    input.slotStartTime,
+    input.shiftDate,
+    input.now ?? new Date(),
+  );
 }
 

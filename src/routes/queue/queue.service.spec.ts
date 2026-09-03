@@ -1,9 +1,17 @@
-import { isAppointmentOnTime } from './queue.service';
+import { isAppointmentOnTime, QueueService } from './queue.service';
+import {
+  QueueStatusEnum,
+  QueueTypeEnum,
+  StepTypeEnum,
+} from '@prisma/client';
 import {
   buildQueueDateFilter,
   pickSameDayFlaggedSession,
   pickUnbookedFlaggedSession,
   resolveManualCodesForEnqueue,
+  isAppointmentSlotDue,
+  shouldDeferAppointmentQueue,
+  normalizeHmTime,
 } from './queue.constants';
 
 describe('QueueService isAppointmentOnTime', () => {
@@ -370,5 +378,285 @@ describe('resolveManualCodesForEnqueue copies visit flags when queue is empty', 
       codes: [],
       copyToQueue: false,
     });
+  });
+});
+
+describe('isAppointmentSlotDue', () => {
+  const timeZone = 'Asia/Ho_Chi_Minh';
+  const shiftDate = new Date('2026-09-03T00:00:00+07:00');
+
+  it('returns true at slot start and later the same day', () => {
+    expect(
+      isAppointmentSlotDue(
+        '15:00',
+        shiftDate,
+        new Date('2026-09-03T15:00:00+07:00'),
+        timeZone,
+      ),
+    ).toBe(true);
+    expect(
+      isAppointmentSlotDue(
+        '15:00:00',
+        shiftDate,
+        new Date('2026-09-03T15:05:00+07:00'),
+        timeZone,
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false before slot start on the same day', () => {
+    expect(
+      isAppointmentSlotDue(
+        '15:00',
+        shiftDate,
+        new Date('2026-09-03T14:59:00+07:00'),
+        timeZone,
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false on a different calendar day', () => {
+    expect(
+      isAppointmentSlotDue(
+        '15:00',
+        shiftDate,
+        new Date('2026-09-02T16:00:00+07:00'),
+        timeZone,
+      ),
+    ).toBe(false);
+  });
+
+  it('normalizes HH:mm:ss start times', () => {
+    expect(normalizeHmTime('15:00:00')).toBe('15:00');
+    expect(normalizeHmTime('9:5')).toBe('09:05');
+  });
+});
+
+describe('shouldDeferAppointmentQueue', () => {
+  const shiftDate = new Date('2026-09-03T00:00:00+07:00');
+  const noon = new Date('2026-09-03T12:00:00+07:00');
+
+  it('defers future CLINICAL APPOINTMENT slots', () => {
+    expect(
+      shouldDeferAppointmentQueue({
+        queueType: QueueTypeEnum.APPOINTMENT,
+        stepType: StepTypeEnum.CLINICAL,
+        slotStartTime: '15:00',
+        shiftDate,
+        now: noon,
+      }),
+    ).toBe(true);
+  });
+
+  it('does not defer when the slot is already due', () => {
+    expect(
+      shouldDeferAppointmentQueue({
+        queueType: QueueTypeEnum.APPOINTMENT,
+        stepType: StepTypeEnum.CLINICAL,
+        slotStartTime: '11:00',
+        shiftDate,
+        now: noon,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not defer when activateNow (check-in)', () => {
+    expect(
+      shouldDeferAppointmentQueue({
+        activateNow: true,
+        queueType: QueueTypeEnum.APPOINTMENT,
+        stepType: StepTypeEnum.CLINICAL,
+        slotStartTime: '15:00',
+        shiftDate,
+        now: noon,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not defer CLS or RETURNING', () => {
+    expect(
+      shouldDeferAppointmentQueue({
+        queueType: QueueTypeEnum.APPOINTMENT,
+        stepType: StepTypeEnum.LAB_TEST,
+        slotStartTime: '15:00',
+        shiftDate,
+        now: noon,
+      }),
+    ).toBe(false);
+    expect(
+      shouldDeferAppointmentQueue({
+        queueType: QueueTypeEnum.RETURNING,
+        stepType: StepTypeEnum.CLINICAL,
+        slotStartTime: '15:00',
+        shiftDate,
+        now: noon,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('QueueService enqueueStep appointment deferral', () => {
+  const shiftDate = new Date('2026-09-03T00:00:00+07:00');
+  const originalEngineFlag = process.env.QUEUE_ENGINE_ENABLED;
+
+  beforeAll(() => {
+    process.env.QUEUE_ENGINE_ENABLED = 'false';
+    jest.useFakeTimers({ now: new Date('2026-09-03T05:00:00.000Z') });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+    if (originalEngineFlag === undefined) {
+      delete process.env.QUEUE_ENGINE_ENABLED;
+    } else {
+      process.env.QUEUE_ENGINE_ENABLED = originalEngineFlag;
+    }
+  });
+
+  function makeStep(overrides?: {
+    startTime?: string;
+    stepType?: StepTypeEnum;
+  }) {
+    return {
+      step_id: 'step-1',
+      room_id: 'room-1',
+      step_type: overrides?.stepType ?? StepTypeEnum.CLINICAL,
+      room: { room_type: 'CLINICAL_ROOM', specialty_id: null },
+      flow: {
+        booking: {
+          patient_id: 'p1',
+          patient: { patient_id: 'p1', dob: null, gender: 'MALE' },
+          slot: {
+            start_time: overrides?.startTime ?? '15:00',
+            end_time: '15:15',
+            shift: { date: shiftDate },
+          },
+          visitSession: {
+            temperature: null,
+            heart_rate: null,
+            spo2: null,
+            blood_pressure_sys: null,
+            manual_rule_codes: ['X'],
+          },
+        },
+      },
+    };
+  }
+
+  function createService() {
+    const createdQueues: Array<Record<string, unknown>> = [];
+    const tx = {
+      step: { findUnique: jest.fn() },
+      queue: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockImplementation(async ({ data }) => {
+          const row = {
+            queue_id: 'q-1',
+            room_id: data.room_id,
+            step_id: data.step_id,
+            status: data.status,
+            queue_type: data.queue_type,
+            queue_number: data.queue_number,
+          };
+          createdQueues.push(row);
+          return row;
+        }),
+      },
+    };
+    const prisma = {
+      $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) =>
+        fn(tx),
+      ),
+      step: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ step_type: StepTypeEnum.CLINICAL }),
+      },
+    };
+    const service = new QueueService(
+      prisma as never,
+      { evaluateRulesForEntry: jest.fn() } as never,
+      {} as never,
+      { emitQueueUpdate: jest.fn() } as never,
+      { scheduleDetectAndSuggest: jest.fn() } as never,
+      {} as never,
+      {
+        invalidateRoom: jest.fn(),
+        getDisplayPayload: jest.fn(),
+        setDisplayPayload: jest.fn(),
+      } as never,
+    );
+    jest.spyOn(service, 'broadcastRoomUpdate').mockResolvedValue(undefined);
+    return { service, tx, createdQueues };
+  }
+
+  it('creates PENDING for a future CLINICAL appointment', async () => {
+    const { service, tx } = createService();
+    tx.step.findUnique.mockResolvedValue(makeStep({ startTime: '15:00' }));
+
+    const result = await service.enqueueStep(
+      'step-1',
+      QueueTypeEnum.APPOINTMENT,
+    );
+
+    expect(result.status).toBe(QueueStatusEnum.PENDING);
+    expect(tx.queue.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: QueueStatusEnum.PENDING }),
+      }),
+    );
+  });
+
+  it('creates QUEUED when the appointment slot is already due', async () => {
+    const { service, tx } = createService();
+    tx.step.findUnique.mockResolvedValue(makeStep({ startTime: '11:00' }));
+
+    const result = await service.enqueueStep(
+      'step-1',
+      QueueTypeEnum.APPOINTMENT,
+    );
+
+    expect(result.status).toBe(QueueStatusEnum.QUEUED);
+  });
+
+  it('creates QUEUED when activateNow even if the slot is in the future', async () => {
+    const { service, tx } = createService();
+    tx.step.findUnique.mockResolvedValue(makeStep({ startTime: '15:00' }));
+
+    const result = await service.enqueueStep(
+      'step-1',
+      QueueTypeEnum.APPOINTMENT,
+      undefined,
+      { activateNow: true },
+    );
+
+    expect(result.status).toBe(QueueStatusEnum.QUEUED);
+  });
+
+  it('does not defer CLS appointment steps', async () => {
+    const { service, tx } = createService();
+    tx.step.findUnique.mockResolvedValue(
+      makeStep({ startTime: '15:00', stepType: StepTypeEnum.LAB_TEST }),
+    );
+
+    const result = await service.enqueueStep(
+      'step-1',
+      QueueTypeEnum.APPOINTMENT,
+    );
+
+    expect(result.status).toBe(QueueStatusEnum.QUEUED);
+  });
+
+  it('does not defer RETURNING', async () => {
+    const { service, tx } = createService();
+    tx.step.findUnique.mockResolvedValue(makeStep({ startTime: '15:00' }));
+
+    const result = await service.enqueueStep(
+      'step-1',
+      QueueTypeEnum.RETURNING,
+    );
+
+    expect(result.status).toBe(QueueStatusEnum.QUEUED);
   });
 });

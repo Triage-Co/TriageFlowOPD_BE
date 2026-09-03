@@ -633,10 +633,7 @@ export class QueueAdminService {
       let maxCurrentWaitMinutes = 0;
 
       for (const q of roomQueues) {
-        if (
-          q.status === QueueStatusEnum.QUEUED ||
-          q.status === QueueStatusEnum.PENDING
-        ) {
+        if (q.status === QueueStatusEnum.QUEUED) {
           waitingCount++;
 
           const enqueuedAt = q.enqueued_at

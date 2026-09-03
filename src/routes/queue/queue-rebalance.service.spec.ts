@@ -35,9 +35,7 @@ function legacyTotalWaitingSecByRoom(
       (q) => q.status === QueueStatusEnum.SERVING,
     );
     const waiting = roomQueues.filter(
-      (q) =>
-        q.status === QueueStatusEnum.PENDING ||
-        q.status === QueueStatusEnum.QUEUED,
+      (q) => q.status === QueueStatusEnum.QUEUED,
     );
     const roomStats = stats.filter((s) => s.room_id === roomId);
     const stepMap = buildStepTypeExpectedSecMap(roomStats);
@@ -152,7 +150,7 @@ describe('rebalance totalWaitingSec aggregate vs legacy computeEtaForRoom loop',
 
     assertMapsEqual(nextGen, legacy);
     expect(nextGen.has('orphan')).toBe(false);
-    expect(nextGen.get(roomA)).toBe(0 + 481 + 720);
+    expect(nextGen.get(roomA)).toBe(0 + 481);
   });
 
   it('returns 0 for a room with no queues (callers use ?? 0)', () => {

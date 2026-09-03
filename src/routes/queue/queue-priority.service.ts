@@ -16,6 +16,8 @@ import { formatInTimeZone, toDate } from 'date-fns-tz';
 import {
   buildQueueDateFilter,
   FLAGGABLE_RULE_TYPES,
+  isAppointmentSlotDue,
+  parseSlotStartOnDate,
   parseStringCodeList,
 } from './queue.constants';
 
@@ -571,7 +573,6 @@ export class QueuePriorityService {
     const db = tx || this.prisma;
     const now = new Date();
     const dateFormatted = formatInTimeZone(now, TIME_ZONE, 'yyyy-MM-dd');
-    const nowHm = formatInTimeZone(now, TIME_ZONE, 'HH:mm');
     const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
       timeZone: TIME_ZONE,
     });
@@ -579,7 +580,7 @@ export class QueuePriorityService {
       timeZone: TIME_ZONE,
     });
 
-    const dueSteps = await db.step.findMany({
+    const todaySteps = await db.step.findMany({
       where: {
         room_id: roomId,
         step_status: {
@@ -588,7 +589,6 @@ export class QueuePriorityService {
         flow: {
           booking: {
             slot: {
-              start_time: { lte: nowHm },
               shift: {
                 date: { gte: startOfDay, lte: endOfDay },
               },
@@ -615,7 +615,18 @@ export class QueuePriorityService {
       },
     });
 
-    if (!dueSteps || dueSteps.length === 0) return;
+    const dueSteps = (todaySteps || []).filter((step) => {
+      const slot = step.flow?.booking?.slot;
+      if (!slot?.start_time || !slot.shift?.date) return false;
+      return isAppointmentSlotDue(
+        slot.start_time,
+        new Date(slot.shift.date),
+        now,
+        TIME_ZONE,
+      );
+    });
+
+    if (dueSteps.length === 0) return;
 
     for (const step of dueSteps) {
       const activeQueue = (step.queues || []).find(
@@ -624,20 +635,18 @@ export class QueuePriorityService {
           q.status !== QueueStatusEnum.CANCELLED,
       );
 
-      if (!activeQueue) {
-        const slotStartTimeStr = step.flow?.booking?.slot?.start_time;
-        let enqueuedAt = now;
-        if (slotStartTimeStr) {
-          try {
-            const parsed = toDate(`${dateFormatted}T${slotStartTimeStr}:00`, {
-              timeZone: TIME_ZONE,
-            });
-            if (parsed <= now) enqueuedAt = parsed;
-          } catch {
-            enqueuedAt = now;
-          }
-        }
+      const slotStartTimeStr = step.flow?.booking?.slot?.start_time;
+      let enqueuedAt = now;
+      if (slotStartTimeStr) {
+        const parsed = parseSlotStartOnDate(
+          slotStartTimeStr,
+          dateFormatted,
+          TIME_ZONE,
+        );
+        if (parsed && parsed <= now) enqueuedAt = parsed;
+      }
 
+      if (!activeQueue) {
         const count = await db.queue.count({
           where: {
             room_id: roomId,
@@ -670,19 +679,6 @@ export class QueuePriorityService {
           },
         });
       } else if (activeQueue.status === QueueStatusEnum.PENDING) {
-        const slotStartTimeStr = step.flow?.booking?.slot?.start_time;
-        let enqueuedAt = activeQueue.enqueued_at || now;
-        if (slotStartTimeStr) {
-          try {
-            const parsed = toDate(`${dateFormatted}T${slotStartTimeStr}:00`, {
-              timeZone: TIME_ZONE,
-            });
-            if (parsed <= now) enqueuedAt = parsed;
-          } catch {
-            // fallback
-          }
-        }
-
         await db.queue.update({
           where: { queue_id: activeQueue.queue_id },
           data: {
@@ -693,6 +689,99 @@ export class QueuePriorityService {
         });
       }
     }
+  }
+
+  /**
+   * Promote all due PENDING appointment queues (any room). Returns affected room IDs.
+   */
+  async activateDueAppointmentQueues(
+    tx?: Prisma.TransactionClient,
+  ): Promise<string[]> {
+    const db = tx || this.prisma;
+    const now = new Date();
+    const dateFormatted = formatInTimeZone(now, TIME_ZONE, 'yyyy-MM-dd');
+    const startOfDay = toDate(`${dateFormatted}T00:00:00`, {
+      timeZone: TIME_ZONE,
+    });
+    const endOfDay = toDate(`${dateFormatted}T23:59:59.999`, {
+      timeZone: TIME_ZONE,
+    });
+
+    const pendingQueues = await db.queue.findMany({
+      where: {
+        status: QueueStatusEnum.PENDING,
+        step: {
+          flow: {
+            booking: {
+              slot: {
+                shift: {
+                  date: { gte: startOfDay, lte: endOfDay },
+                },
+              },
+            },
+          },
+        },
+      },
+      include: {
+        step: {
+          include: {
+            flow: {
+              include: {
+                booking: {
+                  include: {
+                    slot: {
+                      include: {
+                        shift: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const roomIds = new Set<string>();
+
+    for (const queue of pendingQueues) {
+      const slot = queue.step?.flow?.booking?.slot;
+      if (!slot?.start_time || !slot.shift?.date) continue;
+      if (
+        !isAppointmentSlotDue(
+          slot.start_time,
+          new Date(slot.shift.date),
+          now,
+          TIME_ZONE,
+        )
+      ) {
+        continue;
+      }
+
+      let enqueuedAt = queue.enqueued_at || now;
+      const parsed = parseSlotStartOnDate(
+        slot.start_time,
+        dateFormatted,
+        TIME_ZONE,
+      );
+      if (parsed && parsed <= now) enqueuedAt = parsed;
+
+      const roomId = queue.room_id || queue.step?.room_id || null;
+
+      await db.queue.update({
+        where: { queue_id: queue.queue_id },
+        data: {
+          status: QueueStatusEnum.QUEUED,
+          enqueued_at: enqueuedAt,
+          ...(roomId && !queue.room_id ? { room_id: roomId } : {}),
+        },
+      });
+
+      if (roomId) roomIds.add(roomId);
+    }
+
+    return [...roomIds];
   }
 
   async computeQueueOrder(
@@ -723,7 +812,7 @@ export class QueuePriorityService {
 
     const entries = await db.queue.findMany({
       where: {
-        status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
+        status: QueueStatusEnum.QUEUED,
         AND: [
           buildQueueDateFilter(startOfDay, endOfDay),
           {

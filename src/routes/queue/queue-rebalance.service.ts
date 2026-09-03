@@ -178,11 +178,7 @@ export class QueueRebalanceService {
       this.prisma.queue.findMany({
         where: {
           status: {
-            in: [
-              QueueStatusEnum.PENDING,
-              QueueStatusEnum.QUEUED,
-              QueueStatusEnum.SERVING,
-            ],
+            in: [QueueStatusEnum.QUEUED, QueueStatusEnum.SERVING],
           },
         },
         select: {

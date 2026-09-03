@@ -449,6 +449,8 @@ export class TicketService {
           const created = await this.queueService.enqueueStep(
             step.step_id,
             queueType,
+            undefined,
+            { activateNow: true },
           );
           queueNumber = created.queue_number;
         } else if (activeQueue.status === QueueStatusEnum.PENDING) {
@@ -467,7 +469,7 @@ export class TicketService {
             step.step_id,
             queueType,
             undefined,
-            { forceType: true },
+            { forceType: true, activateNow: true },
           );
           queueNumber = repaired.queue_number;
         }

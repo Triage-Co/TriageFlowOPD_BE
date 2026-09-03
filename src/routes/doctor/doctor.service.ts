@@ -9,6 +9,7 @@ import {
   ClinicalRoomType,
   Prisma,
   PrismaClient,
+  QueueStatusEnum,
   RoleTypeEnum,
 } from '@prisma/client';
 import { PrismaService } from '../../shared/config/prisma.service';
@@ -379,26 +380,25 @@ export class DoctorService {
 
   async getPatients(staff_id: string, dateStr?: string) {
     try {
-      const whereCondition: any = {
-        step: {
-          staff_id: staff_id,
-        },
-      };
-
       const timeZone = 'Asia/Ho_Chi_Minh';
       const targetDate = dateStr ? new Date(dateStr) : new Date();
       const dateString = formatInTimeZone(targetDate, timeZone, 'yyyy-MM-dd');
-
       const start = toDate(`${dateString}T00:00:00`, { timeZone });
       const end = toDate(`${dateString}T23:59:59.999`, { timeZone });
 
-      whereCondition.step.flow = {
-        booking: {
-          slot: {
-            shift: {
-              date: {
-                gte: start,
-                lte: end,
+      const whereCondition: Prisma.QueueWhereInput = {
+        status: { not: QueueStatusEnum.PENDING },
+        step: {
+          staff_id: staff_id,
+          flow: {
+            booking: {
+              slot: {
+                shift: {
+                  date: {
+                    gte: start,
+                    lte: end,
+                  },
+                },
               },
             },
           },

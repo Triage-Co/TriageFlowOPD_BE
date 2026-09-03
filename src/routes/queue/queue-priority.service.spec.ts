@@ -514,3 +514,167 @@ describe('shouldAutoMatchScoringRule', () => {
     ).toBe(true);
   });
 });
+
+describe('QueuePriorityService appointment activation', () => {
+  const shiftDate = new Date('2026-09-03T00:00:00+07:00');
+
+  beforeAll(() => {
+    jest.useFakeTimers({ now: new Date('2026-09-03T05:00:00.000Z') });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
+  function createPriorityService() {
+    const prisma = {
+      step: { findMany: jest.fn() },
+      queue: {
+        findMany: jest.fn(),
+        count: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      room: { findUnique: jest.fn().mockResolvedValue({ room_type: null, specialty_id: null }) },
+      queue_Priority_Rule: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const cache = { bumpRulesVersion: jest.fn() };
+    const { QueuePriorityService } = jest.requireActual(
+      './queue-priority.service',
+    ) as typeof import('./queue-priority.service');
+    const service = new QueuePriorityService(prisma as never, cache as never);
+    return { service, prisma };
+  }
+
+  function dueStep(status: QueueStatusEnum | null) {
+    return {
+      step_id: 'step-due',
+      room_id: 'room-1',
+      step_status: 'PENDING',
+      flow: {
+        booking: {
+          patient: { dob: null, gender: 'MALE' },
+          slot: {
+            start_time: '11:00',
+            shift: { date: shiftDate },
+          },
+        },
+      },
+      queues: status
+        ? [
+            {
+              queue_id: 'q-due',
+              status,
+              enqueued_at: new Date('2026-09-03T04:00:00.000Z'),
+              room_id: 'room-1',
+            },
+          ]
+        : [],
+    };
+  }
+
+  function futureStep() {
+    return {
+      step_id: 'step-future',
+      room_id: 'room-1',
+      step_status: 'PENDING',
+      flow: {
+        booking: {
+          patient: { dob: null, gender: 'MALE' },
+          slot: {
+            start_time: '15:00',
+            shift: { date: shiftDate },
+          },
+        },
+      },
+      queues: [
+        {
+          queue_id: 'q-future',
+          status: QueueStatusEnum.PENDING,
+          enqueued_at: new Date('2026-09-03T04:00:00.000Z'),
+          room_id: 'room-1',
+        },
+      ],
+    };
+  }
+
+  it('promotes PENDING to QUEUED when the slot is due', async () => {
+    const { service, prisma } = createPriorityService();
+    prisma.step.findMany.mockResolvedValue([dueStep(QueueStatusEnum.PENDING), futureStep()]);
+
+    await service.autoEnqueueDueAppointments('room-1');
+
+    expect(prisma.queue.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { queue_id: 'q-due' },
+        data: expect.objectContaining({ status: QueueStatusEnum.QUEUED }),
+      }),
+    );
+    expect(prisma.queue.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ where: { queue_id: 'q-future' } }),
+    );
+  });
+
+  it('does not list PENDING entries in computeQueueOrder', async () => {
+    const { service, prisma } = createPriorityService();
+    prisma.step.findMany.mockResolvedValue([]);
+    prisma.queue.findMany.mockResolvedValue([]);
+
+    await service.computeQueueOrder('room-1');
+
+    expect(prisma.queue.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: QueueStatusEnum.QUEUED,
+        }),
+      }),
+    );
+  });
+
+  it('activateDueAppointmentQueues promotes only due PENDING rows', async () => {
+    const { service, prisma } = createPriorityService();
+    prisma.queue.findMany.mockResolvedValue([
+      {
+        queue_id: 'q-due',
+        room_id: 'room-1',
+        status: QueueStatusEnum.PENDING,
+        enqueued_at: new Date('2026-09-03T04:00:00.000Z'),
+        step: {
+          room_id: 'room-1',
+          flow: {
+            booking: {
+              slot: { start_time: '11:00:00', shift: { date: shiftDate } },
+            },
+          },
+        },
+      },
+      {
+        queue_id: 'q-future',
+        room_id: 'room-2',
+        status: QueueStatusEnum.PENDING,
+        enqueued_at: new Date('2026-09-03T04:00:00.000Z'),
+        step: {
+          room_id: 'room-2',
+          flow: {
+            booking: {
+              slot: { start_time: '15:00', shift: { date: shiftDate } },
+            },
+          },
+        },
+      },
+    ]);
+    prisma.queue.update.mockResolvedValue({});
+
+    const roomIds = await service.activateDueAppointmentQueues();
+
+    expect(roomIds).toEqual(['room-1']);
+    expect(prisma.queue.update).toHaveBeenCalledTimes(1);
+    expect(prisma.queue.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { queue_id: 'q-due' },
+        data: expect.objectContaining({ status: QueueStatusEnum.QUEUED }),
+      }),
+    );
+  });
+});

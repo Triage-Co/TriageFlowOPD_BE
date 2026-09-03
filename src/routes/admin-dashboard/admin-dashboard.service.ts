@@ -47,7 +47,7 @@ export class AdminDashboardService {
       this.prisma.service.count({ where: { is_active: true } }),
       this.prisma.queue.count({
         where: {
-          status: { in: [QueueStatusEnum.QUEUED, QueueStatusEnum.PENDING] },
+          status: QueueStatusEnum.QUEUED,
           ...buildQueueDateFilter(startOfDay, endOfDay),
         },
       }),
