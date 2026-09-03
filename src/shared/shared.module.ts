@@ -21,6 +21,8 @@ import { PrismaTriageInformationRepository } from './repositories/prisma-triage-
 import { PrismaSlotRepository } from './repositories/prisma-slot.repository';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './guards/jwt.strategy';
+import { IsAuthGuard } from './guards/is-auth.guard';
+import { IsKioskGuard } from './guards/is_kiosk.guard';
 import { PrismaSpecialtyRepository } from './repositories/prisma-specialty.repository';
 import { PrismaServiceOrderDetailRepository } from './repositories/prisma-service-order-detail.repository';
 import { PrismaServiceOrderRepository } from './repositories/prisma-service-order.repository';
@@ -36,6 +38,8 @@ import { GroqService } from './config/groq.service';
   imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
   providers: [
     JwtStrategy,
+    IsAuthGuard,
+    IsKioskGuard,
     ConfigService,
     SupabaseService,
     PrismaService,
@@ -164,6 +168,8 @@ import { GroqService } from './config/groq.service';
     'IInvoiceRepository',
     'IInvoiceDetailRepository',
     'IRoomServiceRepository',
+    IsAuthGuard,
+    IsKioskGuard,
     PassportModule,
   ],
 })

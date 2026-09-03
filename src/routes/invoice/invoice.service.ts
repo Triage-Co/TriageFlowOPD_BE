@@ -18,7 +18,12 @@ import type { IPatientRepository } from '../../shared/interfaces/i-patient.repos
 import type { IServiceOrderRepository } from '../../shared/interfaces/i-service-order.repository';
 import { QueryPatientBillingDto } from './dto/query-patient-billing.dto';
 
-type AuthUser = { sub?: string; id?: string };
+type AuthUser = {
+  sub?: string;
+  id?: string;
+  patient?: { patient_id?: string; [key: string]: unknown };
+  [key: string]: unknown;
+};
 
 type VisitPaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID';
 
@@ -246,6 +251,34 @@ export class InvoiceService {
   }
 
   private async assertPatientAccess(patientId: string, reqUser: AuthUser) {
+    if (!reqUser) {
+      throw new ForbiddenException('Không xác định được người dùng đăng nhập');
+    }
+
+    // 1. Trường hợp truy cập từ Kiosk:
+    // Token Kiosk chứa thông tin bệnh nhân (trường patient hoặc sub/id là patient_id)
+    const isKioskPatient =
+      reqUser.patient?.patient_id === patientId ||
+      reqUser.sub === patientId ||
+      reqUser.id === patientId;
+
+    if (isKioskPatient) {
+      const patient =
+        await this.patientRepository.findOneWithPatientId(patientId);
+      if (!patient) {
+        throw new NotFoundException('Không tìm thấy hồ sơ bệnh nhân');
+      }
+      return;
+    }
+
+    // Nếu là token Kiosk nhưng đang cố truy cập patientId của người khác
+    if (reqUser.patient) {
+      throw new ForbiddenException(
+        'Bạn không có quyền xem hóa đơn của bệnh nhân này',
+      );
+    }
+
+    // 2. Trường hợp truy cập từ Web/App tài khoản (USER / STAFF):
     const accountId = reqUser.sub || reqUser.id;
     if (!accountId) {
       throw new ForbiddenException('Không xác định được tài khoản đăng nhập');
@@ -337,8 +370,14 @@ export class InvoiceService {
     bookingMeta: BillingOrderRaw['booking'] | null,
     detailed: boolean,
   ) {
-    const paidFlags = orders.map((order) => this.isOrderPaid(order));
-    const mappedOrders = orders.map((order) => this.mapOrder(order, detailed));
+    const payableOrders = orders.filter(
+      (order) => this.resolveOrderAmount(order) > 0,
+    );
+
+    const paidFlags = payableOrders.map((order) => this.isOrderPaid(order));
+    const mappedOrders = payableOrders.map((order) =>
+      this.mapOrder(order, detailed),
+    );
     const totalAmount = mappedOrders.reduce(
       (sum, order) => sum + order.amount,
       0,
@@ -490,7 +529,7 @@ export class InvoiceService {
 
   private resolveVisitPaymentStatus(paidFlags: boolean[]): VisitPaymentStatus {
     if (paidFlags.length === 0) {
-      return 'UNPAID';
+      return 'PAID';
     }
     const paidCount = paidFlags.filter(Boolean).length;
     if (paidCount === paidFlags.length) {

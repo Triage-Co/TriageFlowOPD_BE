@@ -36,9 +36,9 @@ export class InvoiceController {
   @UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '[USER / STAFF] Chi tiết hóa đơn theo lần khám',
+    summary: '[USER / STAFF / KIOSK] Chi tiết hóa đơn theo lần khám',
     description:
-      'Trả về các đơn dịch vụ, line items hóa đơn và giao dịch của một booking. Bệnh nhân (USER) chỉ xem được hồ sơ mình sở hữu.',
+      'Trả về các đơn dịch vụ, line items hóa đơn và giao dịch của một booking. Bệnh nhân (USER / KIOSK) chỉ xem được hồ sơ mình sở hữu.',
   })
   @ApiParam({ name: 'patient_id', description: 'ID bệnh nhân' })
   @ApiParam({ name: 'booking_id', description: 'ID lần khám / booking' })
@@ -48,7 +48,7 @@ export class InvoiceController {
   getPatientVisitBilling(
     @Param('patient_id', ParseUUIDPipe) patientId: string,
     @Param('booking_id', ParseUUIDPipe) bookingId: string,
-    @Req() req: { user: { sub?: string; id?: string } },
+    @Req() req: any,
   ) {
     return this.invoiceService.getPatientVisitBilling(
       patientId,
@@ -61,9 +61,9 @@ export class InvoiceController {
   @UseGuards(orGuard(IsAuthGuard, IsKioskGuard))
   @ApiBearerAuth()
   @ApiOperation({
-    summary: '[USER / STAFF] Tổng hợp hóa đơn bệnh nhân theo lần khám',
+    summary: '[USER / STAFF / KIOSK] Tổng hợp hóa đơn bệnh nhân theo lần khám',
     description:
-      'Danh sách đơn dịch vụ nhóm theo lần khám (booking), kèm summary tổng nợ / đã thanh toán. Bệnh nhân (USER) chỉ xem được hồ sơ mình sở hữu.',
+      'Danh sách đơn dịch vụ nhóm theo lần khám (booking), kèm summary tổng nợ / đã thanh toán. Bệnh nhân (USER / KIOSK) chỉ xem được hồ sơ mình sở hữu.',
   })
   @ApiParam({ name: 'patient_id', description: 'ID bệnh nhân' })
   @ApiOkResponse({
@@ -74,7 +74,7 @@ export class InvoiceController {
   getPatientBilling(
     @Param('patient_id', ParseUUIDPipe) patientId: string,
     @Query() query: QueryPatientBillingDto,
-    @Req() req: { user: { sub?: string; id?: string } },
+    @Req() req: any,
   ) {
     return this.invoiceService.getPatientBilling(patientId, query, req.user);
   }
