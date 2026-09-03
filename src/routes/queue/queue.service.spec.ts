@@ -159,6 +159,9 @@ describe('QueueService Payload Builders', () => {
       queue_id: 'q-1',
       queue_number: 'A001',
       serving_started_at: expect.any(Date),
+      appointment_time: null,
+      slot_start_time: null,
+      slot_end_time: null,
       patient: {
         patient_id: 'pat-1',
         full_name: 'Nguyen Van A',
@@ -240,6 +243,9 @@ describe('QueueService Payload Builders', () => {
       finished_at: expect.any(Date),
       duration_minutes: 15,
       refusal_reason: 'Bệnh nhân xin hủy do có việc bận',
+      appointment_time: null,
+      slot_start_time: null,
+      slot_end_time: null,
       patient: {
         patient_id: 'pat-2',
         full_name: 'Tran Thi B',
@@ -327,6 +333,9 @@ describe('QueueService Payload Builders', () => {
       queue_id: 'q-missed-1',
       queue_number: 'A005',
       patient_name: 'Le Van Missed',
+      appointment_time: null,
+      slot_start_time: null,
+      slot_end_time: null,
       missed_at: expect.any(Date),
     });
   });

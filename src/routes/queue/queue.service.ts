@@ -85,6 +85,12 @@ const SERVING_STEP_INCLUDE = {
               },
             },
           },
+          slot: {
+            select: {
+              start_time: true,
+              end_time: true,
+            },
+          },
         },
       },
     },
@@ -1255,6 +1261,12 @@ export class QueueService {
                 booking: {
                   include: {
                     patient: true,
+                    slot: {
+                      select: {
+                        start_time: true,
+                        end_time: true,
+                      },
+                    },
                   },
                 },
               },
@@ -1291,22 +1303,42 @@ export class QueueService {
       serving,
       upcoming_patients: upcomingOrder.slice(0, 7).map((entry) => {
         const etaInfo = etaMap.get(entry.queue.queue_id);
+        const slot = entry.queue.step?.flow?.booking?.slot;
+        const appointmentTime = slot?.start_time
+          ? slot.end_time
+            ? `${slot.start_time} - ${slot.end_time}`
+            : slot.start_time
+          : null;
         return {
           queue_id: entry.queue.queue_id,
           queue_number: entry.queue.queue_number,
           patient_name:
             entry.queue.step?.flow?.booking?.patient?.full_name || '---',
+          appointment_time: appointmentTime,
+          slot_start_time: slot?.start_time ?? null,
+          slot_end_time: slot?.end_time ?? null,
           queue_type: entry.queue.queue_type,
           priority_reasons: entry.reasons,
           eta_minutes: etaInfo ? Math.round(etaInfo.etaSec / 60) : 0,
         };
       }),
-      missing: missingEntries.map((m) => ({
-        queue_id: m.queue_id,
-        queue_number: m.queue_number,
-        patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
-        missed_at: m.missed_at,
-      })),
+      missing: missingEntries.map((m) => {
+        const slot = m.step?.flow?.booking?.slot;
+        const appointmentTime = slot?.start_time
+          ? slot.end_time
+            ? `${slot.start_time} - ${slot.end_time}`
+            : slot.start_time
+          : null;
+        return {
+          queue_id: m.queue_id,
+          queue_number: m.queue_number,
+          patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
+          appointment_time: appointmentTime,
+          slot_start_time: slot?.start_time ?? null,
+          slot_end_time: slot?.end_time ?? null,
+          missed_at: m.missed_at,
+        };
+      }),
       redirected_patients: redirectedPatients,
       timestamp: new Date().toISOString(),
     };
@@ -1662,7 +1694,7 @@ export class QueueService {
         data: {
           queue_id: queueId,
           action_type: 'RECALLED',
-          actor_account_id: user.id,
+          actor_account_id: toValidUuidOrNull(user?.id),
         },
       });
 
@@ -1674,154 +1706,9 @@ export class QueueService {
     return {
       code: 200,
       status: 'success',
-      message: 'Đã gọi lại bệnh nhân vào hàng chờ.',
+      message: 'Đã gọi lại lượt lỡ.',
       data: updated,
     };
-  }
-
-  async getFlaggableRules() {
-    const data = await this.queuePriorityService.getFlaggableRules();
-    return {
-      code: 200,
-      status: 'success',
-      message: 'Lấy danh sách quy tắc có thể gắn cờ thành công.',
-      data,
-    };
-  }
-
-  async assertValidManualRuleCodes(codes: string[]): Promise<string[]> {
-    return this.validateAndNormalizeManualCodes(codes);
-  }
-
-  async updateQueueManualRuleCodes(
-    queueId: string,
-    codes: string[],
-    user: { id: string; role: string },
-  ) {
-    const queue = await this.prisma.queue.findUnique({
-      where: { queue_id: queueId },
-    });
-    if (!queue || !queue.room_id) {
-      throw new NotFoundException('Không tìm thấy lượt chờ.');
-    }
-    await this.assertCanManageRoom(user, queue.room_id);
-    const normalized = await this.validateAndNormalizeManualCodes(codes);
-    const updated = await this.applyManualCodesToQueue(
-      queue.queue_id,
-      normalized,
-    );
-    await this.broadcastRoomUpdate(queue.room_id);
-    return {
-      code: 200,
-      status: 'success',
-      message: 'Đã cập nhật cờ quy tắc ưu tiên.',
-      data: updated,
-    };
-  }
-
-  async applyManualRuleCodesForVisit(
-    visitSessionId: string,
-    codes: string[],
-  ): Promise<void> {
-    const normalized = await this.validateAndNormalizeManualCodes(codes);
-    const visit = await this.prisma.visit_Session.findUnique({
-      where: { visit_session_id: visitSessionId },
-      select: { booking_id: true },
-    });
-    if (!visit?.booking_id) {
-      return;
-    }
-
-    const queues = await this.prisma.queue.findMany({
-      where: {
-        status: {
-          notIn: [QueueStatusEnum.FINISHED, QueueStatusEnum.CANCELLED],
-        },
-        step: { flow: { booking_id: visit.booking_id } },
-      },
-      select: { queue_id: true, room_id: true },
-    });
-
-    const roomIds = new Set<string>();
-    for (const q of queues) {
-      await this.applyManualCodesToQueue(q.queue_id, normalized);
-      if (q.room_id) roomIds.add(q.room_id);
-    }
-    for (const roomId of roomIds) {
-      await this.broadcastRoomUpdate(roomId);
-    }
-  }
-
-  private async validateAndNormalizeManualCodes(
-    codes: string[],
-  ): Promise<string[]> {
-    const normalized = parseStringCodeList(codes);
-    if (normalized.length === 0) {
-      return [];
-    }
-    const flaggable = await this.queuePriorityService.getFlaggableRules();
-    const allowed = new Set(flaggable.map((r) => r.rule_code));
-    const invalid = normalized.filter((c) => !allowed.has(c));
-    if (invalid.length > 0) {
-      throw new BadRequestException(
-        `rule_code không hợp lệ hoặc không gắn được: ${invalid.join(', ')}`,
-      );
-    }
-    return normalized;
-  }
-
-  private async applyManualCodesToQueue(
-    queueId: string,
-    codes: string[],
-  ): Promise<Queue> {
-    return this.prisma.$transaction(async (tx) => {
-      const queue = await tx.queue.findUnique({
-        where: { queue_id: queueId },
-        include: {
-          step: {
-            include: {
-              room: true,
-              flow: {
-                include: {
-                  booking: {
-                    include: {
-                      patient: true,
-                      slot: { include: { shift: true } },
-                      visitSession: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-      if (!queue?.step) {
-        throw new NotFoundException('Không tìm thấy lượt chờ.');
-      }
-
-      const {
-        basePriority,
-        appliedRules,
-        queueType: typeOverride,
-      } = await this.evaluatePriorityForStep(
-        queue.step,
-        queue.queue_type,
-        queue.missed_count ?? 0,
-        tx,
-        codes,
-      );
-
-      return tx.queue.update({
-        where: { queue_id: queueId },
-        data: {
-          manual_rule_codes: codes,
-          base_priority: basePriority,
-          applied_rules: appliedRules ?? undefined,
-          queue_type: typeOverride ?? queue.queue_type,
-        },
-      });
-    });
   }
 
   async getRoomQueueView(roomId: string, user: { id: string; role: string }) {
@@ -1848,7 +1735,24 @@ export class QueueService {
       },
       include: {
         step: {
-          include: SERVING_STEP_INCLUDE,
+          include: {
+            ...SERVING_STEP_INCLUDE,
+            flow: {
+              include: {
+                booking: {
+                  include: {
+                    patient: true,
+                    slot: {
+                      select: {
+                        start_time: true,
+                        end_time: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
@@ -1878,6 +1782,12 @@ export class QueueService {
                 booking: {
                   include: {
                     patient: true,
+                    slot: {
+                      select: {
+                        start_time: true,
+                        end_time: true,
+                      },
+                    },
                   },
                 },
               },
@@ -1948,6 +1858,12 @@ export class QueueService {
           );
           const etaInfo = etaMap.get(entry.queue.queue_id);
           const etaMinutes = etaInfo ? Math.round(etaInfo.etaSec / 60) : 0;
+          const slot = entry.queue.step?.flow?.booking?.slot;
+          const appointmentTime = slot?.start_time
+            ? slot.end_time
+              ? `${slot.start_time} - ${slot.end_time}`
+              : slot.start_time
+            : null;
 
           return {
             position: entry.position,
@@ -1955,6 +1871,9 @@ export class QueueService {
             queue_number: entry.queue.queue_number,
             patient_name:
               entry.queue.step?.flow?.booking?.patient?.full_name || '---',
+            appointment_time: appointmentTime,
+            slot_start_time: slot?.start_time ?? null,
+            slot_end_time: slot?.end_time ?? null,
             queue_type: entry.queue.queue_type,
             effective_score: entry.effectiveScore,
             reasons: entry.reasons,
@@ -1968,12 +1887,23 @@ export class QueueService {
             eta_time: etaInfo?.etaTime || null,
           };
         }),
-        missing: missingEntries.map((m) => ({
-          queue_id: m.queue_id,
-          queue_number: m.queue_number,
-          patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
-          missed_at: m.missed_at,
-        })),
+        missing: missingEntries.map((m) => {
+          const slot = m.step?.flow?.booking?.slot;
+          const appointmentTime = slot?.start_time
+            ? slot.end_time
+              ? `${slot.start_time} - ${slot.end_time}`
+              : slot.start_time
+            : null;
+          return {
+            queue_id: m.queue_id,
+            queue_number: m.queue_number,
+            patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
+            appointment_time: appointmentTime,
+            slot_start_time: slot?.start_time ?? null,
+            slot_end_time: slot?.end_time ?? null,
+            missed_at: m.missed_at,
+          };
+        }),
         finished: finishedEntries.map((f) => this.buildFinishedPayload(f)),
       },
     };
@@ -1981,13 +1911,23 @@ export class QueueService {
 
   buildServingPayload(servingQueue: any) {
     const step = servingQueue.step;
-    const patient = step?.flow?.booking?.patient ?? null;
+    const booking = step?.flow?.booking ?? null;
+    const patient = booking?.patient ?? null;
+    const slot = booking?.slot ?? null;
     const so = step?.service_order ?? null;
+    const appointmentTime = slot?.start_time
+      ? slot.end_time
+        ? `${slot.start_time} - ${slot.end_time}`
+        : slot.start_time
+      : null;
 
     return {
       queue_id: servingQueue.queue_id,
       queue_number: servingQueue.queue_number,
       serving_started_at: servingQueue.serving_started_at,
+      appointment_time: appointmentTime,
+      slot_start_time: slot?.start_time ?? null,
+      slot_end_time: slot?.end_time ?? null,
       patient: patient
         ? {
             patient_id: patient.patient_id,
@@ -2012,14 +1952,14 @@ export class QueueService {
             service_order_id: so.service_order_id,
             name: so.name,
             status: so.status,
-            details: (so.serviceOrderDetails || []).map((d: any) => ({
-              service_order_detail_id: d.service_order_detail_id,
-              name: d.name || d.service?.service_name || null,
-              service_id: d.service_id,
-              service_code: d.service?.service_code || null,
-              service_name: d.service?.service_name || null,
-              quantity: d.quantity,
-              status: d.status,
+            details: (so.serviceOrderDetails || []).map((detail: any) => ({
+              service_order_detail_id: detail.service_order_detail_id,
+              name: detail.name || detail.service?.service_name,
+              service_id: detail.service_id,
+              service_code: detail.service?.service_code,
+              service_name: detail.service?.service_name,
+              quantity: detail.quantity,
+              status: detail.status,
             })),
           }
         : null,
@@ -2028,7 +1968,9 @@ export class QueueService {
 
   buildFinishedPayload(finishedQueue: any) {
     const step = finishedQueue.step;
-    const patient = step?.flow?.booking?.patient ?? null;
+    const booking = step?.flow?.booking ?? null;
+    const patient = booking?.patient ?? null;
+    const slot = booking?.slot ?? null;
     const so = step?.service_order ?? null;
     const moveLog = finishedQueue.moveLogs?.[0] ?? null;
 
@@ -2049,6 +1991,12 @@ export class QueueService {
       );
     }
 
+    const appointmentTime = slot?.start_time
+      ? slot.end_time
+        ? `${slot.start_time} - ${slot.end_time}`
+        : slot.start_time
+      : null;
+
     return {
       queue_id: finishedQueue.queue_id,
       queue_number: finishedQueue.queue_number,
@@ -2058,6 +2006,9 @@ export class QueueService {
       finished_at: finishedQueue.finished_at ?? finishedQueue.updated_at,
       duration_minutes: durationMinutes,
       refusal_reason: moveLog?.reason ?? null,
+      appointment_time: appointmentTime,
+      slot_start_time: slot?.start_time ?? null,
+      slot_end_time: slot?.end_time ?? null,
       patient: patient
         ? {
             patient_id: patient.patient_id,

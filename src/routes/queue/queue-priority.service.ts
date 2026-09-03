@@ -55,6 +55,7 @@ export type QueueOrderStep = {
   flow?: {
     booking?: {
       patient?: { full_name: string } | null;
+      slot?: { start_time: string; end_time: string } | null;
     } | null;
   } | null;
 };
@@ -108,6 +109,12 @@ const QUEUE_ORDER_SELECT = {
             select: {
               patient: {
                 select: { full_name: true },
+              },
+              slot: {
+                select: {
+                  start_time: true,
+                  end_time: true,
+                },
               },
             },
           },
