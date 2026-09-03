@@ -85,6 +85,12 @@ const SERVING_STEP_INCLUDE = {
               },
             },
           },
+          slot: {
+            select: {
+              start_time: true,
+              end_time: true,
+            },
+          },
         },
       },
     },
@@ -1255,6 +1261,12 @@ export class QueueService {
                 booking: {
                   include: {
                     patient: true,
+                    slot: {
+                      select: {
+                        start_time: true,
+                        end_time: true,
+                      },
+                    },
                   },
                 },
               },
@@ -1291,22 +1303,42 @@ export class QueueService {
       serving,
       upcoming_patients: upcomingOrder.slice(0, 7).map((entry) => {
         const etaInfo = etaMap.get(entry.queue.queue_id);
+        const slot = entry.queue.step?.flow?.booking?.slot;
+        const appointmentTime = slot?.start_time
+          ? slot.end_time
+            ? `${slot.start_time} - ${slot.end_time}`
+            : slot.start_time
+          : null;
         return {
           queue_id: entry.queue.queue_id,
           queue_number: entry.queue.queue_number,
           patient_name:
             entry.queue.step?.flow?.booking?.patient?.full_name || '---',
+          appointment_time: appointmentTime,
+          slot_start_time: slot?.start_time ?? null,
+          slot_end_time: slot?.end_time ?? null,
           queue_type: entry.queue.queue_type,
           priority_reasons: entry.reasons,
           eta_minutes: etaInfo ? Math.round(etaInfo.etaSec / 60) : 0,
         };
       }),
-      missing: missingEntries.map((m) => ({
-        queue_id: m.queue_id,
-        queue_number: m.queue_number,
-        patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
-        missed_at: m.missed_at,
-      })),
+      missing: missingEntries.map((m) => {
+        const slot = m.step?.flow?.booking?.slot;
+        const appointmentTime = slot?.start_time
+          ? slot.end_time
+            ? `${slot.start_time} - ${slot.end_time}`
+            : slot.start_time
+          : null;
+        return {
+          queue_id: m.queue_id,
+          queue_number: m.queue_number,
+          patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
+          appointment_time: appointmentTime,
+          slot_start_time: slot?.start_time ?? null,
+          slot_end_time: slot?.end_time ?? null,
+          missed_at: m.missed_at,
+        };
+      }),
       redirected_patients: redirectedPatients,
       timestamp: new Date().toISOString(),
     };
@@ -1878,6 +1910,12 @@ export class QueueService {
                 booking: {
                   include: {
                     patient: true,
+                    slot: {
+                      select: {
+                        start_time: true,
+                        end_time: true,
+                      },
+                    },
                   },
                 },
               },
@@ -1948,6 +1986,12 @@ export class QueueService {
           );
           const etaInfo = etaMap.get(entry.queue.queue_id);
           const etaMinutes = etaInfo ? Math.round(etaInfo.etaSec / 60) : 0;
+          const slot = entry.queue.step?.flow?.booking?.slot;
+          const appointmentTime = slot?.start_time
+            ? slot.end_time
+              ? `${slot.start_time} - ${slot.end_time}`
+              : slot.start_time
+            : null;
 
           return {
             position: entry.position,
@@ -1955,6 +1999,9 @@ export class QueueService {
             queue_number: entry.queue.queue_number,
             patient_name:
               entry.queue.step?.flow?.booking?.patient?.full_name || '---',
+            appointment_time: appointmentTime,
+            slot_start_time: slot?.start_time ?? null,
+            slot_end_time: slot?.end_time ?? null,
             queue_type: entry.queue.queue_type,
             effective_score: entry.effectiveScore,
             reasons: entry.reasons,
@@ -1968,12 +2015,23 @@ export class QueueService {
             eta_time: etaInfo?.etaTime || null,
           };
         }),
-        missing: missingEntries.map((m) => ({
-          queue_id: m.queue_id,
-          queue_number: m.queue_number,
-          patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
-          missed_at: m.missed_at,
-        })),
+        missing: missingEntries.map((m) => {
+          const slot = m.step?.flow?.booking?.slot;
+          const appointmentTime = slot?.start_time
+            ? slot.end_time
+              ? `${slot.start_time} - ${slot.end_time}`
+              : slot.start_time
+            : null;
+          return {
+            queue_id: m.queue_id,
+            queue_number: m.queue_number,
+            patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
+            appointment_time: appointmentTime,
+            slot_start_time: slot?.start_time ?? null,
+            slot_end_time: slot?.end_time ?? null,
+            missed_at: m.missed_at,
+          };
+        }),
         finished: finishedEntries.map((f) => this.buildFinishedPayload(f)),
       },
     };
@@ -1981,13 +2039,23 @@ export class QueueService {
 
   buildServingPayload(servingQueue: any) {
     const step = servingQueue.step;
-    const patient = step?.flow?.booking?.patient ?? null;
+    const booking = step?.flow?.booking ?? null;
+    const patient = booking?.patient ?? null;
+    const slot = booking?.slot ?? null;
     const so = step?.service_order ?? null;
+    const appointmentTime = slot?.start_time
+      ? slot.end_time
+        ? `${slot.start_time} - ${slot.end_time}`
+        : slot.start_time
+      : null;
 
     return {
       queue_id: servingQueue.queue_id,
       queue_number: servingQueue.queue_number,
       serving_started_at: servingQueue.serving_started_at,
+      appointment_time: appointmentTime,
+      slot_start_time: slot?.start_time ?? null,
+      slot_end_time: slot?.end_time ?? null,
       patient: patient
         ? {
             patient_id: patient.patient_id,
@@ -2028,7 +2096,9 @@ export class QueueService {
 
   buildFinishedPayload(finishedQueue: any) {
     const step = finishedQueue.step;
-    const patient = step?.flow?.booking?.patient ?? null;
+    const booking = step?.flow?.booking ?? null;
+    const patient = booking?.patient ?? null;
+    const slot = booking?.slot ?? null;
     const so = step?.service_order ?? null;
     const moveLog = finishedQueue.moveLogs?.[0] ?? null;
 
@@ -2049,6 +2119,12 @@ export class QueueService {
       );
     }
 
+    const appointmentTime = slot?.start_time
+      ? slot.end_time
+        ? `${slot.start_time} - ${slot.end_time}`
+        : slot.start_time
+      : null;
+
     return {
       queue_id: finishedQueue.queue_id,
       queue_number: finishedQueue.queue_number,
@@ -2058,6 +2134,9 @@ export class QueueService {
       finished_at: finishedQueue.finished_at ?? finishedQueue.updated_at,
       duration_minutes: durationMinutes,
       refusal_reason: moveLog?.reason ?? null,
+      appointment_time: appointmentTime,
+      slot_start_time: slot?.start_time ?? null,
+      slot_end_time: slot?.end_time ?? null,
       patient: patient
         ? {
             patient_id: patient.patient_id,
