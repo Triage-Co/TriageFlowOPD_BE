@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/config/prisma.service';
 import { QueueRebalanceService } from '../queue/queue-rebalance.service';
+import { QueuePriorityService } from '../queue/queue-priority.service';
+import { QueueService } from '../queue/queue.service';
 import {
   BookingStatusEnum,
   FlowStatusEnum,
@@ -21,6 +23,8 @@ export class CronService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly queueRebalanceService: QueueRebalanceService,
+    private readonly queuePriorityService: QueuePriorityService,
+    private readonly queueService: QueueService,
   ) {}
 
   @Cron('1 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
@@ -356,6 +360,26 @@ export class CronService {
         status: 'CANCELLED',
       },
     });
+  }
+
+  @Cron('*/1 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+  async activateDueAppointmentQueues() {
+    try {
+      const roomIds =
+        await this.queuePriorityService.activateDueAppointmentQueues();
+      for (const roomId of roomIds) {
+        await this.queueService.broadcastRoomUpdate(roomId);
+      }
+      return {
+        message: 'Kích hoạt lịch hẹn đã tới giờ thành công',
+        activatedRooms: roomIds.length,
+        roomIds,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed activateDueAppointmentQueues cron: ${message}`);
+      return { activatedRooms: 0, roomIds: [] as string[] };
+    }
   }
 
   @Cron('*/2 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })

@@ -31,14 +31,21 @@ import { QueueRebalanceService } from './queue-rebalance.service';
 import { QueueCacheService } from './queue-cache.service';
 import {
   buildQueueDateFilter,
+  parseSlotStartOnDate,
   parseStringCodeList,
   pickSameDayFlaggedSession,
   resolveManualCodesForEnqueue,
+  shouldDeferAppointmentQueue,
   REBALANCE_REDIRECT_OVERLAY_MS,
   REBALANCEABLE_STEP_TYPES,
 } from './queue.constants';
 import { StepService } from '../step/step.service';
 import { ScanQueueDto } from './dto/create-queue.dto';
+
+export {
+  isAppointmentSlotDue,
+  shouldDeferAppointmentQueue,
+} from './queue.constants';
 
 const ACTIVE_SOD_STATUSES: ServiceOrderDetailStatusEnum[] = [
   ServiceOrderDetailStatusEnum.PENDING,
@@ -375,12 +382,13 @@ export class QueueService {
   /**
    * Create (or repair/retype) a queue entry for a step.
    * @param options.forceType - when true, update queue_type + re-evaluate priority on existing entry
+   * @param options.activateNow - patient is present (check-in); always enter live QUEUED
    */
   async enqueueStep(
     stepId: string,
     queueType: QueueTypeEnum,
     tx?: Prisma.TransactionClient,
-    options?: { forceType?: boolean },
+    options?: { forceType?: boolean; activateNow?: boolean },
   ): Promise<Queue> {
     const execute = async (prismaTx: Prisma.TransactionClient) => {
       const step = await prismaTx.step.findUnique({
@@ -437,11 +445,48 @@ export class QueueService {
         const needsRetype =
           options?.forceType === true && existingQueue.queue_type !== queueType;
 
-        if (!needsRepair && !needsRetype && !needsCopyFlags) {
-          return existingQueue;
+        const baseType = needsRetype ? queueType : existingQueue.queue_type;
+        const deferExisting = shouldDeferAppointmentQueue({
+          activateNow: options?.activateNow,
+          queueType: baseType,
+          stepType: step.step_type,
+          slotStartTime: step.flow?.booking?.slot?.start_time,
+          shiftDate: step.flow?.booking?.slot?.shift?.date
+            ? new Date(step.flow.booking.slot.shift.date)
+            : null,
+        });
+
+        let nextStatus = existingQueue.status;
+        let nextEnqueuedAt: Date | undefined;
+        if (
+          existingQueue.status === QueueStatusEnum.PENDING &&
+          !deferExisting
+        ) {
+          nextStatus = QueueStatusEnum.QUEUED;
+          if (options?.activateNow) {
+            nextEnqueuedAt = new Date();
+          } else {
+            const dateFormatted = formatInTimeZone(
+              new Date(),
+              VN_TZ,
+              'yyyy-MM-dd',
+            );
+            const slotStart = step.flow?.booking?.slot?.start_time;
+            nextEnqueuedAt =
+              (slotStart
+                ? parseSlotStartOnDate(slotStart, dateFormatted, VN_TZ)
+                : null) ?? new Date();
+          }
         }
 
-        const baseType = needsRetype ? queueType : existingQueue.queue_type;
+        if (
+          !needsRepair &&
+          !needsRetype &&
+          !needsCopyFlags &&
+          nextStatus === existingQueue.status
+        ) {
+          return existingQueue;
+        }
 
         const {
           basePriority,
@@ -463,10 +508,8 @@ export class QueueService {
             base_priority: basePriority,
             applied_rules: appliedRules ?? undefined,
             ...(needsCopyFlags ? { manual_rule_codes: manualCodes } : {}),
-            status:
-              existingQueue.status === QueueStatusEnum.PENDING
-                ? QueueStatusEnum.QUEUED
-                : existingQueue.status,
+            status: nextStatus,
+            ...(nextEnqueuedAt ? { enqueued_at: nextEnqueuedAt } : {}),
           },
         });
       }
@@ -496,17 +539,28 @@ export class QueueService {
         manualCodes,
       );
 
+      const resolvedType = typeOverride ?? queueType;
+      const deferNew = shouldDeferAppointmentQueue({
+        activateNow: options?.activateNow,
+        queueType: resolvedType,
+        stepType: step.step_type,
+        slotStartTime: step.flow?.booking?.slot?.start_time,
+        shiftDate: step.flow?.booking?.slot?.shift?.date
+          ? new Date(step.flow.booking.slot.shift.date)
+          : null,
+      });
+
       return prismaTx.queue.create({
         data: {
           step_id: stepId,
           room_id: step.room_id,
           queue_number: nextNumber,
-          queue_type: typeOverride ?? queueType,
+          queue_type: resolvedType,
           base_priority: basePriority,
           applied_rules: appliedRules ?? undefined,
           ...(copyToQueue ? { manual_rule_codes: manualCodes } : {}),
           enqueued_at: new Date(),
-          status: QueueStatusEnum.QUEUED,
+          status: deferNew ? QueueStatusEnum.PENDING : QueueStatusEnum.QUEUED,
         },
       });
     };
@@ -831,7 +885,7 @@ export class QueueService {
         const stepQueue = await tx.queue.findFirst({
           where: {
             step_id: stepId,
-            status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
+            status: QueueStatusEnum.QUEUED,
             OR: [{ room_id: roomId }, { room_id: null }],
           },
         });
@@ -862,7 +916,7 @@ export class QueueService {
       const updateResult = await tx.queue.updateMany({
         where: {
           queue_id: nextQueueId,
-          status: { in: [QueueStatusEnum.PENDING, QueueStatusEnum.QUEUED] },
+          status: QueueStatusEnum.QUEUED,
         },
         data: {
           status: QueueStatusEnum.CALLED,

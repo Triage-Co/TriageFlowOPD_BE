@@ -199,9 +199,7 @@ export function computeRoomTotalWaitingSec(
   const servingType = serving?.step?.step_type || StepTypeEnum.OTHER;
   const servingExpectedSec = stepTypeExpectedSecMap.get(servingType) ?? 900;
   const waiting = roomQueues.filter(
-    (q) =>
-      q.status === QueueStatusEnum.PENDING ||
-      q.status === QueueStatusEnum.QUEUED,
+    (q) => q.status === QueueStatusEnum.QUEUED,
   );
   const waitingInput = waiting.map((q) => ({
     queueId: q.queue_id,
