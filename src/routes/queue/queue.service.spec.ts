@@ -258,6 +258,78 @@ describe('QueueService Payload Builders', () => {
       service_order: null,
     });
   });
+
+  it('buildRoomDisplayPayload should include missing patients list', async () => {
+    const mockRoom = {
+      room_id: 'room-1',
+      room_name: 'Phòng 101',
+      specialty: { specialty_name: 'Khoa Nội' },
+    };
+
+    const mockMissingQueue = [
+      {
+        queue_id: 'q-missed-1',
+        queue_number: 'A005',
+        missed_at: new Date('2026-09-03T09:00:00.000Z'),
+        step: {
+          flow: {
+            booking: {
+              patient: {
+                full_name: 'Le Van Missed',
+              },
+            },
+          },
+        },
+      },
+    ];
+
+    const prismaMock = {
+      queue: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue(mockMissingQueue),
+      },
+      room: {
+        findUnique: jest.fn().mockResolvedValue(mockRoom),
+      },
+      staff: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      shift: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      queue_Rebalance_Suggestion: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    const queuePriorityServiceMock = {
+      computeQueueOrder: jest.fn().mockResolvedValue([]),
+    };
+
+    const queueEtaServiceMock = {
+      computeEtaForRoom: jest.fn().mockResolvedValue({ entries: [] }),
+    };
+
+    const testService = new QueueService(
+      prismaMock as never,
+      queuePriorityServiceMock as never,
+      queueEtaServiceMock as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const payload = await (testService as any).buildRoomDisplayPayload('room-1');
+
+    expect(payload.missing).toHaveLength(1);
+    expect(payload.missing[0]).toEqual({
+      queue_id: 'q-missed-1',
+      queue_number: 'A005',
+      patient_name: 'Le Van Missed',
+      missed_at: expect.any(Date),
+    });
+  });
 });
 
 describe('pickSameDayFlaggedSession', () => {

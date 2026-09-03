@@ -1239,6 +1239,32 @@ export class QueueService {
 
     const redirectedPatients = await this.getRedirectedPatientsForRoom(roomId);
 
+    const startOfDay = getStartOfDayVn();
+    const endOfDay = getEndOfDayVn();
+    const missingEntries = await this.prisma.queue.findMany({
+      where: {
+        room_id: roomId,
+        status: QueueStatusEnum.MISSING,
+        ...buildQueueDateFilter(startOfDay, endOfDay),
+      },
+      include: {
+        step: {
+          include: {
+            flow: {
+              include: {
+                booking: {
+                  include: {
+                    patient: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { missed_at: 'asc' },
+    });
+
     return {
       room_info: {
         specialty_name: room?.specialty?.specialty_name || 'KHOA KHÁM BỆNH',
@@ -1275,6 +1301,12 @@ export class QueueService {
           eta_minutes: etaInfo ? Math.round(etaInfo.etaSec / 60) : 0,
         };
       }),
+      missing: missingEntries.map((m) => ({
+        queue_id: m.queue_id,
+        queue_number: m.queue_number,
+        patient_name: m.step?.flow?.booking?.patient?.full_name || '---',
+        missed_at: m.missed_at,
+      })),
       redirected_patients: redirectedPatients,
       timestamp: new Date().toISOString(),
     };
