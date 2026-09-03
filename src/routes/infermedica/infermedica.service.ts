@@ -91,7 +91,7 @@ CORE PRINCIPLES:
                   content: parseDto.question,
                 },
               ],
-              model: 'openai/gpt-oss-20b',
+              model: 'openai/gpt-oss-120b',
               temperature: 0.1,
             });
 
@@ -174,7 +174,7 @@ QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
                   content: JSON.stringify(data),
                 },
               ],
-              model: 'openai/gpt-oss-20b',
+              model: 'openai/gpt-oss-120b',
               temperature: 0.1,
               response_format: { type: 'json_object' },
             });
@@ -470,7 +470,7 @@ QUY TẮC BẢO TOÀN CẤU TRÚC JSON (NGHIÊM NGẶT):
                   content: JSON.stringify(data.question),
                 },
               ],
-              model: 'openai/gpt-oss-20b',
+              model: 'openai/gpt-oss-120b',
               temperature: 0.1,
               response_format: { type: 'json_object' },
             });
