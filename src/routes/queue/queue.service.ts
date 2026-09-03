@@ -36,6 +36,7 @@ import {
   pickSameDayFlaggedSession,
   resolveManualCodesForEnqueue,
   shouldDeferAppointmentQueue,
+  CHECKED_IN_ACTION,
   REBALANCE_REDIRECT_OVERLAY_MS,
   REBALANCEABLE_STEP_TYPES,
 } from './queue.constants';
@@ -976,6 +977,8 @@ export class QueueService {
           },
           status: {
             in: [
+              QueueStatusEnum.PENDING,
+              QueueStatusEnum.QUEUED,
               QueueStatusEnum.CALLED,
               QueueStatusEnum.MISSING,
               QueueStatusEnum.SERVING,
@@ -1026,6 +1029,40 @@ export class QueueService {
       };
     }
 
+    // PENDING ticket -> Check-in early & activate into QUEUED
+    if (queueItem.status === QueueStatusEnum.PENDING) {
+      const now = new Date();
+      await this.prisma.$transaction(async (tx) => {
+        await tx.queue.update({
+          where: { queue_id: queueItem.queue_id },
+          data: {
+            status: QueueStatusEnum.QUEUED,
+            enqueued_at: queueItem.enqueued_at || now,
+            room_id: room_id,
+          },
+        });
+
+        await tx.move_Log.create({
+          data: {
+            queue_id: queueItem.queue_id,
+            action_type: CHECKED_IN_ACTION,
+            actor_account_id: user.id,
+            reason: 'Quét vé check-in đưa vào hàng chờ',
+          },
+        });
+      });
+
+      const displayPayload = await this.getRoomDisplayPayload(room_id, staff_id);
+      await this.broadcastRoomUpdate(room_id, staff_id, displayPayload);
+
+      return {
+        code: 200,
+        status: 'success',
+        message: 'Check-in thành công. Bệnh nhân đã được đưa vào hàng chờ.',
+        data: displayPayload,
+      };
+    }
+
     // Edge Case 2: MISSING ticket -> Recall back to QUEUED
     if (queueItem.status === QueueStatusEnum.MISSING) {
       const rules = await this.queuePriorityService.getActiveRules();
@@ -1064,8 +1101,11 @@ export class QueueService {
       };
     }
 
-    // Normal case: CALLED -> SERVING
-    if (queueItem.status === QueueStatusEnum.CALLED) {
+    // Normal case: QUEUED or CALLED -> SERVING
+    if (
+      queueItem.status === QueueStatusEnum.QUEUED ||
+      queueItem.status === QueueStatusEnum.CALLED
+    ) {
       const now = new Date();
       await this.prisma.$transaction(async (tx) => {
         await tx.queue.update({

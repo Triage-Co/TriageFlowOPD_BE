@@ -289,6 +289,8 @@ export function isAppointmentSlotDue(
   return checkMinutes >= startMinutes;
 }
 
+export const CHECKED_IN_ACTION = 'CHECKED_IN';
+
 /**
  * Hold APPOINTMENT + CLINICAL off the live queue until slot start,
  * unless the patient is physically present (`activateNow`).
